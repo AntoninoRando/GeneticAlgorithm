@@ -16,6 +16,26 @@
 #include "tree_operators.h"
 
 using namespace std;
+// -----------------------------------------------------------------------------
+
+
+/*
+    This file defines the SchedulerGP class, which implements a genetic 
+    programming algorithm to evolve expression trees that can be used as priority functions for
+    scheduling jobs on satellites.
+
+    The main SchedulerGP method is solve(), which runs the GP algorithm and 
+    returns the best individual found (i.e., the expression tree with the 
+    highest fitness).
+    
+    The fitness of an individual is determined by the amount of jobs it manages
+    to complete. That is, an expression tree which, when used as a priority 
+    function in the greedy decoder, allowed to complete more jobs will be 
+    considered more fit than an expression tree which, when used under the 
+    same conditions of jobs and satellites, allowed to complete fewer jobs.
+*/
+
+
 
 #pragma region TYPES -----------------------------------------------------------
 struct GPIndividual {
@@ -31,9 +51,11 @@ struct GPIndividual {
 
 
 #pragma region ALGORITHM -------------------------------------------------------
-
 class SchedulerGP {
 public:
+    static constexpr int kStatusPrintEveryGenerations = 50;
+    static constexpr int kRandomTreesToPrint = 3;
+
     SchedulerGP(vector<Satellite> satellites, vector<Job> jobs)
         : satellites_(move(satellites))
         , jobs_(move(jobs))
@@ -46,13 +68,14 @@ public:
         ops_.setTerminalCount(static_cast<int>(registry_.size()));
     }
 
-    // ── Main entry point ─────────────────────────────────────────────────────
+    
+    
+    #pragma region PUBLIC API --------------------------------------------------
     GPIndividual solve(int populationSize  = 200,
                        int generations     = 300,
                        double crossoverRate = 0.80,
                        double mutationRate  = 0.08)
     {
-        // Initialise population with ramped half-and-half.
         vector<ExprNode> seeds = builder_.rampedHalfAndHalf(populationSize, 2, 6);
         vector<GPIndividual> population(populationSize);
         for (int i = 0; i < populationSize; ++i) {
@@ -110,7 +133,7 @@ public:
             const GPIndividual& genBest = *max_element(population.begin(), population.end());
             if (genBest.result.fitness > best.result.fitness) best = genBest;
 
-            if ((gen + 1) % 50 == 0 || gen == generations - 1) {
+            if ((gen + 1) % kStatusPrintEveryGenerations == 0 || gen == generations - 1) {
                 cout << "Gen " << setw(4) << gen + 1
                      << " | Fitness: "  << fixed << setprecision(2) << best.result.fitness
                      << " | Jobs: "     << best.result.scheduledJobs << "/" << jobs_.size()
@@ -118,6 +141,8 @@ public:
                      << " | Conflicts: "<< best.result.conflicts
                      << " | Late: "     << best.result.lateness
                      << " | TreeSize: " << best.tree.size() << "\n";
+
+                printRandomPopulationTrees(population);
             }
         }
 
@@ -203,6 +228,7 @@ public:
     const vector<TerminalDef>& registry() const { return registry_; }
 
 private:
+    #pragma region FIELDS ------------------------------------------------------
     vector<Satellite>    satellites_;
     vector<Job>          jobs_;
     mt19937              rng_;
@@ -210,7 +236,22 @@ private:
     TreeBuilder          builder_;
     GreedyDecoder        decoder_;
     TreeOperators        ops_;
+    #pragma endregion ----------------------------------------------------------
 
+
+    
+    const GPIndividual& tournamentSelect(const vector<GPIndividual>& pop, int k) {
+        int best = randomInt(0, static_cast<int>(pop.size()) - 1);
+        for (int i = 1; i < k; ++i) {
+            int cand = randomInt(0, static_cast<int>(pop.size()) - 1);
+            if (pop[cand].result.fitness > pop[best].result.fitness) best = cand;
+        }
+        return pop[best];
+    }
+
+
+
+    #pragma region UTILITIES ---------------------------------------------------
     double randomReal() {
         uniform_real_distribution<double> d{0.0, 1.0};
         return d(rng_);
@@ -220,14 +261,27 @@ private:
         return d(rng_);
     }
 
-    const GPIndividual& tournamentSelect(const vector<GPIndividual>& pop, int k) {
-        int best = randomInt(0, static_cast<int>(pop.size()) - 1);
-        for (int i = 1; i < k; ++i) {
-            int cand = randomInt(0, static_cast<int>(pop.size()) - 1);
-            if (pop[cand].result.fitness > pop[best].result.fitness) best = cand;
-        }
-        return pop[best];
-    }
-};
+    /// @brief Prints the summary of a few random trees from the population 
+    /// for insight into diversity.
+    void printRandomPopulationTrees(const vector<GPIndividual>& population) {
+        if (population.empty()) return;
 
-#pragma endregion
+        vector<int> indices(population.size());
+        for (int i = 0; i < static_cast<int>(indices.size()); ++i) {
+            indices[i] = i;
+        }
+        shuffle(indices.begin(), indices.end(), rng_);
+
+        const int treesToPrint = min(kRandomTreesToPrint, static_cast<int>(population.size()));
+        for (int i = 0; i < treesToPrint; ++i) {
+            const GPIndividual& individual = population[indices[i]];
+            cout << "  Tree sample " << (i + 1)
+                 << " | Fitness: " << fixed << setprecision(2) << individual.result.fitness
+                 << " | Size: " << individual.tree.size()
+                 << " | Expr: " << individual.tree.toString(registry_)
+                 << "\n";
+        }
+    }
+    #pragma endregion ----------------------------------------------------------
+};
+#pragma endregion --------------------------------------------------------------

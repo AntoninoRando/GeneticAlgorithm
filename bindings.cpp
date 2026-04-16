@@ -1,6 +1,6 @@
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>   // needed for vector conversion
-#include "scheduler.h"     
+#include "scheduler/scheduler_gp.h"
 
 namespace py = pybind11;
 
@@ -34,16 +34,15 @@ PYBIND11_MODULE(scheduler, m) {
         .def_readwrite("initialDeadline", &Job::initialDeadline)
         .def_readwrite("remainingDeadline", &Job::remainingDeadline);
 
-    py::class_<Individual>(m, "Individual")
-        .def_readonly("fitness", &Individual::fitness)
-        .def_readonly("scheduledJobs", &Individual::scheduledJobs)
-        .def_readonly("servedPriority", &Individual::servedPriority)
-        .def_readonly("conflicts", &Individual::conflicts)
-        .def_readonly("lateness", &Individual::lateness)
-        .def_readonly("genes", &Individual::genes);
+    py::class_<GPIndividual>(m, "Individual")
+        .def_property_readonly("fitness", [](const GPIndividual& ind) { return ind.result.fitness; })
+        .def_property_readonly("scheduledJobs", [](const GPIndividual& ind) { return ind.result.scheduledJobs; })
+        .def_property_readonly("servedPriority", [](const GPIndividual& ind) { return ind.result.servedPriority; })
+        .def_property_readonly("conflicts", [](const GPIndividual& ind) { return ind.result.conflicts; })
+        .def_property_readonly("lateness", [](const GPIndividual& ind) { return ind.result.lateness; });
 
-    py::class_<SchedulerGA>(m, "SchedulerGA")
+    py::class_<SchedulerGP>(m, "SchedulerGA")
         .def(py::init<std::vector<Satellite>, std::vector<Job>>())
-        .def("solve", &SchedulerGA::solve)
-        .def("printSchedule", &SchedulerGA::printSchedule);
+        .def("solve", &SchedulerGP::solve)
+        .def("printSchedule", &SchedulerGP::printSchedule);
 }

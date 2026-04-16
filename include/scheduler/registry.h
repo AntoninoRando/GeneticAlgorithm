@@ -11,6 +11,22 @@ using namespace std;
 
 
 
+/*
+    This file defines the terminal registry for the genetic programming algorithm.
+    The registry maps human-readable names to field accessors that can be used to
+    evaluate nodes in the expression tree.
+
+    Examples of terminals include:
+        - "job.durationMinutes" to access the duration of a job.
+        - "sat.RemainingEnergy" to access the remaining energy of a satellite.
+        - "job.slack" to access the slack time of a job (derived from dueMinute 
+          and duration).
+        - "sat.loadRatio" to access the load ratio of a satellite (derived from 
+          ComputingLoad and ComputingCapability).
+*/
+
+
+
 #pragma region TYPES -----------------------------------------------------------
 using FieldAccessor = function<double(const Job&, const Satellite&)>;
 

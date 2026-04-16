@@ -1,4 +1,5 @@
 #pragma once
+
 #include <algorithm>
 #include <cmath>
 #include <iomanip>
@@ -9,6 +10,31 @@
 
 #include "types.h"
 #include "registry.h"
+// -----------------------------------------------------------------------------
+
+
+
+/*
+    This file defines the class ExprNode, which represents a node in the 
+    expression tree used for scoring jobs in the genetic programming algorithm.
+
+    Each job-satellite pair is scored by evaluating the expression tree, where 
+    the terminals are features of the job and satellite (e.g., job priority, 
+    satellite energy). These scoring are used as scheduling criteria. The GP 
+    algorithm evolves these trees to find effective trees that lead to good
+    scheduling criteria.
+
+    Examples of expressions that might be evolved include:
+        - `priority / (1 + activeTasks)` to prefer high-priority jobs on less 
+          busy satellites.
+        - `priority * (1 + RemainingEnergy)` to prefer high-priority jobs on 
+          satellites with more energy.
+        - `priority / (1 + abs(dueMinute - currentTime))` to prefer jobs that 
+          are closer to their due time.
+    In these cases, "priority", "activeTasks", "RemainingEnergy", and 
+    "dueMinute" would be terminals in the expression tree, and the tree would 
+    combine them using operators like +, -, *, /, etc.
+*/
 
 
 
@@ -75,14 +101,18 @@ struct ExprNode {
 
 
     #pragma region UTILITIES ---------------------------------------------------
-    // Count nodes in the subtree.
+    /// @brief Count the number of nodes in the subtree.
+    /// @return The number of nodes.
     int size() const {
         int s = 1;
         for (const auto& c : children) s += c.size();
         return s;
     }
 
-    /// @brief Pretty-print the expression as a string.
+    /// @brief Returns the expression represented by this node as a string.
+    /// @param registry The terminal registry to resolve terminal names.
+    /// @return The string representation of the expression.
+    /// @throws runtime_error if the node type is invalid.
     string toString(const vector<TerminalDef>& registry) const {
         switch (nodeType) {
             case NodeType::TERMINAL: return registry[terminalIndex].name;
@@ -101,7 +131,8 @@ struct ExprNode {
             case NodeType::ABS:    return "ABS(" + children[0].toString(registry) + ")";
             case NodeType::INV:    return "(1/" + children[0].toString(registry) + ")";
         }
-        return "?";
+
+        throw runtime_error("Invalid node type" + to_string(static_cast<int>(nodeType)) + " in ExprNode::toString");
     }
     #pragma endregion ----------------------------------------------------------
 };

@@ -1,0 +1,27 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Build scheduler module (Debug)",
+      "type": "shell",
+      "command": "bash",
+      "args": [
+        "-lc",
+        "cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug -DPYTHON_EXECUTABLE=$(which python3) && cmake --build build && cp build/scheduler*.so ."
+      ],
+      "group": "build",
+      "problemMatcher": []
+    },
+    {
+      "label": "Build scheduler cli (Debug)",
+      "type": "shell",
+      "command": "bash",
+      "args": [
+        "-lc",
+        "cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug -DPYTHON_EXECUTABLE=$(which python3) && cmake --build build --target scheduler_cli"
+      ],
+      "group": "build",
+      "problemMatcher": []
+    }
+  ]
+}

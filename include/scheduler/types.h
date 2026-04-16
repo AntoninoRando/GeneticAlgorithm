@@ -4,6 +4,7 @@
 #include <vector>
 #include <limits>
 #include <string>
+#include <unordered_set>
 
 using namespace std;
 // -----------------------------------------------------------------------------
@@ -19,11 +20,12 @@ struct Opportunity {
 struct Job {
     int    id;
     string name;
+    
+    vector<Opportunity> opportunities;
+    
     int    durationMinutes;
     int    dueMinute;
     double priority;
-    vector<Opportunity> opportunities;
-
     time_t arrivalTime      = 0;
     double taskSize         = 0.0;
     double initialDeadline  = 0.0;
@@ -34,6 +36,7 @@ struct Satellite {
     int    id;
     string name;
 
+    /// @brief Set of satellites that this satellite can communicate with.
     vector<Satellite> listeningDome;
 
     int    activeTasks          = 0;

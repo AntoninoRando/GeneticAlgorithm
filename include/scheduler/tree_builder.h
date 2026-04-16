@@ -10,6 +10,17 @@ using namespace std;
 // -----------------------------------------------------------------------------
 
 
+/*
+    This file defines the TreeBuilder class, which is responsible for generating
+    random expression trees for the genetic programming algorithm. It provides
+    three methods for building trees:
+        1. grow: at each internal node, randomly pick operator or terminal.
+        2. full: every leaf is at exactly maxDepth.
+        3. rampedHalfAndHalf: builds a population of  'count' trees with a mix 
+           of grow and full, and varying depths.
+*/
+
+
 
 class TreeBuilder {
 public:
