@@ -1,1 +1,1 @@
-cmake --build /workspace/GeneticAlgorithm/build --target scheduler
+cmake --build /workspaces/GeneticAlgorithm/build --target scheduler
