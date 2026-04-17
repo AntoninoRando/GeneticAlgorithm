@@ -1,4 +1,5 @@
 import scheduler  # the compiled .so module
+import time
 import random
 
 def create_satellites():
@@ -66,6 +67,9 @@ def run_genetic_algorithm(population_size=160, generations=500,
     ga = scheduler.SchedulerGP(satellites, jobs)
     ga.initialize(population_size, crossover_rate, mutation_rate, elitism_count)
 
+    SIMULATION_TIME = 0.001
+    tot_time = 0;
+
     for generation_index in range(generations):
         # ! IMPORTANT
         # Run the actual simulation. For now, randomly assign fitness values.
@@ -74,14 +78,17 @@ def run_genetic_algorithm(population_size=160, generations=500,
             # Simulate the individual's tree and set its fitness based on the results.
             # Here we use a random fitness for demonstration purposes.
             individual.fitness = random.uniform(0, 100)
+            # time.sleep(SIMULATION_TIME)
 
+        start_time = time.time()
         ga.solveNextGeneration()
+        end_time = time.time()
+        tot_time += (end_time - start_time)
 
         if (generation_index + 1) % print_every == 0 or generation_index == generations - 1:
             ga.printSchedule()
-            #print_best_individual(generation_index, ga.getPopulation())
-
-    population = ga.getPopulation()
+            print(f"Generations {generation_index + 1}/{generations} completed in {tot_time:.2f} seconds.")
+            tot_time = 0
 
 if __name__ == "__main__":
     run_genetic_algorithm()

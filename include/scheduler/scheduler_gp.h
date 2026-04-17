@@ -158,10 +158,10 @@ public:
 
             // Mutation
             ops_.mutate(childA.tree, mutationRate);
+            ops_.mutate(childB.tree, mutationRate);
+
             // Occasional hoist to fight bloat.
             if (randomReal() < 0.05) ops_.hoist(childA.tree);
-
-            ops_.mutate(childB.tree, mutationRate);
             if (randomReal() < 0.05) ops_.hoist(childB.tree);
 
             next.push_back(move(childA));

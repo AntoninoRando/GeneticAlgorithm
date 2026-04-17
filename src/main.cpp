@@ -22,14 +22,21 @@ int gp_main() {
     cout << "Operators: +, -, *, /safe, MAX, MIN, NEG, ABS, INV\n\n";
 
     SchedulerGP gp(satellites, jobs);
-
-    GPIndividual best = gp.solve(
+    gp.initialize(
         /*populationSize=*/ 200,
-        /*generations=*/    300,
         /*crossoverRate=*/  0.80,
         /*mutationRate=*/   0.08
     );
 
-    gp.printSchedule(best);
+    size_t generations = 500;
+    size_t printInterval = generations / 10;
+    for (auto gen = 0; gen < generations; ++gen) {
+        gp.solveNextGeneration();
+        if (gen % printInterval == 0) {
+            gp.printSchedule();
+        }
+    }
+
+    gp.printSchedule();
     return 0;
 }
