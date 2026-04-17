@@ -11,17 +11,9 @@ using namespace std;
 
 
 
-struct Opportunity {
-    int satelliteId;
-    int startMinute;
-    int endMinute;
-};
-
 struct Job {
     int    id;
     string name;
-    
-    vector<Opportunity> opportunities;
     
     int    durationMinutes;
     int    dueMinute;

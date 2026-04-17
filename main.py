@@ -1,4 +1,5 @@
 import scheduler  # the compiled .so module
+import random
 
 def create_satellites():
     satellites = [
@@ -30,22 +31,19 @@ def create_satellites():
     return satellites
 
 def create_jobs():
-    def opp(sat, start, end):
-        return scheduler.Opportunity(sat, start, end)
-
     mission_start_epoch = 1700000000
 
     jobs = [
-        scheduler.Job(0, "Target-01", 8, 100, 5.0, [opp(0, 30, 38), opp(1, 42, 50), opp(2, 55, 63)]),
-        scheduler.Job(1, "Target-02", 10, 145, 7.0, [opp(0, 70, 80), opp(1, 92, 102), opp(2, 110, 120)]),
-        scheduler.Job(2, "Target-03", 12, 190, 9.0, [opp(0, 125, 137), opp(1, 140, 152), opp(2, 162, 174)]),
-        scheduler.Job(3, "Target-04", 9, 205, 4.0, [opp(0, 155, 164), opp(1, 175, 184), opp(2, 188, 197)]),
-        scheduler.Job(4, "Target-05", 7, 230, 6.5, [opp(0, 180, 187), opp(1, 198, 205), opp(2, 216, 223)]),
-        scheduler.Job(5, "Target-06", 11, 280, 8.5, [opp(0, 220, 231), opp(1, 240, 251), opp(2, 255, 266)]),
-        scheduler.Job(6, "Target-07", 8, 315, 5.5, [opp(0, 260, 268), opp(1, 272, 280), opp(2, 295, 303)]),
-        scheduler.Job(7, "Target-08", 10, 350, 7.5, [opp(0, 300, 310), opp(1, 320, 330), opp(2, 338, 348)]),
-        scheduler.Job(8, "Target-09", 12, 390, 9.5, [opp(0, 335, 347), opp(1, 355, 367), opp(2, 370, 382)]),
-        scheduler.Job(9, "Target-10", 9, 430, 6.0, [opp(0, 365, 374), opp(1, 385, 394), opp(2, 405, 414)]),
+        scheduler.Job(0, "Target-01", 8, 100),
+        scheduler.Job(1, "Target-02", 10, 145),
+        scheduler.Job(2, "Target-03", 12, 190),
+        scheduler.Job(3, "Target-04", 9, 205),
+        scheduler.Job(4, "Target-05", 7, 230),
+        scheduler.Job(5, "Target-06", 11, 280),
+        scheduler.Job(6, "Target-07", 8, 315),
+        scheduler.Job(7, "Target-08", 10, 350),
+        scheduler.Job(8, "Target-09", 12, 390),
+        scheduler.Job(9, "Target-10", 9, 430),
     ]
 
     arrivals = [10, 55, 105, 138, 165, 205, 245, 285, 320, 350]
@@ -60,20 +58,30 @@ def create_jobs():
     return jobs
 
 def run_genetic_algorithm(population_size=160, generations=500,
-                           crossover_rate=0.85, mutation_rate=0.06):
+                           crossover_rate=0.85, mutation_rate=0.06,
+                           elitism_count=2, print_every=25):
     satellites = create_satellites()
     jobs = create_jobs()
 
-    ga = scheduler.SchedulerGA(satellites, jobs)
-    best = ga.solve(population_size, generations, crossover_rate, mutation_rate)
+    ga = scheduler.SchedulerGP(satellites, jobs)
+    ga.initialize(population_size, crossover_rate, mutation_rate, elitism_count)
 
-    print(f"Fitness:        {best.fitness:.2f}")
-    print(f"Scheduled jobs: {best.scheduledJobs}")
-    print(f"Conflicts:      {best.conflicts}")
-    print(f"Lateness:       {best.lateness} min")
+    for generation_index in range(generations):
+        # ! IMPORTANT
+        # Run the actual simulation. For now, randomly assign fitness values.
+        population = ga.getPopulation()
+        for individual in population:
+            # Simulate the individual's tree and set its fitness based on the results.
+            # Here we use a random fitness for demonstration purposes.
+            individual.fitness = random.uniform(0, 100)
 
-    ga.printSchedule(best)
-    return best
+        ga.solveNextGeneration()
+
+        if (generation_index + 1) % print_every == 0 or generation_index == generations - 1:
+            ga.printSchedule()
+            #print_best_individual(generation_index, ga.getPopulation())
+
+    population = ga.getPopulation()
 
 if __name__ == "__main__":
     run_genetic_algorithm()

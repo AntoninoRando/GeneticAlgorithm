@@ -53,7 +53,6 @@ static vector<TerminalDef> buildTerminalRegistry() {
         { "job.taskSize",          [](const Job& j, const Satellite&) { return j.taskSize;                               } },
         { "job.initialDeadline",   [](const Job& j, const Satellite&) { return j.initialDeadline;                        } },
         { "job.remainingDeadline", [](const Job& j, const Satellite&) { return j.remainingDeadline;                      } },
-        { "job.opportunityCount",  [](const Job& j, const Satellite&) { return static_cast<double>(j.opportunities.size()); } },
     // ── Satellite fields ──────────────────────────────────────────────────
         { "sat.activeTasks",         [](const Job&, const Satellite& s) { return static_cast<double>(s.activeTasks);       } },
         { "sat.RemainingEnergy",     [](const Job&, const Satellite& s) { return s.RemainingEnergy;                        } },

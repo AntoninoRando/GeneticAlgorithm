@@ -7,16 +7,27 @@
 #include "tree_builder.h"
 
 using namespace std;
+// -----------------------------------------------------------------------------
 
-// ─────────────────────────────────────────────────────────────────────────────
-//  GENETIC OPERATORS ON TREES
-// ─────────────────────────────────────────────────────────────────────────────
+
+
+/*
+    This file defines the TreeOperators class, which implements the genetic
+    operators for manipulating expression trees in the GP algorithm.
+*/
+
+
 
 class TreeOperators {
 public:
+    #pragma region CONSTRUCTORS ------------------------------------------------
     explicit TreeOperators(mt19937& rng, TreeBuilder& builder, int maxDepth = 7)
         : rng_(rng), builder_(builder), maxTreeDepth_(maxDepth) {}
+    #pragma endregion ----------------------------------------------------------
 
+
+
+    #pragma region PUBLIC API --------------------------------------------------
     // ── Subtree crossover ────────────────────────────────────────────────────
     // Build two new trees by substituting random subtrees.
     // Uses index-based helpers to avoid raw pointer invalidation.
@@ -113,13 +124,21 @@ public:
     }
 
     void setTerminalCount(int n) { terminalCount_ = n; }
+    #pragma endregion ----------------------------------------------------------
 
+    
+    
 private:
+    #pragma region FIELDS ------------------------------------------------------
     mt19937&     rng_;
     TreeBuilder& builder_;
     int          maxTreeDepth_;
     int          terminalCount_ = 1;
+    #pragma endregion ----------------------------------------------------------
 
+
+
+    #pragma region UTILITIES ---------------------------------------------------
     int maxTreeSize() const { return 1 << (maxTreeDepth_ + 1); }
 
     double randomReal() {
@@ -130,4 +149,5 @@ private:
         uniform_int_distribution<int> d{lo, hi};
         return d(rng_);
     }
+    #pragma endregion ----------------------------------------------------------
 };
