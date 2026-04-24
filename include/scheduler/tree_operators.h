@@ -76,23 +76,24 @@ public:
     // ── Point mutation ───────────────────────────────────────────────────────
     // Recursively walk and return a mutated copy.  This avoids UAF from raw
     // pointer lists becoming stale after a child vector reallocation.
+    //
+    // Constants are disabled: TERMINAL nodes always mutate to another terminal,
+    // and the CONST branch is intentionally omitted.
     ExprNode mutateNode(ExprNode node, double mutationRate) {
         if (randomReal() < mutationRate) {
             switch (node.nodeType) {
                 case NodeType::TERMINAL:
-                    if (randomReal() < 0.15) {
-                        node.nodeType   = NodeType::CONST;
-                        node.constValue = (randomReal() * 20.0) - 10.0;
-                        node.children.clear();
-                    } else {
-                        node.terminalIndex = randomInt(0, terminalCount_ - 1);
-                    }
+                    // Always stay a terminal; pick a different registry index.
+                    node.terminalIndex = randomInt(0, terminalCount_ - 1);
                     return node;
-                case NodeType::CONST: {
-                    normal_distribution<double> gauss{0.0, 1.0};
-                    node.constValue += gauss(rng_);
+                case NodeType::CONST:
+                    // Demote any stale CONST node (e.g. loaded from an external
+                    // source) to a proper terminal so the invariant is enforced.
+                    node.nodeType   = NodeType::TERMINAL;
+                    node.constValue = 0.0;
+                    node.terminalIndex = randomInt(0, terminalCount_ - 1);
+                    node.children.clear();
                     return node;
-                }
                 default:
                     if (randomReal() < 0.10)
                         return builder_.grow(3);

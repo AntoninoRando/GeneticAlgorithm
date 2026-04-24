@@ -57,5 +57,8 @@
 \indexentry{energyPerMinute (scheduler.SimulationSnapshot property)@\spxentry{energyPerMinute}\spxextra{scheduler.SimulationSnapshot property}|hyperpage}{8}
 \indexentry{jobs (scheduler.SimulationSnapshot property)@\spxentry{jobs}\spxextra{scheduler.SimulationSnapshot property}|hyperpage}{8}
 \indexentry{satellites (scheduler.SimulationSnapshot property)@\spxentry{satellites}\spxextra{scheduler.SimulationSnapshot property}|hyperpage}{8}
+\indexentry{TerminalDef (class in scheduler)@\spxentry{TerminalDef}\spxextra{class in scheduler}|hyperpage}{8}
+\indexentry{name (scheduler.TerminalDef property)@\spxentry{name}\spxextra{scheduler.TerminalDef property}|hyperpage}{8}
+\indexentry{buildTerminalRegistry() (in module scheduler)@\spxentry{buildTerminalRegistry()}\spxextra{in module scheduler}|hyperpage}{8}
 \indexentry{module@\spxentry{module}!schedulerlib@\spxentry{schedulerlib}|hyperpage}{8}
 \indexentry{schedulerlib@\spxentry{schedulerlib}!module@\spxentry{module}|hyperpage}{8}

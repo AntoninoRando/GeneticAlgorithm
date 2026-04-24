@@ -689,6 +689,45 @@ Must have the same length as <code class="docutils literal notranslate"><span cl
 
 </dd></dl>
 
+<dl class="py class">
+<dt class="sig sig-object py" id="scheduler.TerminalDef">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">scheduler.</span></span><span class="sig-name descname"><span class="pre">TerminalDef</span></span><a class="headerlink" href="#scheduler.TerminalDef" title="Link to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">pybind11_object</span></code></p>
+<p>A named terminal variable used in GP expression trees (e.g. ‘job.priority’).</p>
+<dl class="py property">
+<dt class="sig sig-object py" id="scheduler.TerminalDef.name">
+<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">name</span></span><a class="headerlink" href="#scheduler.TerminalDef.name" title="Link to this definition">¶</a></dt>
+<dd><p>Human-readable name of the terminal (e.g. <code class="docutils literal notranslate"><span class="pre">'job.priority'</span></code>).</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="scheduler.buildTerminalRegistry">
+<span class="sig-prename descclassname"><span class="pre">scheduler.</span></span><span class="sig-name descname"><span class="pre">buildTerminalRegistry</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="#scheduler.TerminalDef" title="scheduler.TerminalDef"><span class="pre">scheduler.TerminalDef</span></a><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#scheduler.buildTerminalRegistry" title="Link to this definition">¶</a></dt>
+<dd><p>Build and return the terminal registry used by the GP algorithm.</p>
+<p>The registry maps human-readable names to field accessors that the expression
+tree evaluator uses to read job and satellite features at runtime.  You must
+pass the returned list to <a class="reference internal" href="#scheduler.FitnessEvaluator" title="scheduler.FitnessEvaluator"><code class="xref py py-class docutils literal notranslate"><span class="pre">FitnessEvaluator</span></code></a> and, if you construct
+a <code class="xref py py-class docutils literal notranslate"><span class="pre">TreeBuilder</span></code> directly, to that as well.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Ordered list of terminal definitions.  The index of each entry corresponds
+to the <code class="docutils literal notranslate"><span class="pre">terminalIndex</span></code> stored in <code class="docutils literal notranslate"><span class="pre">TERMINAL</span></code> nodes of the expression tree.</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p>list[<a class="reference internal" href="#scheduler.TerminalDef" title="scheduler.TerminalDef">TerminalDef</a>]</p>
+</dd>
+</dl>
+<p class="rubric">Example</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span> <span class="nn">scheduler</span> <span class="kn">import</span> <span class="n">buildTerminalRegistry</span><span class="p">,</span> <span class="n">FitnessEvaluator</span>
+
+<span class="n">registry</span> <span class="o">=</span> <span class="n">buildTerminalRegistry</span><span class="p">()</span>
+<span class="n">evaluator</span> <span class="o">=</span> <span class="n">FitnessEvaluator</span><span class="p">(</span><span class="n">registry</span><span class="p">)</span>
+</pre></div>
+</div>
+</dd></dl>
+
 <span class="target" id="module-schedulerlib"></span></section>
 
         </article>
@@ -812,6 +851,11 @@ Must have the same length as <code class="docutils literal notranslate"><span cl
 <li><a class="reference internal" href="#scheduler.SimulationSnapshot.satellites"><code class="docutils literal notranslate"><span class="pre">SimulationSnapshot.satellites</span></code></a></li>
 </ul>
 </li>
+<li><a class="reference internal" href="#scheduler.TerminalDef"><code class="docutils literal notranslate"><span class="pre">TerminalDef</span></code></a><ul>
+<li><a class="reference internal" href="#scheduler.TerminalDef.name"><code class="docutils literal notranslate"><span class="pre">TerminalDef.name</span></code></a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#scheduler.buildTerminalRegistry"><code class="docutils literal notranslate"><span class="pre">buildTerminalRegistry()</span></code></a></li>
 </ul>
 </li>
 </ul>

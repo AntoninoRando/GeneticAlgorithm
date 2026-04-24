@@ -9,7 +9,6 @@
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>   // needed for vector conversion
 
-#include "scheduler/decoder.h"
 #include "scheduler/expr_tree.h"
 #include "scheduler/registry.h"
 #include "scheduler/tree_builder.h"
@@ -301,4 +300,36 @@ tuple[float, float, float]
     * ``mean_response_time``  – average (completion - arrival) in minutes.
     * ``total_energy``        – total energy consumed (watt-minutes).
              )doc");
+
+// ── TerminalDef ───────────────────────────────────────────────────────────────
+py::class_<TerminalDef>(m, "TerminalDef",
+    "A named terminal variable used in GP expression trees (e.g. 'job.priority').")
+    .def_readonly("name", &TerminalDef::name,
+        "Human-readable name of the terminal (e.g. ``'job.priority'``).");
+
+// ── buildTerminalRegistry ─────────────────────────────────────────────────────
+m.def("buildTerminalRegistry", &buildTerminalRegistry,
+    R"doc(
+Build and return the terminal registry used by the GP algorithm.
+
+The registry maps human-readable names to field accessors that the expression
+tree evaluator uses to read job and satellite features at runtime.  You must
+pass the returned list to :py:class:`FitnessEvaluator` and, if you construct
+a :py:class:`TreeBuilder` directly, to that as well.
+
+Returns
+-------
+list[TerminalDef]
+    Ordered list of terminal definitions.  The index of each entry corresponds
+    to the ``terminalIndex`` stored in ``TERMINAL`` nodes of the expression tree.
+
+Example
+-------
+.. code-block:: python
+
+    from scheduler import buildTerminalRegistry, FitnessEvaluator
+
+    registry = buildTerminalRegistry()
+    evaluator = FitnessEvaluator(registry)
+    )doc");
 }

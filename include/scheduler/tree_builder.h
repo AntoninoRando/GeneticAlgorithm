@@ -99,14 +99,9 @@ private:
 
     ExprNode makeTerminal() {
         ExprNode node;
-        // 20% chance of ephemeral constant.
-        if (randomReal() < 0.20) {
-            node.nodeType   = NodeType::CONST;
-            node.constValue = (randomReal() * 20.0) - 10.0;
-        } else {
-            node.nodeType      = NodeType::TERMINAL;
-            node.terminalIndex = randomInt(0, static_cast<int>(registry_.size()) - 1);
-        }
+        // Constants are disabled: every leaf is a registry terminal.
+        node.nodeType      = NodeType::TERMINAL;
+        node.terminalIndex = randomInt(0, static_cast<int>(registry_.size()) - 1);
         return node;
     }
 

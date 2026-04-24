@@ -1035,6 +1035,75 @@ Current state of every satellite in the constellation.
 
 \end{fulllineitems}
 
+\index{TerminalDef (class in scheduler)@\spxentry{TerminalDef}\spxextra{class in scheduler}}
+
+\begin{fulllineitems}
+\phantomsection\label{\detokenize{api:scheduler.TerminalDef}}
+\pysigstartsignatures
+\pysigline
+{\sphinxbfcode{\sphinxupquote{\DUrole{k}{class}\DUrole{w}{ }}}\sphinxcode{\sphinxupquote{scheduler.}}\sphinxbfcode{\sphinxupquote{TerminalDef}}}
+\pysigstopsignatures
+\sphinxAtStartPar
+Bases: \sphinxcode{\sphinxupquote{pybind11\_object}}
+
+\sphinxAtStartPar
+A named terminal variable used in GP expression trees (e.g. ‘job.priority’).
+\index{name (scheduler.TerminalDef property)@\spxentry{name}\spxextra{scheduler.TerminalDef property}}
+
+\begin{fulllineitems}
+\phantomsection\label{\detokenize{api:scheduler.TerminalDef.name}}
+\pysigstartsignatures
+\pysigline
+{\sphinxbfcode{\sphinxupquote{\DUrole{k}{property}\DUrole{w}{ }}}\sphinxbfcode{\sphinxupquote{name}}}
+\pysigstopsignatures
+\sphinxAtStartPar
+Human\sphinxhyphen{}readable name of the terminal (e.g. \sphinxcode{\sphinxupquote{\textquotesingle{}job.priority\textquotesingle{}}}).
+
+\end{fulllineitems}
+
+
+\end{fulllineitems}
+
+\index{buildTerminalRegistry() (in module scheduler)@\spxentry{buildTerminalRegistry()}\spxextra{in module scheduler}}
+
+\begin{fulllineitems}
+\phantomsection\label{\detokenize{api:scheduler.buildTerminalRegistry}}
+\pysigstartsignatures
+\pysiglinewithargsret
+{\sphinxcode{\sphinxupquote{scheduler.}}\sphinxbfcode{\sphinxupquote{buildTerminalRegistry}}}
+{}
+{{ $\rightarrow$ list\DUrole{p}{{[}}{\hyperref[\detokenize{api:scheduler.TerminalDef}]{\sphinxcrossref{scheduler.TerminalDef}}}\DUrole{p}{{]}}}}
+\pysigstopsignatures
+\sphinxAtStartPar
+Build and return the terminal registry used by the GP algorithm.
+
+\sphinxAtStartPar
+The registry maps human\sphinxhyphen{}readable names to field accessors that the expression
+tree evaluator uses to read job and satellite features at runtime.  You must
+pass the returned list to {\hyperref[\detokenize{api:scheduler.FitnessEvaluator}]{\sphinxcrossref{\sphinxcode{\sphinxupquote{FitnessEvaluator}}}}} and, if you construct
+a \sphinxcode{\sphinxupquote{TreeBuilder}} directly, to that as well.
+\begin{quote}\begin{description}
+\sphinxlineitem{Returns}
+\sphinxAtStartPar
+Ordered list of terminal definitions.  The index of each entry corresponds
+to the \sphinxcode{\sphinxupquote{terminalIndex}} stored in \sphinxcode{\sphinxupquote{TERMINAL}} nodes of the expression tree.
+
+\sphinxlineitem{Return type}
+\sphinxAtStartPar
+list{[}{\hyperref[\detokenize{api:scheduler.TerminalDef}]{\sphinxcrossref{TerminalDef}}}{]}
+
+\end{description}\end{quote}
+\subsubsection*{Example}
+
+\begin{sphinxVerbatim}[commandchars=\\\{\}]
+\PYG{k+kn}{from} \PYG{n+nn}{scheduler} \PYG{k+kn}{import} \PYG{n}{buildTerminalRegistry}\PYG{p}{,} \PYG{n}{FitnessEvaluator}
+
+\PYG{n}{registry} \PYG{o}{=} \PYG{n}{buildTerminalRegistry}\PYG{p}{(}\PYG{p}{)}
+\PYG{n}{evaluator} \PYG{o}{=} \PYG{n}{FitnessEvaluator}\PYG{p}{(}\PYG{n}{registry}\PYG{p}{)}
+\end{sphinxVerbatim}
+
+\end{fulllineitems}
+
 \index{module@\spxentry{module}!schedulerlib@\spxentry{schedulerlib}}\index{schedulerlib@\spxentry{schedulerlib}!module@\spxentry{module}}\phantomsection\label{\detokenize{api:module-schedulerlib}}
 
 \renewcommand{\indexname}{Python Module Index}

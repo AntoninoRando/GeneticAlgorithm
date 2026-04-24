@@ -8,7 +8,6 @@
 #include <utility>
 #include <vector>
 
-#include "decoder.h"
 #include "registry.h"
 #include "tree_builder.h"
 #include "tree_operators.h"
