@@ -92,3 +92,8 @@ def run_genetic_algorithm(population_size=160, generations=500,
 
 if __name__ == "__main__":
     run_genetic_algorithm()
+
+"""
+1. Capire (in base ai criteri di obiettivo nostro) qual è il miglior function set e terminal
+2. API per il siumaltore
+"""
