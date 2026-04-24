@@ -15,6 +15,7 @@
 #include "scheduler/tree_builder.h"
 #include "scheduler/tree_operators.h"
 #include "scheduler/types.h"
+#include "scheduler/fitness_evaluator.h"
 
 #define const
 #include "scheduler/scheduler_gp.h"
@@ -98,4 +99,206 @@ PYBIND11_MODULE(scheduler, m) {
            .def("getPopulation", &SchedulerGP::getPopulation,
                py::return_value_policy::reference_internal, "Get the current population of individuals")
            .def("printSchedule", &SchedulerGP::printSchedule, "Print the best schedule found so far");
+    
+           // ── SimulationSnapshot ────────────────────────────────────────────────────
+    py::class_<SimulationSnapshot>(m, "SimulationSnapshot",
+        R"doc(
+A self-contained, point-in-time snapshot of the simulation world.
+
+The external application must construct and populate a snapshot before
+calling :py:meth:`FitnessEvaluator.evaluate` for each GP generation.
+All satellite and job objects are copied into the snapshot, so subsequent
+changes to the originals have no effect on the evaluator.
+
+Example
+-------
+.. code-block:: python
+
+    snap = scheduler.SimulationSnapshot(
+        currentMinute = 0.0,
+        satellites    = my_satellites,
+        jobs          = my_jobs,
+        uniformEnergy = 2.5,   # watts per minute per satellite
+    )
+        )doc")
+
+        .def(py::init<double, vector<Satellite>, vector<Job>, double>(),
+             py::arg("currentMinute"),
+             py::arg("satellites"),
+             py::arg("jobs"),
+             py::arg("uniformEnergy") = 1.0,
+             R"doc(
+Construct a snapshot.
+
+Parameters
+----------
+currentMinute : float
+    Simulation clock at the time of the snapshot, in minutes from the
+    simulation epoch.  Jobs whose ``arrivalTime`` is greater than this
+    value are treated as not yet available and are ignored by the decoder.
+satellites : list[Satellite]
+    Current state of every satellite in the constellation.
+jobs : list[Job]
+    Pool of jobs available for scheduling at this instant.
+uniformEnergy : float, optional
+    Energy consumed per minute of active computation, applied uniformly
+    to every satellite.  Defaults to ``1.0``.  Pass ``0.0`` to use the
+    per-satellite ``energyPerMinute`` vector instead.
+             )doc")
+
+        .def_readwrite("currentMinute", &SimulationSnapshot::currentMinute,
+            "Simulation clock at snapshot time (minutes from epoch).")
+        .def_readwrite("satellites", &SimulationSnapshot::satellites,
+            "Current state of every satellite in the constellation.")
+        .def_readwrite("jobs", &SimulationSnapshot::jobs,
+            "Pool of jobs available for scheduling at this instant.")
+        .def_readwrite("energyPerMinute", &SimulationSnapshot::energyPerMinute,
+            R"doc(
+Energy consumed per minute of computation, indexed by satellite position in
+the ``satellites`` list.  When non-empty this overrides ``uniformEnergy``.
+Must have the same length as ``satellites`` if provided.
+            )doc");
+
+
+    // ── FitnessEvaluator ──────────────────────────────────────────────────────
+    py::class_<FitnessEvaluator>(m, "FitnessEvaluator",
+        R"doc(
+Evaluates a population of GP individuals by simulating a greedy schedule
+with each individual's expression tree as the priority function.
+
+After evaluation every :py:class:`Individual` in the population will have
+its ``fitness`` field set to a scalar value that reflects how well the tree
+minimised response time and energy consumption.
+
+Fitness formula
+---------------
+Three raw objectives are collected for each individual:
+
+* ``compRatio``  – fraction of available jobs that were successfully
+  scheduled (higher is better).
+* ``meanResp``   – average response time (completion − arrival) in minutes
+  (lower is better).
+* ``energy``     – total energy consumed across all satellites in watt-
+  minutes (lower is better).
+
+Each objective is normalised to ``[0, 1]`` across the current population
+so that differences in scale cannot dominate the result.  The final fitness
+is then:
+
+.. math::
+
+    f = w_{\\text{jobs}} \\cdot \\widehat{r}
+      - w_{\\text{time}} \\cdot \\widehat{t}
+      - w_{\\text{energy}} \\cdot \\widehat{e}
+
+where :math:`\\hat{\\cdot}` denotes population-normalised values and the
+default weights are ``(0.60, 0.25, 0.15)``.
+
+Example
+-------
+.. code-block:: python
+
+    from scheduler import SchedulerGP, FitnessEvaluator, SimulationSnapshot
+    from scheduler import buildTerminalRegistry
+
+    gp   = SchedulerGP(satellites, jobs)
+    gp.initialize(populationSize=100)
+
+    eval = FitnessEvaluator(buildTerminalRegistry())
+
+    for generation in range(50):
+        snap = SimulationSnapshot(current_minute, satellites, jobs)
+        eval.evaluate(gp.getPopulation(), snap)  # writes fitness in place
+        gp.solveNextGeneration()
+        )doc")
+
+        .def(py::init<vector<TerminalDef>>(),
+             py::arg("registry"),
+             R"doc(
+Construct the evaluator.
+
+Parameters
+----------
+registry : list[TerminalDef]
+    Terminal registry produced by :py:func:`buildTerminalRegistry`.
+             )doc")
+
+        // ── Weights ───────────────────────────────────────────────────────
+        .def_readwrite("weightJobs", &FitnessEvaluator::weightJobs,
+            R"doc(
+Weight applied to the completion-ratio reward term.  Default ``0.60``.
+Increase this to make the GP prioritise scheduling as many jobs as possible.
+            )doc")
+        .def_readwrite("weightTime", &FitnessEvaluator::weightTime,
+            R"doc(
+Weight applied to the mean-response-time penalty.  Default ``0.25``.
+Increase this to make the GP prioritise faster job turnaround.
+            )doc")
+        .def_readwrite("weightEnergy", &FitnessEvaluator::weightEnergy,
+            R"doc(
+Weight applied to the energy-consumption penalty.  Default ``0.15``.
+Increase this to make the GP prefer energy-efficient satellite assignments.
+            )doc")
+
+        // ── Core method ───────────────────────────────────────────────────
+        .def("evaluate",
+             &FitnessEvaluator::evaluate,
+             py::arg("population"),
+             py::arg("snap"),
+             R"doc(
+Score every individual in *population* and write the result into each
+individual's ``fitness`` field.
+
+This is the only method the main GP loop needs to call each generation.
+
+Parameters
+----------
+population : list[Individual]
+    The current GP population, obtained via :py:meth:`SchedulerGP.getPopulation`.
+    Each individual's ``fitness`` field is updated in place.
+snap : SimulationSnapshot
+    Read-only snapshot of the current simulation state.  The evaluator
+    runs a fresh greedy simulation for every individual, so ``snap`` is
+    never modified.
+
+Notes
+-----
+Fitness values are population-relative: the same tree may receive a
+different score in a different generation if the rest of the population
+has changed.
+             )doc")
+
+        // ── Debug helper ──────────────────────────────────────────────────
+        .def("evaluate_single",
+             [](const FitnessEvaluator& self,
+                const GPIndividual&       ind,
+                const SimulationSnapshot& snap) -> py::tuple
+             {
+                 double cr, mr, en;
+                 self.evaluateSingle(ind, snap, cr, mr, en);
+                 return py::make_tuple(cr, mr, en);
+             },
+             py::arg("individual"),
+             py::arg("snap"),
+             R"doc(
+Evaluate a single individual and return its raw (un-normalised) objectives.
+
+Useful for inspecting the best individual after evolution has finished.
+
+Parameters
+----------
+individual : Individual
+    The GP individual to evaluate.
+snap : SimulationSnapshot
+    Simulation snapshot used for the evaluation.
+
+Returns
+-------
+tuple[float, float, float]
+    ``(comp_ratio, mean_response_time, total_energy)``
+
+    * ``comp_ratio``          – fraction of available jobs scheduled ∈ [0, 1].
+    * ``mean_response_time``  – average (completion − arrival) in minutes.
+    * ``total_energy``        – total energy consumed (watt-minutes).
+             )doc");
 }
