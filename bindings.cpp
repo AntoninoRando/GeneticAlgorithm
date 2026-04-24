@@ -176,7 +176,7 @@ Three raw objectives are collected for each individual:
 
 * ``compRatio``  – fraction of available jobs that were successfully
   scheduled (higher is better).
-* ``meanResp``   – average response time (completion − arrival) in minutes
+* ``meanResp``   – average response time (completion - arrival) in minutes
   (lower is better).
 * ``energy``     – total energy consumed across all satellites in watt-
   minutes (lower is better).
@@ -298,7 +298,7 @@ tuple[float, float, float]
     ``(comp_ratio, mean_response_time, total_energy)``
 
     * ``comp_ratio``          – fraction of available jobs scheduled ∈ [0, 1].
-    * ``mean_response_time``  – average (completion − arrival) in minutes.
+    * ``mean_response_time``  – average (completion - arrival) in minutes.
     * ``total_energy``        – total energy consumed (watt-minutes).
              )doc");
 }

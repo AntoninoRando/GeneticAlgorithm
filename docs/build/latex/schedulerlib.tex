@@ -65,7 +65,7 @@
 
 
 \title{schedulerlib}
-\date{Apr 23, 2026}
+\date{Apr 24, 2026}
 \release{0}
 \author{La Sapienza, Università di Roma, Emiliano Casalicchio, Antonino Rando}
 \newcommand{\sphinxlogo}{\vbox{}}
@@ -91,7 +91,959 @@ Add your content using \sphinxcode{\sphinxupquote{reStructuredText}} syntax. See
 \sphinxhref{https://www.sphinx-doc.org/en/master/usage/restructuredtext/index.html}{reStructuredText}
 documentation for details.
 
+\sphinxstepscope
 
+
+\chapter{API Reference}
+\label{\detokenize{api:module-scheduler}}\label{\detokenize{api:api-reference}}\label{\detokenize{api::doc}}\index{module@\spxentry{module}!scheduler@\spxentry{scheduler}}\index{scheduler@\spxentry{scheduler}!module@\spxentry{module}}
+\sphinxAtStartPar
+Python bindings for the Scheduler GP module
+\index{ExprNode (class in scheduler)@\spxentry{ExprNode}\spxextra{class in scheduler}}
+
+\begin{fulllineitems}
+\phantomsection\label{\detokenize{api:scheduler.ExprNode}}
+\pysigstartsignatures
+\pysigline
+{\sphinxbfcode{\sphinxupquote{\DUrole{k}{class}\DUrole{w}{ }}}\sphinxcode{\sphinxupquote{scheduler.}}\sphinxbfcode{\sphinxupquote{ExprNode}}}
+\pysigstopsignatures
+\sphinxAtStartPar
+Bases: \sphinxcode{\sphinxupquote{pybind11\_object}}
+
+\sphinxAtStartPar
+A node in the expression tree used by the GP individual
+\index{children (scheduler.ExprNode property)@\spxentry{children}\spxextra{scheduler.ExprNode property}}
+
+\begin{fulllineitems}
+\phantomsection\label{\detokenize{api:scheduler.ExprNode.children}}
+\pysigstartsignatures
+\pysigline
+{\sphinxbfcode{\sphinxupquote{\DUrole{k}{property}\DUrole{w}{ }}}\sphinxbfcode{\sphinxupquote{children}}}
+\pysigstopsignatures
+\sphinxAtStartPar
+List of child nodes
+
+\end{fulllineitems}
+
+\index{constValue (scheduler.ExprNode property)@\spxentry{constValue}\spxextra{scheduler.ExprNode property}}
+
+\begin{fulllineitems}
+\phantomsection\label{\detokenize{api:scheduler.ExprNode.constValue}}
+\pysigstartsignatures
+\pysigline
+{\sphinxbfcode{\sphinxupquote{\DUrole{k}{property}\DUrole{w}{ }}}\sphinxbfcode{\sphinxupquote{constValue}}}
+\pysigstopsignatures
+\sphinxAtStartPar
+Constant value if the node is a CONST
+
+\end{fulllineitems}
+
+\index{nodeType (scheduler.ExprNode property)@\spxentry{nodeType}\spxextra{scheduler.ExprNode property}}
+
+\begin{fulllineitems}
+\phantomsection\label{\detokenize{api:scheduler.ExprNode.nodeType}}
+\pysigstartsignatures
+\pysigline
+{\sphinxbfcode{\sphinxupquote{\DUrole{k}{property}\DUrole{w}{ }}}\sphinxbfcode{\sphinxupquote{nodeType}}}
+\pysigstopsignatures
+\sphinxAtStartPar
+Type of the node (e.g., ADD, CONST, TERMINAL)
+
+\end{fulllineitems}
+
+\index{size() (scheduler.ExprNode method)@\spxentry{size()}\spxextra{scheduler.ExprNode method}}
+
+\begin{fulllineitems}
+\phantomsection\label{\detokenize{api:scheduler.ExprNode.size}}
+\pysigstartsignatures
+\pysiglinewithargsret
+{\sphinxbfcode{\sphinxupquote{size}}}
+{\sphinxparam{\DUrole{n}{self}\DUrole{p}{:}\DUrole{w}{ }\DUrole{n}{{\hyperref[\detokenize{api:scheduler.ExprNode}]{\sphinxcrossref{scheduler.ExprNode}}}}}}
+{{ $\rightarrow$ int}}
+\pysigstopsignatures
+\sphinxAtStartPar
+Get the size of the subtree rooted at this node
+
+\end{fulllineitems}
+
+\index{terminalIndex (scheduler.ExprNode property)@\spxentry{terminalIndex}\spxextra{scheduler.ExprNode property}}
+
+\begin{fulllineitems}
+\phantomsection\label{\detokenize{api:scheduler.ExprNode.terminalIndex}}
+\pysigstartsignatures
+\pysigline
+{\sphinxbfcode{\sphinxupquote{\DUrole{k}{property}\DUrole{w}{ }}}\sphinxbfcode{\sphinxupquote{terminalIndex}}}
+\pysigstopsignatures
+\sphinxAtStartPar
+Index of the terminal if the node is a TERMINAL
+
+\end{fulllineitems}
+
+
+\end{fulllineitems}
+
+\index{FitnessEvaluator (class in scheduler)@\spxentry{FitnessEvaluator}\spxextra{class in scheduler}}
+
+\begin{fulllineitems}
+\phantomsection\label{\detokenize{api:scheduler.FitnessEvaluator}}
+\pysigstartsignatures
+\pysigline
+{\sphinxbfcode{\sphinxupquote{\DUrole{k}{class}\DUrole{w}{ }}}\sphinxcode{\sphinxupquote{scheduler.}}\sphinxbfcode{\sphinxupquote{FitnessEvaluator}}}
+\pysigstopsignatures
+\sphinxAtStartPar
+Bases: \sphinxcode{\sphinxupquote{pybind11\_object}}
+
+\sphinxAtStartPar
+Evaluates a population of GP individuals by simulating a greedy schedule
+with each individual’s expression tree as the priority function.
+
+\sphinxAtStartPar
+After evaluation every {\hyperref[\detokenize{api:scheduler.Individual}]{\sphinxcrossref{\sphinxcode{\sphinxupquote{Individual}}}}} in the population will have
+its \sphinxcode{\sphinxupquote{fitness}} field set to a scalar value that reflects how well the tree
+minimised response time and energy consumption.
+
+
+\section{Fitness formula}
+\label{\detokenize{api:fitness-formula}}
+\sphinxAtStartPar
+Three raw objectives are collected for each individual:
+\begin{itemize}
+\item {} 
+\sphinxAtStartPar
+\sphinxcode{\sphinxupquote{compRatio}}  \textendash{} fraction of available jobs that were successfully
+scheduled (higher is better).
+
+\item {} 
+\sphinxAtStartPar
+\sphinxcode{\sphinxupquote{meanResp}}   \textendash{} average response time (completion \sphinxhyphen{} arrival) in minutes
+(lower is better).
+
+\item {} 
+\sphinxAtStartPar
+\sphinxcode{\sphinxupquote{energy}}     \textendash{} total energy consumed across all satellites in watt\sphinxhyphen{}
+minutes (lower is better).
+
+\end{itemize}
+
+\sphinxAtStartPar
+Each objective is normalised to \sphinxcode{\sphinxupquote{{[}0, 1{]}}} across the current population
+so that differences in scale cannot dominate the result.  The final fitness
+is then:
+\begin{equation*}
+\begin{split}f = w_{\\text{jobs}} \\cdot \\widehat{r}
+  - w_{\\text{time}} \\cdot \\widehat{t}
+  - w_{\\text{energy}} \\cdot \\widehat{e}\end{split}
+\end{equation*}
+\sphinxAtStartPar
+where \(\\hat{\\cdot}\) denotes population\sphinxhyphen{}normalised values and the
+default weights are \sphinxcode{\sphinxupquote{(0.60, 0.25, 0.15)}}.
+\subsubsection*{Example}
+
+\begin{sphinxVerbatim}[commandchars=\\\{\}]
+\PYG{k+kn}{from} \PYG{n+nn}{scheduler} \PYG{k+kn}{import} \PYG{n}{SchedulerGP}\PYG{p}{,} \PYG{n}{FitnessEvaluator}\PYG{p}{,} \PYG{n}{SimulationSnapshot}
+\PYG{k+kn}{from} \PYG{n+nn}{scheduler} \PYG{k+kn}{import} \PYG{n}{buildTerminalRegistry}
+
+\PYG{n}{gp}   \PYG{o}{=} \PYG{n}{SchedulerGP}\PYG{p}{(}\PYG{n}{satellites}\PYG{p}{,} \PYG{n}{jobs}\PYG{p}{)}
+\PYG{n}{gp}\PYG{o}{.}\PYG{n}{initialize}\PYG{p}{(}\PYG{n}{populationSize}\PYG{o}{=}\PYG{l+m+mi}{100}\PYG{p}{)}
+
+\PYG{n+nb}{eval} \PYG{o}{=} \PYG{n}{FitnessEvaluator}\PYG{p}{(}\PYG{n}{buildTerminalRegistry}\PYG{p}{(}\PYG{p}{)}\PYG{p}{)}
+
+\PYG{k}{for} \PYG{n}{generation} \PYG{o+ow}{in} \PYG{n+nb}{range}\PYG{p}{(}\PYG{l+m+mi}{50}\PYG{p}{)}\PYG{p}{:}
+    \PYG{n}{snap} \PYG{o}{=} \PYG{n}{SimulationSnapshot}\PYG{p}{(}\PYG{n}{current\PYGZus{}minute}\PYG{p}{,} \PYG{n}{satellites}\PYG{p}{,} \PYG{n}{jobs}\PYG{p}{)}
+    \PYG{n+nb}{eval}\PYG{o}{.}\PYG{n}{evaluate}\PYG{p}{(}\PYG{n}{gp}\PYG{o}{.}\PYG{n}{getPopulation}\PYG{p}{(}\PYG{p}{)}\PYG{p}{,} \PYG{n}{snap}\PYG{p}{)}  \PYG{c+c1}{\PYGZsh{} writes fitness in place}
+    \PYG{n}{gp}\PYG{o}{.}\PYG{n}{solveNextGeneration}\PYG{p}{(}\PYG{p}{)}
+\end{sphinxVerbatim}
+\index{evaluate() (scheduler.FitnessEvaluator method)@\spxentry{evaluate()}\spxextra{scheduler.FitnessEvaluator method}}
+
+\begin{fulllineitems}
+\phantomsection\label{\detokenize{api:scheduler.FitnessEvaluator.evaluate}}
+\pysigstartsignatures
+\pysiglinewithargsret
+{\sphinxbfcode{\sphinxupquote{evaluate}}}
+{\sphinxparam{\DUrole{n}{self}\DUrole{p}{:}\DUrole{w}{ }\DUrole{n}{{\hyperref[\detokenize{api:scheduler.FitnessEvaluator}]{\sphinxcrossref{scheduler.FitnessEvaluator}}}}}\sphinxparamcomma \sphinxparam{\DUrole{n}{population}\DUrole{p}{:}\DUrole{w}{ }\DUrole{n}{list\DUrole{p}{{[}}{\hyperref[\detokenize{api:scheduler.Individual}]{\sphinxcrossref{scheduler.Individual}}}\DUrole{p}{{]}}}}\sphinxparamcomma \sphinxparam{\DUrole{n}{snap}\DUrole{p}{:}\DUrole{w}{ }\DUrole{n}{{\hyperref[\detokenize{api:scheduler.SimulationSnapshot}]{\sphinxcrossref{scheduler.SimulationSnapshot}}}}}}
+{{ $\rightarrow$ None}}
+\pysigstopsignatures
+\sphinxAtStartPar
+Score every individual in \sphinxstyleemphasis{population} and write the result into each
+individual’s \sphinxcode{\sphinxupquote{fitness}} field.
+
+\sphinxAtStartPar
+This is the only method the main GP loop needs to call each generation.
+\begin{quote}\begin{description}
+\sphinxlineitem{Parameters}\begin{itemize}
+\item {} 
+\sphinxAtStartPar
+\sphinxstyleliteralstrong{\sphinxupquote{population}} (\sphinxstyleliteralemphasis{\sphinxupquote{list}}\sphinxstyleliteralemphasis{\sphinxupquote{{[}}}{\hyperref[\detokenize{api:scheduler.Individual}]{\sphinxcrossref{\sphinxstyleliteralemphasis{\sphinxupquote{Individual}}}}}\sphinxstyleliteralemphasis{\sphinxupquote{{]}}}) \textendash{} The current GP population, obtained via {\hyperref[\detokenize{api:scheduler.SchedulerGP.getPopulation}]{\sphinxcrossref{\sphinxcode{\sphinxupquote{SchedulerGP.getPopulation()}}}}}.
+Each individual’s \sphinxcode{\sphinxupquote{fitness}} field is updated in place.
+
+\item {} 
+\sphinxAtStartPar
+\sphinxstyleliteralstrong{\sphinxupquote{snap}} ({\hyperref[\detokenize{api:scheduler.SimulationSnapshot}]{\sphinxcrossref{\sphinxstyleliteralemphasis{\sphinxupquote{SimulationSnapshot}}}}}) \textendash{} Read\sphinxhyphen{}only snapshot of the current simulation state.  The evaluator
+runs a fresh greedy simulation for every individual, so \sphinxcode{\sphinxupquote{snap}} is
+never modified.
+
+\end{itemize}
+
+\end{description}\end{quote}
+\subsubsection*{Notes}
+
+\sphinxAtStartPar
+Fitness values are population\sphinxhyphen{}relative: the same tree may receive a
+different score in a different generation if the rest of the population
+has changed.
+
+\end{fulllineitems}
+
+\index{evaluate\_single() (scheduler.FitnessEvaluator method)@\spxentry{evaluate\_single()}\spxextra{scheduler.FitnessEvaluator method}}
+
+\begin{fulllineitems}
+\phantomsection\label{\detokenize{api:scheduler.FitnessEvaluator.evaluate_single}}
+\pysigstartsignatures
+\pysiglinewithargsret
+{\sphinxbfcode{\sphinxupquote{evaluate\_single}}}
+{\sphinxparam{\DUrole{n}{self}\DUrole{p}{:}\DUrole{w}{ }\DUrole{n}{{\hyperref[\detokenize{api:scheduler.FitnessEvaluator}]{\sphinxcrossref{scheduler.FitnessEvaluator}}}}}\sphinxparamcomma \sphinxparam{\DUrole{n}{individual}\DUrole{p}{:}\DUrole{w}{ }\DUrole{n}{{\hyperref[\detokenize{api:scheduler.Individual}]{\sphinxcrossref{scheduler.Individual}}}}}\sphinxparamcomma \sphinxparam{\DUrole{n}{snap}\DUrole{p}{:}\DUrole{w}{ }\DUrole{n}{{\hyperref[\detokenize{api:scheduler.SimulationSnapshot}]{\sphinxcrossref{scheduler.SimulationSnapshot}}}}}}
+{{ $\rightarrow$ tuple}}
+\pysigstopsignatures
+\sphinxAtStartPar
+Evaluate a single individual and return its raw (un\sphinxhyphen{}normalised) objectives.
+
+\sphinxAtStartPar
+Useful for inspecting the best individual after evolution has finished.
+\begin{quote}\begin{description}
+\sphinxlineitem{Parameters}\begin{itemize}
+\item {} 
+\sphinxAtStartPar
+\sphinxstyleliteralstrong{\sphinxupquote{individual}} ({\hyperref[\detokenize{api:scheduler.Individual}]{\sphinxcrossref{\sphinxstyleliteralemphasis{\sphinxupquote{Individual}}}}}) \textendash{} The GP individual to evaluate.
+
+\item {} 
+\sphinxAtStartPar
+\sphinxstyleliteralstrong{\sphinxupquote{snap}} ({\hyperref[\detokenize{api:scheduler.SimulationSnapshot}]{\sphinxcrossref{\sphinxstyleliteralemphasis{\sphinxupquote{SimulationSnapshot}}}}}) \textendash{} Simulation snapshot used for the evaluation.
+
+\end{itemize}
+
+\sphinxlineitem{Returns}
+\sphinxAtStartPar
+
+\sphinxAtStartPar
+\sphinxcode{\sphinxupquote{(comp\_ratio, mean\_response\_time, total\_energy)}}
+\begin{itemize}
+\item {} 
+\sphinxAtStartPar
+\sphinxcode{\sphinxupquote{comp\_ratio}}          \textendash{} fraction of available jobs scheduled ∈ {[}0, 1{]}.
+
+\item {} 
+\sphinxAtStartPar
+\sphinxcode{\sphinxupquote{mean\_response\_time}}  \textendash{} average (completion \sphinxhyphen{} arrival) in minutes.
+
+\item {} 
+\sphinxAtStartPar
+\sphinxcode{\sphinxupquote{total\_energy}}        \textendash{} total energy consumed (watt\sphinxhyphen{}minutes).
+
+\end{itemize}
+
+
+\sphinxlineitem{Return type}
+\sphinxAtStartPar
+tuple{[}float, float, float{]}
+
+\end{description}\end{quote}
+
+\end{fulllineitems}
+
+\index{weightEnergy (scheduler.FitnessEvaluator property)@\spxentry{weightEnergy}\spxextra{scheduler.FitnessEvaluator property}}
+
+\begin{fulllineitems}
+\phantomsection\label{\detokenize{api:scheduler.FitnessEvaluator.weightEnergy}}
+\pysigstartsignatures
+\pysigline
+{\sphinxbfcode{\sphinxupquote{\DUrole{k}{property}\DUrole{w}{ }}}\sphinxbfcode{\sphinxupquote{weightEnergy}}}
+\pysigstopsignatures
+\sphinxAtStartPar
+Weight applied to the energy\sphinxhyphen{}consumption penalty.  Default \sphinxcode{\sphinxupquote{0.15}}.
+Increase this to make the GP prefer energy\sphinxhyphen{}efficient satellite assignments.
+
+\end{fulllineitems}
+
+\index{weightJobs (scheduler.FitnessEvaluator property)@\spxentry{weightJobs}\spxextra{scheduler.FitnessEvaluator property}}
+
+\begin{fulllineitems}
+\phantomsection\label{\detokenize{api:scheduler.FitnessEvaluator.weightJobs}}
+\pysigstartsignatures
+\pysigline
+{\sphinxbfcode{\sphinxupquote{\DUrole{k}{property}\DUrole{w}{ }}}\sphinxbfcode{\sphinxupquote{weightJobs}}}
+\pysigstopsignatures
+\sphinxAtStartPar
+Weight applied to the completion\sphinxhyphen{}ratio reward term.  Default \sphinxcode{\sphinxupquote{0.60}}.
+Increase this to make the GP prioritise scheduling as many jobs as possible.
+
+\end{fulllineitems}
+
+\index{weightTime (scheduler.FitnessEvaluator property)@\spxentry{weightTime}\spxextra{scheduler.FitnessEvaluator property}}
+
+\begin{fulllineitems}
+\phantomsection\label{\detokenize{api:scheduler.FitnessEvaluator.weightTime}}
+\pysigstartsignatures
+\pysigline
+{\sphinxbfcode{\sphinxupquote{\DUrole{k}{property}\DUrole{w}{ }}}\sphinxbfcode{\sphinxupquote{weightTime}}}
+\pysigstopsignatures
+\sphinxAtStartPar
+Weight applied to the mean\sphinxhyphen{}response\sphinxhyphen{}time penalty.  Default \sphinxcode{\sphinxupquote{0.25}}.
+Increase this to make the GP prioritise faster job turnaround.
+
+\end{fulllineitems}
+
+
+\end{fulllineitems}
+
+\index{Individual (class in scheduler)@\spxentry{Individual}\spxextra{class in scheduler}}
+
+\begin{fulllineitems}
+\phantomsection\label{\detokenize{api:scheduler.Individual}}
+\pysigstartsignatures
+\pysigline
+{\sphinxbfcode{\sphinxupquote{\DUrole{k}{class}\DUrole{w}{ }}}\sphinxcode{\sphinxupquote{scheduler.}}\sphinxbfcode{\sphinxupquote{Individual}}}
+\pysigstopsignatures
+\sphinxAtStartPar
+Bases: \sphinxcode{\sphinxupquote{pybind11\_object}}
+
+\sphinxAtStartPar
+Represents a single candidate solution in the Genetic Programming population
+\index{fitness (scheduler.Individual property)@\spxentry{fitness}\spxextra{scheduler.Individual property}}
+
+\begin{fulllineitems}
+\phantomsection\label{\detokenize{api:scheduler.Individual.fitness}}
+\pysigstartsignatures
+\pysigline
+{\sphinxbfcode{\sphinxupquote{\DUrole{k}{property}\DUrole{w}{ }}}\sphinxbfcode{\sphinxupquote{fitness}}}
+\pysigstopsignatures
+\sphinxAtStartPar
+Evaluated fitness score
+
+\end{fulllineitems}
+
+\index{id (scheduler.Individual property)@\spxentry{id}\spxextra{scheduler.Individual property}}
+
+\begin{fulllineitems}
+\phantomsection\label{\detokenize{api:scheduler.Individual.id}}
+\pysigstartsignatures
+\pysigline
+{\sphinxbfcode{\sphinxupquote{\DUrole{k}{property}\DUrole{w}{ }}}\sphinxbfcode{\sphinxupquote{id}}}
+\pysigstopsignatures
+\sphinxAtStartPar
+Unique identifier of the individual
+
+\end{fulllineitems}
+
+\index{tree (scheduler.Individual property)@\spxentry{tree}\spxextra{scheduler.Individual property}}
+
+\begin{fulllineitems}
+\phantomsection\label{\detokenize{api:scheduler.Individual.tree}}
+\pysigstartsignatures
+\pysigline
+{\sphinxbfcode{\sphinxupquote{\DUrole{k}{property}\DUrole{w}{ }}}\sphinxbfcode{\sphinxupquote{tree}}}
+\pysigstopsignatures
+\sphinxAtStartPar
+The individual’s expression tree root node
+
+\end{fulllineitems}
+
+
+\end{fulllineitems}
+
+\index{Job (class in scheduler)@\spxentry{Job}\spxextra{class in scheduler}}
+
+\begin{fulllineitems}
+\phantomsection\label{\detokenize{api:scheduler.Job}}
+\pysigstartsignatures
+\pysigline
+{\sphinxbfcode{\sphinxupquote{\DUrole{k}{class}\DUrole{w}{ }}}\sphinxcode{\sphinxupquote{scheduler.}}\sphinxbfcode{\sphinxupquote{Job}}}
+\pysigstopsignatures
+\sphinxAtStartPar
+Bases: \sphinxcode{\sphinxupquote{pybind11\_object}}
+
+\sphinxAtStartPar
+Represents a job/task to be scheduled
+\index{arrivalTime (scheduler.Job property)@\spxentry{arrivalTime}\spxextra{scheduler.Job property}}
+
+\begin{fulllineitems}
+\phantomsection\label{\detokenize{api:scheduler.Job.arrivalTime}}
+\pysigstartsignatures
+\pysigline
+{\sphinxbfcode{\sphinxupquote{\DUrole{k}{property}\DUrole{w}{ }}}\sphinxbfcode{\sphinxupquote{arrivalTime}}}
+\pysigstopsignatures
+\sphinxAtStartPar
+When the job originally arrived
+
+\end{fulllineitems}
+
+\index{dueMinute (scheduler.Job property)@\spxentry{dueMinute}\spxextra{scheduler.Job property}}
+
+\begin{fulllineitems}
+\phantomsection\label{\detokenize{api:scheduler.Job.dueMinute}}
+\pysigstartsignatures
+\pysigline
+{\sphinxbfcode{\sphinxupquote{\DUrole{k}{property}\DUrole{w}{ }}}\sphinxbfcode{\sphinxupquote{dueMinute}}}
+\pysigstopsignatures
+\sphinxAtStartPar
+The minute by which the job is due
+
+\end{fulllineitems}
+
+\index{durationMinutes (scheduler.Job property)@\spxentry{durationMinutes}\spxextra{scheduler.Job property}}
+
+\begin{fulllineitems}
+\phantomsection\label{\detokenize{api:scheduler.Job.durationMinutes}}
+\pysigstartsignatures
+\pysigline
+{\sphinxbfcode{\sphinxupquote{\DUrole{k}{property}\DUrole{w}{ }}}\sphinxbfcode{\sphinxupquote{durationMinutes}}}
+\pysigstopsignatures
+\sphinxAtStartPar
+Required duration to complete in minutes
+
+\end{fulllineitems}
+
+\index{id (scheduler.Job property)@\spxentry{id}\spxextra{scheduler.Job property}}
+
+\begin{fulllineitems}
+\phantomsection\label{\detokenize{api:scheduler.Job.id}}
+\pysigstartsignatures
+\pysigline
+{\sphinxbfcode{\sphinxupquote{\DUrole{k}{property}\DUrole{w}{ }}}\sphinxbfcode{\sphinxupquote{id}}}
+\pysigstopsignatures
+\sphinxAtStartPar
+Unique identifier of the job
+
+\end{fulllineitems}
+
+\index{initialDeadline (scheduler.Job property)@\spxentry{initialDeadline}\spxextra{scheduler.Job property}}
+
+\begin{fulllineitems}
+\phantomsection\label{\detokenize{api:scheduler.Job.initialDeadline}}
+\pysigstartsignatures
+\pysigline
+{\sphinxbfcode{\sphinxupquote{\DUrole{k}{property}\DUrole{w}{ }}}\sphinxbfcode{\sphinxupquote{initialDeadline}}}
+\pysigstopsignatures
+\sphinxAtStartPar
+Initial established deadline
+
+\end{fulllineitems}
+
+\index{name (scheduler.Job property)@\spxentry{name}\spxextra{scheduler.Job property}}
+
+\begin{fulllineitems}
+\phantomsection\label{\detokenize{api:scheduler.Job.name}}
+\pysigstartsignatures
+\pysigline
+{\sphinxbfcode{\sphinxupquote{\DUrole{k}{property}\DUrole{w}{ }}}\sphinxbfcode{\sphinxupquote{name}}}
+\pysigstopsignatures
+\sphinxAtStartPar
+Name of the job
+
+\end{fulllineitems}
+
+\index{priority (scheduler.Job property)@\spxentry{priority}\spxextra{scheduler.Job property}}
+
+\begin{fulllineitems}
+\phantomsection\label{\detokenize{api:scheduler.Job.priority}}
+\pysigstartsignatures
+\pysigline
+{\sphinxbfcode{\sphinxupquote{\DUrole{k}{property}\DUrole{w}{ }}}\sphinxbfcode{\sphinxupquote{priority}}}
+\pysigstopsignatures
+\sphinxAtStartPar
+Priority level of the job
+
+\end{fulllineitems}
+
+\index{remainingDeadline (scheduler.Job property)@\spxentry{remainingDeadline}\spxextra{scheduler.Job property}}
+
+\begin{fulllineitems}
+\phantomsection\label{\detokenize{api:scheduler.Job.remainingDeadline}}
+\pysigstartsignatures
+\pysigline
+{\sphinxbfcode{\sphinxupquote{\DUrole{k}{property}\DUrole{w}{ }}}\sphinxbfcode{\sphinxupquote{remainingDeadline}}}
+\pysigstopsignatures
+\sphinxAtStartPar
+Remaining time before the deadline is missed
+
+\end{fulllineitems}
+
+\index{taskSize (scheduler.Job property)@\spxentry{taskSize}\spxextra{scheduler.Job property}}
+
+\begin{fulllineitems}
+\phantomsection\label{\detokenize{api:scheduler.Job.taskSize}}
+\pysigstartsignatures
+\pysigline
+{\sphinxbfcode{\sphinxupquote{\DUrole{k}{property}\DUrole{w}{ }}}\sphinxbfcode{\sphinxupquote{taskSize}}}
+\pysigstopsignatures
+\sphinxAtStartPar
+Size or complexity of the task
+
+\end{fulllineitems}
+
+
+\end{fulllineitems}
+
+\index{NodeType (class in scheduler)@\spxentry{NodeType}\spxextra{class in scheduler}}
+
+\begin{fulllineitems}
+\phantomsection\label{\detokenize{api:scheduler.NodeType}}
+\pysigstartsignatures
+\pysigline
+{\sphinxbfcode{\sphinxupquote{\DUrole{k}{class}\DUrole{w}{ }}}\sphinxcode{\sphinxupquote{scheduler.}}\sphinxbfcode{\sphinxupquote{NodeType}}}
+\pysigstopsignatures
+\sphinxAtStartPar
+Bases: \sphinxcode{\sphinxupquote{pybind11\_object}}
+
+\sphinxAtStartPar
+Enum representing the type of operation or value in an expression tree node
+
+\sphinxAtStartPar
+Members:
+\begin{quote}
+
+\sphinxAtStartPar
+ADD : Addition operator
+
+\sphinxAtStartPar
+SUB : Subtraction operator
+
+\sphinxAtStartPar
+MUL : Multiplication operator
+
+\sphinxAtStartPar
+DIV : Division operator
+
+\sphinxAtStartPar
+MAX\_OP : Maximum of two values
+
+\sphinxAtStartPar
+MIN\_OP : Minimum of two values
+
+\sphinxAtStartPar
+NEG : Negation operator
+
+\sphinxAtStartPar
+ABS : Absolute value operator
+
+\sphinxAtStartPar
+INV : Inverse value operator
+
+\sphinxAtStartPar
+TERMINAL : Terminal node (variable)
+
+\sphinxAtStartPar
+CONST : Constant value node
+\end{quote}
+\index{ABS (scheduler.NodeType attribute)@\spxentry{ABS}\spxextra{scheduler.NodeType attribute}}
+
+\begin{fulllineitems}
+\phantomsection\label{\detokenize{api:scheduler.NodeType.ABS}}
+\pysigstartsignatures
+\pysigline
+{\sphinxbfcode{\sphinxupquote{ABS}}\sphinxbfcode{\sphinxupquote{\DUrole{w}{ }\DUrole{p}{=}\DUrole{w}{ }\textless{}NodeType.ABS: 7\textgreater{}}}}
+\pysigstopsignatures
+\end{fulllineitems}
+
+\index{ADD (scheduler.NodeType attribute)@\spxentry{ADD}\spxextra{scheduler.NodeType attribute}}
+
+\begin{fulllineitems}
+\phantomsection\label{\detokenize{api:scheduler.NodeType.ADD}}
+\pysigstartsignatures
+\pysigline
+{\sphinxbfcode{\sphinxupquote{ADD}}\sphinxbfcode{\sphinxupquote{\DUrole{w}{ }\DUrole{p}{=}\DUrole{w}{ }\textless{}NodeType.ADD: 0\textgreater{}}}}
+\pysigstopsignatures
+\end{fulllineitems}
+
+\index{CONST (scheduler.NodeType attribute)@\spxentry{CONST}\spxextra{scheduler.NodeType attribute}}
+
+\begin{fulllineitems}
+\phantomsection\label{\detokenize{api:scheduler.NodeType.CONST}}
+\pysigstartsignatures
+\pysigline
+{\sphinxbfcode{\sphinxupquote{CONST}}\sphinxbfcode{\sphinxupquote{\DUrole{w}{ }\DUrole{p}{=}\DUrole{w}{ }\textless{}NodeType.CONST: 10\textgreater{}}}}
+\pysigstopsignatures
+\end{fulllineitems}
+
+\index{DIV (scheduler.NodeType attribute)@\spxentry{DIV}\spxextra{scheduler.NodeType attribute}}
+
+\begin{fulllineitems}
+\phantomsection\label{\detokenize{api:scheduler.NodeType.DIV}}
+\pysigstartsignatures
+\pysigline
+{\sphinxbfcode{\sphinxupquote{DIV}}\sphinxbfcode{\sphinxupquote{\DUrole{w}{ }\DUrole{p}{=}\DUrole{w}{ }\textless{}NodeType.DIV: 3\textgreater{}}}}
+\pysigstopsignatures
+\end{fulllineitems}
+
+\index{INV (scheduler.NodeType attribute)@\spxentry{INV}\spxextra{scheduler.NodeType attribute}}
+
+\begin{fulllineitems}
+\phantomsection\label{\detokenize{api:scheduler.NodeType.INV}}
+\pysigstartsignatures
+\pysigline
+{\sphinxbfcode{\sphinxupquote{INV}}\sphinxbfcode{\sphinxupquote{\DUrole{w}{ }\DUrole{p}{=}\DUrole{w}{ }\textless{}NodeType.INV: 8\textgreater{}}}}
+\pysigstopsignatures
+\end{fulllineitems}
+
+\index{MAX\_OP (scheduler.NodeType attribute)@\spxentry{MAX\_OP}\spxextra{scheduler.NodeType attribute}}
+
+\begin{fulllineitems}
+\phantomsection\label{\detokenize{api:scheduler.NodeType.MAX_OP}}
+\pysigstartsignatures
+\pysigline
+{\sphinxbfcode{\sphinxupquote{MAX\_OP}}\sphinxbfcode{\sphinxupquote{\DUrole{w}{ }\DUrole{p}{=}\DUrole{w}{ }\textless{}NodeType.MAX\_OP: 4\textgreater{}}}}
+\pysigstopsignatures
+\end{fulllineitems}
+
+\index{MIN\_OP (scheduler.NodeType attribute)@\spxentry{MIN\_OP}\spxextra{scheduler.NodeType attribute}}
+
+\begin{fulllineitems}
+\phantomsection\label{\detokenize{api:scheduler.NodeType.MIN_OP}}
+\pysigstartsignatures
+\pysigline
+{\sphinxbfcode{\sphinxupquote{MIN\_OP}}\sphinxbfcode{\sphinxupquote{\DUrole{w}{ }\DUrole{p}{=}\DUrole{w}{ }\textless{}NodeType.MIN\_OP: 5\textgreater{}}}}
+\pysigstopsignatures
+\end{fulllineitems}
+
+\index{MUL (scheduler.NodeType attribute)@\spxentry{MUL}\spxextra{scheduler.NodeType attribute}}
+
+\begin{fulllineitems}
+\phantomsection\label{\detokenize{api:scheduler.NodeType.MUL}}
+\pysigstartsignatures
+\pysigline
+{\sphinxbfcode{\sphinxupquote{MUL}}\sphinxbfcode{\sphinxupquote{\DUrole{w}{ }\DUrole{p}{=}\DUrole{w}{ }\textless{}NodeType.MUL: 2\textgreater{}}}}
+\pysigstopsignatures
+\end{fulllineitems}
+
+\index{NEG (scheduler.NodeType attribute)@\spxentry{NEG}\spxextra{scheduler.NodeType attribute}}
+
+\begin{fulllineitems}
+\phantomsection\label{\detokenize{api:scheduler.NodeType.NEG}}
+\pysigstartsignatures
+\pysigline
+{\sphinxbfcode{\sphinxupquote{NEG}}\sphinxbfcode{\sphinxupquote{\DUrole{w}{ }\DUrole{p}{=}\DUrole{w}{ }\textless{}NodeType.NEG: 6\textgreater{}}}}
+\pysigstopsignatures
+\end{fulllineitems}
+
+\index{SUB (scheduler.NodeType attribute)@\spxentry{SUB}\spxextra{scheduler.NodeType attribute}}
+
+\begin{fulllineitems}
+\phantomsection\label{\detokenize{api:scheduler.NodeType.SUB}}
+\pysigstartsignatures
+\pysigline
+{\sphinxbfcode{\sphinxupquote{SUB}}\sphinxbfcode{\sphinxupquote{\DUrole{w}{ }\DUrole{p}{=}\DUrole{w}{ }\textless{}NodeType.SUB: 1\textgreater{}}}}
+\pysigstopsignatures
+\end{fulllineitems}
+
+\index{TERMINAL (scheduler.NodeType attribute)@\spxentry{TERMINAL}\spxextra{scheduler.NodeType attribute}}
+
+\begin{fulllineitems}
+\phantomsection\label{\detokenize{api:scheduler.NodeType.TERMINAL}}
+\pysigstartsignatures
+\pysigline
+{\sphinxbfcode{\sphinxupquote{TERMINAL}}\sphinxbfcode{\sphinxupquote{\DUrole{w}{ }\DUrole{p}{=}\DUrole{w}{ }\textless{}NodeType.TERMINAL: 9\textgreater{}}}}
+\pysigstopsignatures
+\end{fulllineitems}
+
+
+
+\begin{fulllineitems}
+
+\pysigstartsignatures
+\pysigline
+{\sphinxbfcode{\sphinxupquote{NodeType.name~\sphinxhyphen{}\textgreater{}~str}}}
+\pysigstopsignatures
+\end{fulllineitems}
+
+\index{value (scheduler.NodeType property)@\spxentry{value}\spxextra{scheduler.NodeType property}}
+
+\begin{fulllineitems}
+\phantomsection\label{\detokenize{api:scheduler.NodeType.value}}
+\pysigstartsignatures
+\pysigline
+{\sphinxbfcode{\sphinxupquote{\DUrole{k}{property}\DUrole{w}{ }}}\sphinxbfcode{\sphinxupquote{value}}}
+\pysigstopsignatures
+\end{fulllineitems}
+
+
+\end{fulllineitems}
+
+\index{Satellite (class in scheduler)@\spxentry{Satellite}\spxextra{class in scheduler}}
+
+\begin{fulllineitems}
+\phantomsection\label{\detokenize{api:scheduler.Satellite}}
+\pysigstartsignatures
+\pysigline
+{\sphinxbfcode{\sphinxupquote{\DUrole{k}{class}\DUrole{w}{ }}}\sphinxcode{\sphinxupquote{scheduler.}}\sphinxbfcode{\sphinxupquote{Satellite}}}
+\pysigstopsignatures
+\sphinxAtStartPar
+Bases: \sphinxcode{\sphinxupquote{pybind11\_object}}
+
+\sphinxAtStartPar
+Represents a computing satellite resource
+\index{ComputingCapability (scheduler.Satellite property)@\spxentry{ComputingCapability}\spxextra{scheduler.Satellite property}}
+
+\begin{fulllineitems}
+\phantomsection\label{\detokenize{api:scheduler.Satellite.ComputingCapability}}
+\pysigstartsignatures
+\pysigline
+{\sphinxbfcode{\sphinxupquote{\DUrole{k}{property}\DUrole{w}{ }}}\sphinxbfcode{\sphinxupquote{ComputingCapability}}}
+\pysigstopsignatures
+\sphinxAtStartPar
+Max computing capability of the satellite
+
+\end{fulllineitems}
+
+\index{ComputingLoad (scheduler.Satellite property)@\spxentry{ComputingLoad}\spxextra{scheduler.Satellite property}}
+
+\begin{fulllineitems}
+\phantomsection\label{\detokenize{api:scheduler.Satellite.ComputingLoad}}
+\pysigstartsignatures
+\pysigline
+{\sphinxbfcode{\sphinxupquote{\DUrole{k}{property}\DUrole{w}{ }}}\sphinxbfcode{\sphinxupquote{ComputingLoad}}}
+\pysigstopsignatures
+\sphinxAtStartPar
+Current computing load
+
+\end{fulllineitems}
+
+\index{RemainingEnergy (scheduler.Satellite property)@\spxentry{RemainingEnergy}\spxextra{scheduler.Satellite property}}
+
+\begin{fulllineitems}
+\phantomsection\label{\detokenize{api:scheduler.Satellite.RemainingEnergy}}
+\pysigstartsignatures
+\pysigline
+{\sphinxbfcode{\sphinxupquote{\DUrole{k}{property}\DUrole{w}{ }}}\sphinxbfcode{\sphinxupquote{RemainingEnergy}}}
+\pysigstopsignatures
+\sphinxAtStartPar
+Remaining energy available for computation
+
+\end{fulllineitems}
+
+\index{activeTasks (scheduler.Satellite property)@\spxentry{activeTasks}\spxextra{scheduler.Satellite property}}
+
+\begin{fulllineitems}
+\phantomsection\label{\detokenize{api:scheduler.Satellite.activeTasks}}
+\pysigstartsignatures
+\pysigline
+{\sphinxbfcode{\sphinxupquote{\DUrole{k}{property}\DUrole{w}{ }}}\sphinxbfcode{\sphinxupquote{activeTasks}}}
+\pysigstopsignatures
+\sphinxAtStartPar
+Number of active tasks running on the satellite
+
+\end{fulllineitems}
+
+\index{id (scheduler.Satellite property)@\spxentry{id}\spxextra{scheduler.Satellite property}}
+
+\begin{fulllineitems}
+\phantomsection\label{\detokenize{api:scheduler.Satellite.id}}
+\pysigstartsignatures
+\pysigline
+{\sphinxbfcode{\sphinxupquote{\DUrole{k}{property}\DUrole{w}{ }}}\sphinxbfcode{\sphinxupquote{id}}}
+\pysigstopsignatures
+\sphinxAtStartPar
+Unique identifier of the satellite
+
+\end{fulllineitems}
+
+\index{listeningDome (scheduler.Satellite property)@\spxentry{listeningDome}\spxextra{scheduler.Satellite property}}
+
+\begin{fulllineitems}
+\phantomsection\label{\detokenize{api:scheduler.Satellite.listeningDome}}
+\pysigstartsignatures
+\pysigline
+{\sphinxbfcode{\sphinxupquote{\DUrole{k}{property}\DUrole{w}{ }}}\sphinxbfcode{\sphinxupquote{listeningDome}}}
+\pysigstopsignatures
+\sphinxAtStartPar
+The listening dome availability state
+
+\end{fulllineitems}
+
+\index{name (scheduler.Satellite property)@\spxentry{name}\spxextra{scheduler.Satellite property}}
+
+\begin{fulllineitems}
+\phantomsection\label{\detokenize{api:scheduler.Satellite.name}}
+\pysigstartsignatures
+\pysigline
+{\sphinxbfcode{\sphinxupquote{\DUrole{k}{property}\DUrole{w}{ }}}\sphinxbfcode{\sphinxupquote{name}}}
+\pysigstopsignatures
+\sphinxAtStartPar
+Name of the satellite
+
+\end{fulllineitems}
+
+
+\end{fulllineitems}
+
+\index{SchedulerGP (class in scheduler)@\spxentry{SchedulerGP}\spxextra{class in scheduler}}
+
+\begin{fulllineitems}
+\phantomsection\label{\detokenize{api:scheduler.SchedulerGP}}
+\pysigstartsignatures
+\pysigline
+{\sphinxbfcode{\sphinxupquote{\DUrole{k}{class}\DUrole{w}{ }}}\sphinxcode{\sphinxupquote{scheduler.}}\sphinxbfcode{\sphinxupquote{SchedulerGP}}}
+\pysigstopsignatures
+\sphinxAtStartPar
+Bases: \sphinxcode{\sphinxupquote{pybind11\_object}}
+
+\sphinxAtStartPar
+Genetic Programming Scheduler Manager
+\index{getPopulation() (scheduler.SchedulerGP method)@\spxentry{getPopulation()}\spxextra{scheduler.SchedulerGP method}}
+
+\begin{fulllineitems}
+\phantomsection\label{\detokenize{api:scheduler.SchedulerGP.getPopulation}}
+\pysigstartsignatures
+\pysiglinewithargsret
+{\sphinxbfcode{\sphinxupquote{getPopulation}}}
+{\sphinxparam{\DUrole{n}{self}\DUrole{p}{:}\DUrole{w}{ }\DUrole{n}{{\hyperref[\detokenize{api:scheduler.SchedulerGP}]{\sphinxcrossref{scheduler.SchedulerGP}}}}}}
+{{ $\rightarrow$ list\DUrole{p}{{[}}{\hyperref[\detokenize{api:scheduler.Individual}]{\sphinxcrossref{scheduler.Individual}}}\DUrole{p}{{]}}}}
+\pysigstopsignatures
+\sphinxAtStartPar
+Get the current population of individuals
+
+\end{fulllineitems}
+
+\index{initialize() (scheduler.SchedulerGP method)@\spxentry{initialize()}\spxextra{scheduler.SchedulerGP method}}
+
+\begin{fulllineitems}
+\phantomsection\label{\detokenize{api:scheduler.SchedulerGP.initialize}}
+\pysigstartsignatures
+\pysiglinewithargsret
+{\sphinxbfcode{\sphinxupquote{initialize}}}
+{\sphinxparam{\DUrole{n}{self}\DUrole{p}{:}\DUrole{w}{ }\DUrole{n}{{\hyperref[\detokenize{api:scheduler.SchedulerGP}]{\sphinxcrossref{scheduler.SchedulerGP}}}}}\sphinxparamcomma \sphinxparam{\DUrole{n}{populationSize}\DUrole{p}{:}\DUrole{w}{ }\DUrole{n}{int}\DUrole{w}{ }\DUrole{o}{=}\DUrole{w}{ }\DUrole{default_value}{200}}\sphinxparamcomma \sphinxparam{\DUrole{n}{crossoverRate}\DUrole{p}{:}\DUrole{w}{ }\DUrole{n}{float}\DUrole{w}{ }\DUrole{o}{=}\DUrole{w}{ }\DUrole{default_value}{0.8}}\sphinxparamcomma \sphinxparam{\DUrole{n}{mutationRate}\DUrole{p}{:}\DUrole{w}{ }\DUrole{n}{float}\DUrole{w}{ }\DUrole{o}{=}\DUrole{w}{ }\DUrole{default_value}{0.08}}\sphinxparamcomma \sphinxparam{\DUrole{n}{elitismCount}\DUrole{p}{:}\DUrole{w}{ }\DUrole{n}{int}\DUrole{w}{ }\DUrole{o}{=}\DUrole{w}{ }\DUrole{default_value}{2}}}
+{{ $\rightarrow$ None}}
+\pysigstopsignatures
+\sphinxAtStartPar
+Initialize the GP population with parameters
+
+\end{fulllineitems}
+
+\index{printSchedule() (scheduler.SchedulerGP method)@\spxentry{printSchedule()}\spxextra{scheduler.SchedulerGP method}}
+
+\begin{fulllineitems}
+\phantomsection\label{\detokenize{api:scheduler.SchedulerGP.printSchedule}}
+\pysigstartsignatures
+\pysiglinewithargsret
+{\sphinxbfcode{\sphinxupquote{printSchedule}}}
+{\sphinxparam{\DUrole{n}{self}\DUrole{p}{:}\DUrole{w}{ }\DUrole{n}{{\hyperref[\detokenize{api:scheduler.SchedulerGP}]{\sphinxcrossref{scheduler.SchedulerGP}}}}}}
+{{ $\rightarrow$ None}}
+\pysigstopsignatures
+\sphinxAtStartPar
+Print the best schedule found so far
+
+\end{fulllineitems}
+
+\index{solveNextGeneration() (scheduler.SchedulerGP method)@\spxentry{solveNextGeneration()}\spxextra{scheduler.SchedulerGP method}}
+
+\begin{fulllineitems}
+\phantomsection\label{\detokenize{api:scheduler.SchedulerGP.solveNextGeneration}}
+\pysigstartsignatures
+\pysiglinewithargsret
+{\sphinxbfcode{\sphinxupquote{solveNextGeneration}}}
+{\sphinxparam{\DUrole{n}{self}\DUrole{p}{:}\DUrole{w}{ }\DUrole{n}{{\hyperref[\detokenize{api:scheduler.SchedulerGP}]{\sphinxcrossref{scheduler.SchedulerGP}}}}}}
+{{ $\rightarrow$ None}}
+\pysigstopsignatures
+\sphinxAtStartPar
+Evaluate the current population and evolve to the next generation
+
+\end{fulllineitems}
+
+
+\end{fulllineitems}
+
+\index{SimulationSnapshot (class in scheduler)@\spxentry{SimulationSnapshot}\spxextra{class in scheduler}}
+
+\begin{fulllineitems}
+\phantomsection\label{\detokenize{api:scheduler.SimulationSnapshot}}
+\pysigstartsignatures
+\pysigline
+{\sphinxbfcode{\sphinxupquote{\DUrole{k}{class}\DUrole{w}{ }}}\sphinxcode{\sphinxupquote{scheduler.}}\sphinxbfcode{\sphinxupquote{SimulationSnapshot}}}
+\pysigstopsignatures
+\sphinxAtStartPar
+Bases: \sphinxcode{\sphinxupquote{pybind11\_object}}
+
+\sphinxAtStartPar
+A self\sphinxhyphen{}contained, point\sphinxhyphen{}in\sphinxhyphen{}time snapshot of the simulation world.
+
+\sphinxAtStartPar
+The external application must construct and populate a snapshot before
+calling {\hyperref[\detokenize{api:scheduler.FitnessEvaluator.evaluate}]{\sphinxcrossref{\sphinxcode{\sphinxupquote{FitnessEvaluator.evaluate()}}}}} for each GP generation.
+All satellite and job objects are copied into the snapshot, so subsequent
+changes to the originals have no effect on the evaluator.
+\subsubsection*{Example}
+
+\begin{sphinxVerbatim}[commandchars=\\\{\}]
+\PYG{n}{snap} \PYG{o}{=} \PYG{n}{scheduler}\PYG{o}{.}\PYG{n}{SimulationSnapshot}\PYG{p}{(}
+    \PYG{n}{currentMinute} \PYG{o}{=} \PYG{l+m+mf}{0.0}\PYG{p}{,}
+    \PYG{n}{satellites}    \PYG{o}{=} \PYG{n}{my\PYGZus{}satellites}\PYG{p}{,}
+    \PYG{n}{jobs}          \PYG{o}{=} \PYG{n}{my\PYGZus{}jobs}\PYG{p}{,}
+    \PYG{n}{uniformEnergy} \PYG{o}{=} \PYG{l+m+mf}{2.5}\PYG{p}{,}   \PYG{c+c1}{\PYGZsh{} watts per minute per satellite}
+\PYG{p}{)}
+\end{sphinxVerbatim}
+\index{currentMinute (scheduler.SimulationSnapshot property)@\spxentry{currentMinute}\spxextra{scheduler.SimulationSnapshot property}}
+
+\begin{fulllineitems}
+\phantomsection\label{\detokenize{api:scheduler.SimulationSnapshot.currentMinute}}
+\pysigstartsignatures
+\pysigline
+{\sphinxbfcode{\sphinxupquote{\DUrole{k}{property}\DUrole{w}{ }}}\sphinxbfcode{\sphinxupquote{currentMinute}}}
+\pysigstopsignatures
+\sphinxAtStartPar
+Simulation clock at snapshot time (minutes from epoch).
+
+\end{fulllineitems}
+
+\index{energyPerMinute (scheduler.SimulationSnapshot property)@\spxentry{energyPerMinute}\spxextra{scheduler.SimulationSnapshot property}}
+
+\begin{fulllineitems}
+\phantomsection\label{\detokenize{api:scheduler.SimulationSnapshot.energyPerMinute}}
+\pysigstartsignatures
+\pysigline
+{\sphinxbfcode{\sphinxupquote{\DUrole{k}{property}\DUrole{w}{ }}}\sphinxbfcode{\sphinxupquote{energyPerMinute}}}
+\pysigstopsignatures
+\sphinxAtStartPar
+Energy consumed per minute of computation, indexed by satellite position in
+the \sphinxcode{\sphinxupquote{satellites}} list.  When non\sphinxhyphen{}empty this overrides \sphinxcode{\sphinxupquote{uniformEnergy}}.
+Must have the same length as \sphinxcode{\sphinxupquote{satellites}} if provided.
+
+\end{fulllineitems}
+
+\index{jobs (scheduler.SimulationSnapshot property)@\spxentry{jobs}\spxextra{scheduler.SimulationSnapshot property}}
+
+\begin{fulllineitems}
+\phantomsection\label{\detokenize{api:scheduler.SimulationSnapshot.jobs}}
+\pysigstartsignatures
+\pysigline
+{\sphinxbfcode{\sphinxupquote{\DUrole{k}{property}\DUrole{w}{ }}}\sphinxbfcode{\sphinxupquote{jobs}}}
+\pysigstopsignatures
+\sphinxAtStartPar
+Pool of jobs available for scheduling at this instant.
+
+\end{fulllineitems}
+
+\index{satellites (scheduler.SimulationSnapshot property)@\spxentry{satellites}\spxextra{scheduler.SimulationSnapshot property}}
+
+\begin{fulllineitems}
+\phantomsection\label{\detokenize{api:scheduler.SimulationSnapshot.satellites}}
+\pysigstartsignatures
+\pysigline
+{\sphinxbfcode{\sphinxupquote{\DUrole{k}{property}\DUrole{w}{ }}}\sphinxbfcode{\sphinxupquote{satellites}}}
+\pysigstopsignatures
+\sphinxAtStartPar
+Current state of every satellite in the constellation.
+
+\end{fulllineitems}
+
+
+\end{fulllineitems}
+
+\index{module@\spxentry{module}!schedulerlib@\spxentry{schedulerlib}}\index{schedulerlib@\spxentry{schedulerlib}!module@\spxentry{module}}\phantomsection\label{\detokenize{api:module-schedulerlib}}
+
+\renewcommand{\indexname}{Python Module Index}
+\begin{sphinxtheindex}
+\let\bigletter\sphinxstyleindexlettergroup
+\bigletter{s}
+\item\relax\sphinxstyleindexentry{scheduler}\sphinxstyleindexpageref{api:\detokenize{module-scheduler}}
+\item\relax\sphinxstyleindexentry{schedulerlib}\sphinxstyleindexpageref{api:\detokenize{module-schedulerlib}}
+\end{sphinxtheindex}
 
 \renewcommand{\indexname}{Index}
 \printindex

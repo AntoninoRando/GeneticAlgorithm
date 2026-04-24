@@ -205,7 +205,7 @@ private:
     #pragma region FIELDS ------------------------------------------------------
     vector<Satellite>    satellites_;
     vector<Job>          jobs_;
-    mt19937              rng_;
+    mutable mt19937      rng_;
     vector<TerminalDef>  registry_;
     TreeBuilder          builder_;
     TreeOperators        ops_;

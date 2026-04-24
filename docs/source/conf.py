@@ -1,5 +1,12 @@
 import os, sys
 sys.path.insert(0, os.path.abspath('../../'))   # so Sphinx can find mylib/
+print("SPHINX SYS.PATH:", sys.path)
+try:
+    import scheduler
+    print("SUCCESSFULLY IMPORTED SCHEDULER", scheduler)
+    print("SCHEDULER DIR:", dir(scheduler))
+except Exception as e:
+    print("FAILED TO IMPORT SCHEDULER", e)
 
 project = 'schedulerlib'
 copyright = '2026, La Sapienza, Università di Roma, Emiliano Casalicchio, Antonino Rando'
@@ -19,4 +26,4 @@ html_theme = 'furo'                # clean modern look
 napoleon_numpy_docstring = True
 napoleon_google_docstring = False
 
-autodoc_mock_imports = ["mylib"]
+autodoc_mock_imports = ["schedulerlib"]

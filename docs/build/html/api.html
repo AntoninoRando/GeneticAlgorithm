@@ -3,7 +3,7 @@
   <head><meta charset="utf-8">
     <meta name="viewport" content="width=device-width,initial-scale=1">
     <meta name="color-scheme" content="light dark"><meta name="viewport" content="width=device-width, initial-scale=1" />
-<link rel="index" title="Index" href="genindex.html"><link rel="search" title="Search" href="search.html">
+<link rel="index" title="Index" href="genindex.html"><link rel="search" title="Search" href="search.html"><link rel="prev" title="schedulerlib documentation" href="index.html">
 
     <!-- Generated with Sphinx 9.1.0 and Furo 2025.12.19 -->
         <title>API Reference - schedulerlib 0 documentation</title>
@@ -172,7 +172,7 @@
           <svg class="theme-icon-when-light"><use href="#svg-sun"></use></svg>
         </button>
       </div>
-      <label class="toc-overlay-icon toc-header-icon no-toc" for="__toc">
+      <label class="toc-overlay-icon toc-header-icon" for="__toc">
         <span class="icon"><svg><use href="#svg-toc"></use></svg></span>
       </label>
     </div>
@@ -190,7 +190,11 @@
   <input type="hidden" name="area" value="default">
 </form>
 <div id="searchbox"></div><div class="sidebar-scroll"><div class="sidebar-tree">
-  
+  <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1 current current-page"><a class="current reference internal" href="#">API Reference</a></li>
+</ul>
+
 </div>
 </div>
 
@@ -222,14 +226,470 @@
               <svg class="theme-icon-when-light"><use href="#svg-sun"></use></svg>
             </button>
           </div>
-          <label class="toc-overlay-icon toc-content-icon no-toc" for="__toc">
+          <label class="toc-overlay-icon toc-content-icon" for="__toc">
             <span class="icon"><svg><use href="#svg-toc"></use></svg></span>
           </label>
         </div>
         <article role="main" id="furo-main-content">
-          <section id="api-reference">
-<h1>API Reference<a class="headerlink" href="#api-reference" title="Link to this heading">¶</a></h1>
+          <section id="module-scheduler">
+<span id="api-reference"></span><h1>API Reference<a class="headerlink" href="#module-scheduler" title="Link to this heading">¶</a></h1>
+<p>Python bindings for the Scheduler GP module</p>
+<dl class="py class">
+<dt class="sig sig-object py" id="scheduler.ExprNode">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">scheduler.</span></span><span class="sig-name descname"><span class="pre">ExprNode</span></span><a class="headerlink" href="#scheduler.ExprNode" title="Link to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">pybind11_object</span></code></p>
+<p>A node in the expression tree used by the GP individual</p>
+<dl class="py property">
+<dt class="sig sig-object py" id="scheduler.ExprNode.children">
+<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">children</span></span><a class="headerlink" href="#scheduler.ExprNode.children" title="Link to this definition">¶</a></dt>
+<dd><p>List of child nodes</p>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="scheduler.ExprNode.constValue">
+<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">constValue</span></span><a class="headerlink" href="#scheduler.ExprNode.constValue" title="Link to this definition">¶</a></dt>
+<dd><p>Constant value if the node is a CONST</p>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="scheduler.ExprNode.nodeType">
+<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">nodeType</span></span><a class="headerlink" href="#scheduler.ExprNode.nodeType" title="Link to this definition">¶</a></dt>
+<dd><p>Type of the node (e.g., ADD, CONST, TERMINAL)</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="scheduler.ExprNode.size">
+<span class="sig-name descname"><span class="pre">size</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">self</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#scheduler.ExprNode" title="scheduler.ExprNode"><span class="pre">scheduler.ExprNode</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">int</span></span></span><a class="headerlink" href="#scheduler.ExprNode.size" title="Link to this definition">¶</a></dt>
+<dd><p>Get the size of the subtree rooted at this node</p>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="scheduler.ExprNode.terminalIndex">
+<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">terminalIndex</span></span><a class="headerlink" href="#scheduler.ExprNode.terminalIndex" title="Link to this definition">¶</a></dt>
+<dd><p>Index of the terminal if the node is a TERMINAL</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="scheduler.FitnessEvaluator">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">scheduler.</span></span><span class="sig-name descname"><span class="pre">FitnessEvaluator</span></span><a class="headerlink" href="#scheduler.FitnessEvaluator" title="Link to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">pybind11_object</span></code></p>
+<p>Evaluates a population of GP individuals by simulating a greedy schedule
+with each individual’s expression tree as the priority function.</p>
+<p>After evaluation every <a class="reference internal" href="#scheduler.Individual" title="scheduler.Individual"><code class="xref py py-class docutils literal notranslate"><span class="pre">Individual</span></code></a> in the population will have
+its <code class="docutils literal notranslate"><span class="pre">fitness</span></code> field set to a scalar value that reflects how well the tree
+minimised response time and energy consumption.</p>
+<section id="fitness-formula">
+<h2>Fitness formula<a class="headerlink" href="#fitness-formula" title="Link to this heading">¶</a></h2>
+<p>Three raw objectives are collected for each individual:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">compRatio</span></code>  – fraction of available jobs that were successfully
+scheduled (higher is better).</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">meanResp</span></code>   – average response time (completion - arrival) in minutes
+(lower is better).</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">energy</span></code>     – total energy consumed across all satellites in watt-
+minutes (lower is better).</p></li>
+</ul>
+<p>Each objective is normalised to <code class="docutils literal notranslate"><span class="pre">[0,</span> <span class="pre">1]</span></code> across the current population
+so that differences in scale cannot dominate the result.  The final fitness
+is then:</p>
+<div class="math-wrapper docutils container">
+<div class="math notranslate nohighlight">
+\[\begin{split}f = w_{\\text{jobs}} \\cdot \\widehat{r}
+  - w_{\\text{time}} \\cdot \\widehat{t}
+  - w_{\\text{energy}} \\cdot \\widehat{e}\end{split}\]</div>
+</div>
+<p>where <span class="math notranslate nohighlight">\(\\hat{\\cdot}\)</span> denotes population-normalised values and the
+default weights are <code class="docutils literal notranslate"><span class="pre">(0.60,</span> <span class="pre">0.25,</span> <span class="pre">0.15)</span></code>.</p>
+<p class="rubric">Example</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span> <span class="nn">scheduler</span> <span class="kn">import</span> <span class="n">SchedulerGP</span><span class="p">,</span> <span class="n">FitnessEvaluator</span><span class="p">,</span> <span class="n">SimulationSnapshot</span>
+<span class="kn">from</span> <span class="nn">scheduler</span> <span class="kn">import</span> <span class="n">buildTerminalRegistry</span>
+
+<span class="n">gp</span>   <span class="o">=</span> <span class="n">SchedulerGP</span><span class="p">(</span><span class="n">satellites</span><span class="p">,</span> <span class="n">jobs</span><span class="p">)</span>
+<span class="n">gp</span><span class="o">.</span><span class="n">initialize</span><span class="p">(</span><span class="n">populationSize</span><span class="o">=</span><span class="mi">100</span><span class="p">)</span>
+
+<span class="nb">eval</span> <span class="o">=</span> <span class="n">FitnessEvaluator</span><span class="p">(</span><span class="n">buildTerminalRegistry</span><span class="p">())</span>
+
+<span class="k">for</span> <span class="n">generation</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">50</span><span class="p">):</span>
+    <span class="n">snap</span> <span class="o">=</span> <span class="n">SimulationSnapshot</span><span class="p">(</span><span class="n">current_minute</span><span class="p">,</span> <span class="n">satellites</span><span class="p">,</span> <span class="n">jobs</span><span class="p">)</span>
+    <span class="nb">eval</span><span class="o">.</span><span class="n">evaluate</span><span class="p">(</span><span class="n">gp</span><span class="o">.</span><span class="n">getPopulation</span><span class="p">(),</span> <span class="n">snap</span><span class="p">)</span>  <span class="c1"># writes fitness in place</span>
+    <span class="n">gp</span><span class="o">.</span><span class="n">solveNextGeneration</span><span class="p">()</span>
+</pre></div>
+</div>
+<dl class="py method">
+<dt class="sig sig-object py" id="scheduler.FitnessEvaluator.evaluate">
+<span class="sig-name descname"><span class="pre">evaluate</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">self</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#scheduler.FitnessEvaluator" title="scheduler.FitnessEvaluator"><span class="pre">scheduler.FitnessEvaluator</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">population</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="#scheduler.Individual" title="scheduler.Individual"><span class="pre">scheduler.Individual</span></a><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">snap</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#scheduler.SimulationSnapshot" title="scheduler.SimulationSnapshot"><span class="pre">scheduler.SimulationSnapshot</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#scheduler.FitnessEvaluator.evaluate" title="Link to this definition">¶</a></dt>
+<dd><p>Score every individual in <em>population</em> and write the result into each
+individual’s <code class="docutils literal notranslate"><span class="pre">fitness</span></code> field.</p>
+<p>This is the only method the main GP loop needs to call each generation.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>population</strong> (<em>list</em><em>[</em><a class="reference internal" href="#scheduler.Individual" title="scheduler.Individual"><em>Individual</em></a><em>]</em>) – The current GP population, obtained via <a class="reference internal" href="#scheduler.SchedulerGP.getPopulation" title="scheduler.SchedulerGP.getPopulation"><code class="xref py py-meth docutils literal notranslate"><span class="pre">SchedulerGP.getPopulation()</span></code></a>.
+Each individual’s <code class="docutils literal notranslate"><span class="pre">fitness</span></code> field is updated in place.</p></li>
+<li><p><strong>snap</strong> (<a class="reference internal" href="#scheduler.SimulationSnapshot" title="scheduler.SimulationSnapshot"><em>SimulationSnapshot</em></a>) – Read-only snapshot of the current simulation state.  The evaluator
+runs a fresh greedy simulation for every individual, so <code class="docutils literal notranslate"><span class="pre">snap</span></code> is
+never modified.</p></li>
+</ul>
+</dd>
+</dl>
+<p class="rubric">Notes</p>
+<p>Fitness values are population-relative: the same tree may receive a
+different score in a different generation if the rest of the population
+has changed.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="scheduler.FitnessEvaluator.evaluate_single">
+<span class="sig-name descname"><span class="pre">evaluate_single</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">self</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#scheduler.FitnessEvaluator" title="scheduler.FitnessEvaluator"><span class="pre">scheduler.FitnessEvaluator</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">individual</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#scheduler.Individual" title="scheduler.Individual"><span class="pre">scheduler.Individual</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">snap</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#scheduler.SimulationSnapshot" title="scheduler.SimulationSnapshot"><span class="pre">scheduler.SimulationSnapshot</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">tuple</span></span></span><a class="headerlink" href="#scheduler.FitnessEvaluator.evaluate_single" title="Link to this definition">¶</a></dt>
+<dd><p>Evaluate a single individual and return its raw (un-normalised) objectives.</p>
+<p>Useful for inspecting the best individual after evolution has finished.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>individual</strong> (<a class="reference internal" href="#scheduler.Individual" title="scheduler.Individual"><em>Individual</em></a>) – The GP individual to evaluate.</p></li>
+<li><p><strong>snap</strong> (<a class="reference internal" href="#scheduler.SimulationSnapshot" title="scheduler.SimulationSnapshot"><em>SimulationSnapshot</em></a>) – Simulation snapshot used for the evaluation.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><p><code class="docutils literal notranslate"><span class="pre">(comp_ratio,</span> <span class="pre">mean_response_time,</span> <span class="pre">total_energy)</span></code></p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">comp_ratio</span></code>          – fraction of available jobs scheduled ∈ [0, 1].</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">mean_response_time</span></code>  – average (completion - arrival) in minutes.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">total_energy</span></code>        – total energy consumed (watt-minutes).</p></li>
+</ul>
+</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>tuple[float, float, float]</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="scheduler.FitnessEvaluator.weightEnergy">
+<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">weightEnergy</span></span><a class="headerlink" href="#scheduler.FitnessEvaluator.weightEnergy" title="Link to this definition">¶</a></dt>
+<dd><p>Weight applied to the energy-consumption penalty.  Default <code class="docutils literal notranslate"><span class="pre">0.15</span></code>.
+Increase this to make the GP prefer energy-efficient satellite assignments.</p>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="scheduler.FitnessEvaluator.weightJobs">
+<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">weightJobs</span></span><a class="headerlink" href="#scheduler.FitnessEvaluator.weightJobs" title="Link to this definition">¶</a></dt>
+<dd><p>Weight applied to the completion-ratio reward term.  Default <code class="docutils literal notranslate"><span class="pre">0.60</span></code>.
+Increase this to make the GP prioritise scheduling as many jobs as possible.</p>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="scheduler.FitnessEvaluator.weightTime">
+<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">weightTime</span></span><a class="headerlink" href="#scheduler.FitnessEvaluator.weightTime" title="Link to this definition">¶</a></dt>
+<dd><p>Weight applied to the mean-response-time penalty.  Default <code class="docutils literal notranslate"><span class="pre">0.25</span></code>.
+Increase this to make the GP prioritise faster job turnaround.</p>
+</dd></dl>
+
 </section>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="scheduler.Individual">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">scheduler.</span></span><span class="sig-name descname"><span class="pre">Individual</span></span><a class="headerlink" href="#scheduler.Individual" title="Link to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">pybind11_object</span></code></p>
+<p>Represents a single candidate solution in the Genetic Programming population</p>
+<dl class="py property">
+<dt class="sig sig-object py" id="scheduler.Individual.fitness">
+<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">fitness</span></span><a class="headerlink" href="#scheduler.Individual.fitness" title="Link to this definition">¶</a></dt>
+<dd><p>Evaluated fitness score</p>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="scheduler.Individual.id">
+<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">id</span></span><a class="headerlink" href="#scheduler.Individual.id" title="Link to this definition">¶</a></dt>
+<dd><p>Unique identifier of the individual</p>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="scheduler.Individual.tree">
+<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">tree</span></span><a class="headerlink" href="#scheduler.Individual.tree" title="Link to this definition">¶</a></dt>
+<dd><p>The individual’s expression tree root node</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="scheduler.Job">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">scheduler.</span></span><span class="sig-name descname"><span class="pre">Job</span></span><a class="headerlink" href="#scheduler.Job" title="Link to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">pybind11_object</span></code></p>
+<p>Represents a job/task to be scheduled</p>
+<dl class="py property">
+<dt class="sig sig-object py" id="scheduler.Job.arrivalTime">
+<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">arrivalTime</span></span><a class="headerlink" href="#scheduler.Job.arrivalTime" title="Link to this definition">¶</a></dt>
+<dd><p>When the job originally arrived</p>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="scheduler.Job.dueMinute">
+<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">dueMinute</span></span><a class="headerlink" href="#scheduler.Job.dueMinute" title="Link to this definition">¶</a></dt>
+<dd><p>The minute by which the job is due</p>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="scheduler.Job.durationMinutes">
+<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">durationMinutes</span></span><a class="headerlink" href="#scheduler.Job.durationMinutes" title="Link to this definition">¶</a></dt>
+<dd><p>Required duration to complete in minutes</p>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="scheduler.Job.id">
+<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">id</span></span><a class="headerlink" href="#scheduler.Job.id" title="Link to this definition">¶</a></dt>
+<dd><p>Unique identifier of the job</p>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="scheduler.Job.initialDeadline">
+<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">initialDeadline</span></span><a class="headerlink" href="#scheduler.Job.initialDeadline" title="Link to this definition">¶</a></dt>
+<dd><p>Initial established deadline</p>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="scheduler.Job.name">
+<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">name</span></span><a class="headerlink" href="#scheduler.Job.name" title="Link to this definition">¶</a></dt>
+<dd><p>Name of the job</p>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="scheduler.Job.priority">
+<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">priority</span></span><a class="headerlink" href="#scheduler.Job.priority" title="Link to this definition">¶</a></dt>
+<dd><p>Priority level of the job</p>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="scheduler.Job.remainingDeadline">
+<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">remainingDeadline</span></span><a class="headerlink" href="#scheduler.Job.remainingDeadline" title="Link to this definition">¶</a></dt>
+<dd><p>Remaining time before the deadline is missed</p>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="scheduler.Job.taskSize">
+<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">taskSize</span></span><a class="headerlink" href="#scheduler.Job.taskSize" title="Link to this definition">¶</a></dt>
+<dd><p>Size or complexity of the task</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="scheduler.NodeType">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">scheduler.</span></span><span class="sig-name descname"><span class="pre">NodeType</span></span><a class="headerlink" href="#scheduler.NodeType" title="Link to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">pybind11_object</span></code></p>
+<p>Enum representing the type of operation or value in an expression tree node</p>
+<p>Members:</p>
+<blockquote>
+<div><p>ADD : Addition operator</p>
+<p>SUB : Subtraction operator</p>
+<p>MUL : Multiplication operator</p>
+<p>DIV : Division operator</p>
+<p>MAX_OP : Maximum of two values</p>
+<p>MIN_OP : Minimum of two values</p>
+<p>NEG : Negation operator</p>
+<p>ABS : Absolute value operator</p>
+<p>INV : Inverse value operator</p>
+<p>TERMINAL : Terminal node (variable)</p>
+<p>CONST : Constant value node</p>
+</div></blockquote>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="scheduler.NodeType.ABS">
+<span class="sig-name descname"><span class="pre">ABS</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;NodeType.ABS:</span> <span class="pre">7&gt;</span></span><a class="headerlink" href="#scheduler.NodeType.ABS" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="scheduler.NodeType.ADD">
+<span class="sig-name descname"><span class="pre">ADD</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;NodeType.ADD:</span> <span class="pre">0&gt;</span></span><a class="headerlink" href="#scheduler.NodeType.ADD" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="scheduler.NodeType.CONST">
+<span class="sig-name descname"><span class="pre">CONST</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;NodeType.CONST:</span> <span class="pre">10&gt;</span></span><a class="headerlink" href="#scheduler.NodeType.CONST" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="scheduler.NodeType.DIV">
+<span class="sig-name descname"><span class="pre">DIV</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;NodeType.DIV:</span> <span class="pre">3&gt;</span></span><a class="headerlink" href="#scheduler.NodeType.DIV" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="scheduler.NodeType.INV">
+<span class="sig-name descname"><span class="pre">INV</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;NodeType.INV:</span> <span class="pre">8&gt;</span></span><a class="headerlink" href="#scheduler.NodeType.INV" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="scheduler.NodeType.MAX_OP">
+<span class="sig-name descname"><span class="pre">MAX_OP</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;NodeType.MAX_OP:</span> <span class="pre">4&gt;</span></span><a class="headerlink" href="#scheduler.NodeType.MAX_OP" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="scheduler.NodeType.MIN_OP">
+<span class="sig-name descname"><span class="pre">MIN_OP</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;NodeType.MIN_OP:</span> <span class="pre">5&gt;</span></span><a class="headerlink" href="#scheduler.NodeType.MIN_OP" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="scheduler.NodeType.MUL">
+<span class="sig-name descname"><span class="pre">MUL</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;NodeType.MUL:</span> <span class="pre">2&gt;</span></span><a class="headerlink" href="#scheduler.NodeType.MUL" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="scheduler.NodeType.NEG">
+<span class="sig-name descname"><span class="pre">NEG</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;NodeType.NEG:</span> <span class="pre">6&gt;</span></span><a class="headerlink" href="#scheduler.NodeType.NEG" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="scheduler.NodeType.SUB">
+<span class="sig-name descname"><span class="pre">SUB</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;NodeType.SUB:</span> <span class="pre">1&gt;</span></span><a class="headerlink" href="#scheduler.NodeType.SUB" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="scheduler.NodeType.TERMINAL">
+<span class="sig-name descname"><span class="pre">TERMINAL</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;NodeType.TERMINAL:</span> <span class="pre">9&gt;</span></span><a class="headerlink" href="#scheduler.NodeType.TERMINAL" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py">
+<span class="sig-name descname"><span class="pre">NodeType.name</span> <span class="pre">-&gt;</span> <span class="pre">str</span></span></dt>
+<dd></dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="scheduler.NodeType.value">
+<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">value</span></span><a class="headerlink" href="#scheduler.NodeType.value" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="scheduler.Satellite">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">scheduler.</span></span><span class="sig-name descname"><span class="pre">Satellite</span></span><a class="headerlink" href="#scheduler.Satellite" title="Link to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">pybind11_object</span></code></p>
+<p>Represents a computing satellite resource</p>
+<dl class="py property">
+<dt class="sig sig-object py" id="scheduler.Satellite.ComputingCapability">
+<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">ComputingCapability</span></span><a class="headerlink" href="#scheduler.Satellite.ComputingCapability" title="Link to this definition">¶</a></dt>
+<dd><p>Max computing capability of the satellite</p>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="scheduler.Satellite.ComputingLoad">
+<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">ComputingLoad</span></span><a class="headerlink" href="#scheduler.Satellite.ComputingLoad" title="Link to this definition">¶</a></dt>
+<dd><p>Current computing load</p>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="scheduler.Satellite.RemainingEnergy">
+<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">RemainingEnergy</span></span><a class="headerlink" href="#scheduler.Satellite.RemainingEnergy" title="Link to this definition">¶</a></dt>
+<dd><p>Remaining energy available for computation</p>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="scheduler.Satellite.activeTasks">
+<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">activeTasks</span></span><a class="headerlink" href="#scheduler.Satellite.activeTasks" title="Link to this definition">¶</a></dt>
+<dd><p>Number of active tasks running on the satellite</p>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="scheduler.Satellite.id">
+<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">id</span></span><a class="headerlink" href="#scheduler.Satellite.id" title="Link to this definition">¶</a></dt>
+<dd><p>Unique identifier of the satellite</p>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="scheduler.Satellite.listeningDome">
+<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">listeningDome</span></span><a class="headerlink" href="#scheduler.Satellite.listeningDome" title="Link to this definition">¶</a></dt>
+<dd><p>The listening dome availability state</p>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="scheduler.Satellite.name">
+<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">name</span></span><a class="headerlink" href="#scheduler.Satellite.name" title="Link to this definition">¶</a></dt>
+<dd><p>Name of the satellite</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="scheduler.SchedulerGP">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">scheduler.</span></span><span class="sig-name descname"><span class="pre">SchedulerGP</span></span><a class="headerlink" href="#scheduler.SchedulerGP" title="Link to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">pybind11_object</span></code></p>
+<p>Genetic Programming Scheduler Manager</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="scheduler.SchedulerGP.getPopulation">
+<span class="sig-name descname"><span class="pre">getPopulation</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">self</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#scheduler.SchedulerGP" title="scheduler.SchedulerGP"><span class="pre">scheduler.SchedulerGP</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="#scheduler.Individual" title="scheduler.Individual"><span class="pre">scheduler.Individual</span></a><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#scheduler.SchedulerGP.getPopulation" title="Link to this definition">¶</a></dt>
+<dd><p>Get the current population of individuals</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="scheduler.SchedulerGP.initialize">
+<span class="sig-name descname"><span class="pre">initialize</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">self</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#scheduler.SchedulerGP" title="scheduler.SchedulerGP"><span class="pre">scheduler.SchedulerGP</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">populationSize</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">200</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">crossoverRate</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">0.8</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mutationRate</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">0.08</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">elitismCount</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">2</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#scheduler.SchedulerGP.initialize" title="Link to this definition">¶</a></dt>
+<dd><p>Initialize the GP population with parameters</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="scheduler.SchedulerGP.printSchedule">
+<span class="sig-name descname"><span class="pre">printSchedule</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">self</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#scheduler.SchedulerGP" title="scheduler.SchedulerGP"><span class="pre">scheduler.SchedulerGP</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#scheduler.SchedulerGP.printSchedule" title="Link to this definition">¶</a></dt>
+<dd><p>Print the best schedule found so far</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="scheduler.SchedulerGP.solveNextGeneration">
+<span class="sig-name descname"><span class="pre">solveNextGeneration</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">self</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#scheduler.SchedulerGP" title="scheduler.SchedulerGP"><span class="pre">scheduler.SchedulerGP</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#scheduler.SchedulerGP.solveNextGeneration" title="Link to this definition">¶</a></dt>
+<dd><p>Evaluate the current population and evolve to the next generation</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="scheduler.SimulationSnapshot">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">scheduler.</span></span><span class="sig-name descname"><span class="pre">SimulationSnapshot</span></span><a class="headerlink" href="#scheduler.SimulationSnapshot" title="Link to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">pybind11_object</span></code></p>
+<p>A self-contained, point-in-time snapshot of the simulation world.</p>
+<p>The external application must construct and populate a snapshot before
+calling <a class="reference internal" href="#scheduler.FitnessEvaluator.evaluate" title="scheduler.FitnessEvaluator.evaluate"><code class="xref py py-meth docutils literal notranslate"><span class="pre">FitnessEvaluator.evaluate()</span></code></a> for each GP generation.
+All satellite and job objects are copied into the snapshot, so subsequent
+changes to the originals have no effect on the evaluator.</p>
+<p class="rubric">Example</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">snap</span> <span class="o">=</span> <span class="n">scheduler</span><span class="o">.</span><span class="n">SimulationSnapshot</span><span class="p">(</span>
+    <span class="n">currentMinute</span> <span class="o">=</span> <span class="mf">0.0</span><span class="p">,</span>
+    <span class="n">satellites</span>    <span class="o">=</span> <span class="n">my_satellites</span><span class="p">,</span>
+    <span class="n">jobs</span>          <span class="o">=</span> <span class="n">my_jobs</span><span class="p">,</span>
+    <span class="n">uniformEnergy</span> <span class="o">=</span> <span class="mf">2.5</span><span class="p">,</span>   <span class="c1"># watts per minute per satellite</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+<dl class="py property">
+<dt class="sig sig-object py" id="scheduler.SimulationSnapshot.currentMinute">
+<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">currentMinute</span></span><a class="headerlink" href="#scheduler.SimulationSnapshot.currentMinute" title="Link to this definition">¶</a></dt>
+<dd><p>Simulation clock at snapshot time (minutes from epoch).</p>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="scheduler.SimulationSnapshot.energyPerMinute">
+<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">energyPerMinute</span></span><a class="headerlink" href="#scheduler.SimulationSnapshot.energyPerMinute" title="Link to this definition">¶</a></dt>
+<dd><p>Energy consumed per minute of computation, indexed by satellite position in
+the <code class="docutils literal notranslate"><span class="pre">satellites</span></code> list.  When non-empty this overrides <code class="docutils literal notranslate"><span class="pre">uniformEnergy</span></code>.
+Must have the same length as <code class="docutils literal notranslate"><span class="pre">satellites</span></code> if provided.</p>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="scheduler.SimulationSnapshot.jobs">
+<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">jobs</span></span><a class="headerlink" href="#scheduler.SimulationSnapshot.jobs" title="Link to this definition">¶</a></dt>
+<dd><p>Pool of jobs available for scheduling at this instant.</p>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="scheduler.SimulationSnapshot.satellites">
+<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">satellites</span></span><a class="headerlink" href="#scheduler.SimulationSnapshot.satellites" title="Link to this definition">¶</a></dt>
+<dd><p>Current state of every satellite in the constellation.</p>
+</dd></dl>
+
+</dd></dl>
+
+<span class="target" id="module-schedulerlib"></span></section>
 
         </article>
       </div>
@@ -237,7 +697,17 @@
         
         <div class="related-pages">
           
-          
+          <a class="prev-page" href="index.html">
+              <svg class="furo-related-icon"><use href="#svg-arrow-right"></use></svg>
+              <div class="page-info">
+                <div class="context">
+                  <span>Previous</span>
+                </div>
+                
+                <div class="title">Home</div>
+                
+              </div>
+            </a>
         </div>
         <div class="bottom-of-page">
           <div class="left-details">
@@ -256,8 +726,99 @@
         
       </footer>
     </div>
-    <aside class="toc-drawer no-toc">
+    <aside class="toc-drawer">
       
+      
+      <div class="toc-sticky toc-scroll">
+        <div class="toc-title-container">
+          <span class="toc-title">
+            On this page
+          </span>
+        </div>
+        <div class="toc-tree-container">
+          <div class="toc-tree">
+            <ul>
+<li><a class="reference internal" href="#">API Reference</a><ul>
+<li><a class="reference internal" href="#scheduler.ExprNode"><code class="docutils literal notranslate"><span class="pre">ExprNode</span></code></a><ul>
+<li><a class="reference internal" href="#scheduler.ExprNode.children"><code class="docutils literal notranslate"><span class="pre">ExprNode.children</span></code></a></li>
+<li><a class="reference internal" href="#scheduler.ExprNode.constValue"><code class="docutils literal notranslate"><span class="pre">ExprNode.constValue</span></code></a></li>
+<li><a class="reference internal" href="#scheduler.ExprNode.nodeType"><code class="docutils literal notranslate"><span class="pre">ExprNode.nodeType</span></code></a></li>
+<li><a class="reference internal" href="#scheduler.ExprNode.size"><code class="docutils literal notranslate"><span class="pre">ExprNode.size()</span></code></a></li>
+<li><a class="reference internal" href="#scheduler.ExprNode.terminalIndex"><code class="docutils literal notranslate"><span class="pre">ExprNode.terminalIndex</span></code></a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#scheduler.FitnessEvaluator"><code class="docutils literal notranslate"><span class="pre">FitnessEvaluator</span></code></a><ul>
+<li><a class="reference internal" href="#scheduler.FitnessEvaluator.evaluate"><code class="docutils literal notranslate"><span class="pre">FitnessEvaluator.evaluate()</span></code></a></li>
+<li><a class="reference internal" href="#scheduler.FitnessEvaluator.evaluate_single"><code class="docutils literal notranslate"><span class="pre">FitnessEvaluator.evaluate_single()</span></code></a></li>
+<li><a class="reference internal" href="#scheduler.FitnessEvaluator.weightEnergy"><code class="docutils literal notranslate"><span class="pre">FitnessEvaluator.weightEnergy</span></code></a></li>
+<li><a class="reference internal" href="#scheduler.FitnessEvaluator.weightJobs"><code class="docutils literal notranslate"><span class="pre">FitnessEvaluator.weightJobs</span></code></a></li>
+<li><a class="reference internal" href="#scheduler.FitnessEvaluator.weightTime"><code class="docutils literal notranslate"><span class="pre">FitnessEvaluator.weightTime</span></code></a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#scheduler.Individual"><code class="docutils literal notranslate"><span class="pre">Individual</span></code></a><ul>
+<li><a class="reference internal" href="#scheduler.Individual.fitness"><code class="docutils literal notranslate"><span class="pre">Individual.fitness</span></code></a></li>
+<li><a class="reference internal" href="#scheduler.Individual.id"><code class="docutils literal notranslate"><span class="pre">Individual.id</span></code></a></li>
+<li><a class="reference internal" href="#scheduler.Individual.tree"><code class="docutils literal notranslate"><span class="pre">Individual.tree</span></code></a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#scheduler.Job"><code class="docutils literal notranslate"><span class="pre">Job</span></code></a><ul>
+<li><a class="reference internal" href="#scheduler.Job.arrivalTime"><code class="docutils literal notranslate"><span class="pre">Job.arrivalTime</span></code></a></li>
+<li><a class="reference internal" href="#scheduler.Job.dueMinute"><code class="docutils literal notranslate"><span class="pre">Job.dueMinute</span></code></a></li>
+<li><a class="reference internal" href="#scheduler.Job.durationMinutes"><code class="docutils literal notranslate"><span class="pre">Job.durationMinutes</span></code></a></li>
+<li><a class="reference internal" href="#scheduler.Job.id"><code class="docutils literal notranslate"><span class="pre">Job.id</span></code></a></li>
+<li><a class="reference internal" href="#scheduler.Job.initialDeadline"><code class="docutils literal notranslate"><span class="pre">Job.initialDeadline</span></code></a></li>
+<li><a class="reference internal" href="#scheduler.Job.name"><code class="docutils literal notranslate"><span class="pre">Job.name</span></code></a></li>
+<li><a class="reference internal" href="#scheduler.Job.priority"><code class="docutils literal notranslate"><span class="pre">Job.priority</span></code></a></li>
+<li><a class="reference internal" href="#scheduler.Job.remainingDeadline"><code class="docutils literal notranslate"><span class="pre">Job.remainingDeadline</span></code></a></li>
+<li><a class="reference internal" href="#scheduler.Job.taskSize"><code class="docutils literal notranslate"><span class="pre">Job.taskSize</span></code></a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#scheduler.NodeType"><code class="docutils literal notranslate"><span class="pre">NodeType</span></code></a><ul>
+<li><a class="reference internal" href="#scheduler.NodeType.ABS"><code class="docutils literal notranslate"><span class="pre">NodeType.ABS</span></code></a></li>
+<li><a class="reference internal" href="#scheduler.NodeType.ADD"><code class="docutils literal notranslate"><span class="pre">NodeType.ADD</span></code></a></li>
+<li><a class="reference internal" href="#scheduler.NodeType.CONST"><code class="docutils literal notranslate"><span class="pre">NodeType.CONST</span></code></a></li>
+<li><a class="reference internal" href="#scheduler.NodeType.DIV"><code class="docutils literal notranslate"><span class="pre">NodeType.DIV</span></code></a></li>
+<li><a class="reference internal" href="#scheduler.NodeType.INV"><code class="docutils literal notranslate"><span class="pre">NodeType.INV</span></code></a></li>
+<li><a class="reference internal" href="#scheduler.NodeType.MAX_OP"><code class="docutils literal notranslate"><span class="pre">NodeType.MAX_OP</span></code></a></li>
+<li><a class="reference internal" href="#scheduler.NodeType.MIN_OP"><code class="docutils literal notranslate"><span class="pre">NodeType.MIN_OP</span></code></a></li>
+<li><a class="reference internal" href="#scheduler.NodeType.MUL"><code class="docutils literal notranslate"><span class="pre">NodeType.MUL</span></code></a></li>
+<li><a class="reference internal" href="#scheduler.NodeType.NEG"><code class="docutils literal notranslate"><span class="pre">NodeType.NEG</span></code></a></li>
+<li><a class="reference internal" href="#scheduler.NodeType.SUB"><code class="docutils literal notranslate"><span class="pre">NodeType.SUB</span></code></a></li>
+<li><a class="reference internal" href="#scheduler.NodeType.TERMINAL"><code class="docutils literal notranslate"><span class="pre">NodeType.TERMINAL</span></code></a></li>
+<li><a class="reference internal" href="#scheduler.NodeType.value"><code class="docutils literal notranslate"><span class="pre">NodeType.value</span></code></a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#scheduler.Satellite"><code class="docutils literal notranslate"><span class="pre">Satellite</span></code></a><ul>
+<li><a class="reference internal" href="#scheduler.Satellite.ComputingCapability"><code class="docutils literal notranslate"><span class="pre">Satellite.ComputingCapability</span></code></a></li>
+<li><a class="reference internal" href="#scheduler.Satellite.ComputingLoad"><code class="docutils literal notranslate"><span class="pre">Satellite.ComputingLoad</span></code></a></li>
+<li><a class="reference internal" href="#scheduler.Satellite.RemainingEnergy"><code class="docutils literal notranslate"><span class="pre">Satellite.RemainingEnergy</span></code></a></li>
+<li><a class="reference internal" href="#scheduler.Satellite.activeTasks"><code class="docutils literal notranslate"><span class="pre">Satellite.activeTasks</span></code></a></li>
+<li><a class="reference internal" href="#scheduler.Satellite.id"><code class="docutils literal notranslate"><span class="pre">Satellite.id</span></code></a></li>
+<li><a class="reference internal" href="#scheduler.Satellite.listeningDome"><code class="docutils literal notranslate"><span class="pre">Satellite.listeningDome</span></code></a></li>
+<li><a class="reference internal" href="#scheduler.Satellite.name"><code class="docutils literal notranslate"><span class="pre">Satellite.name</span></code></a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#scheduler.SchedulerGP"><code class="docutils literal notranslate"><span class="pre">SchedulerGP</span></code></a><ul>
+<li><a class="reference internal" href="#scheduler.SchedulerGP.getPopulation"><code class="docutils literal notranslate"><span class="pre">SchedulerGP.getPopulation()</span></code></a></li>
+<li><a class="reference internal" href="#scheduler.SchedulerGP.initialize"><code class="docutils literal notranslate"><span class="pre">SchedulerGP.initialize()</span></code></a></li>
+<li><a class="reference internal" href="#scheduler.SchedulerGP.printSchedule"><code class="docutils literal notranslate"><span class="pre">SchedulerGP.printSchedule()</span></code></a></li>
+<li><a class="reference internal" href="#scheduler.SchedulerGP.solveNextGeneration"><code class="docutils literal notranslate"><span class="pre">SchedulerGP.solveNextGeneration()</span></code></a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#scheduler.SimulationSnapshot"><code class="docutils literal notranslate"><span class="pre">SimulationSnapshot</span></code></a><ul>
+<li><a class="reference internal" href="#scheduler.SimulationSnapshot.currentMinute"><code class="docutils literal notranslate"><span class="pre">SimulationSnapshot.currentMinute</span></code></a></li>
+<li><a class="reference internal" href="#scheduler.SimulationSnapshot.energyPerMinute"><code class="docutils literal notranslate"><span class="pre">SimulationSnapshot.energyPerMinute</span></code></a></li>
+<li><a class="reference internal" href="#scheduler.SimulationSnapshot.jobs"><code class="docutils literal notranslate"><span class="pre">SimulationSnapshot.jobs</span></code></a></li>
+<li><a class="reference internal" href="#scheduler.SimulationSnapshot.satellites"><code class="docutils literal notranslate"><span class="pre">SimulationSnapshot.satellites</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+
+          </div>
+        </div>
+      </div>
       
       
     </aside>
@@ -266,5 +827,6 @@
     <script src="_static/doctools.js?v=fd6eb6e6"></script>
     <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
     <script src="_static/scripts/furo.js?v=46bd48cc"></script>
+    <script defer="defer" src="https://cdn.jsdelivr.net/npm/mathjax@4/tex-mml-chtml.js"></script>
     </body>
 </html>
