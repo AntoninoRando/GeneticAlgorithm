@@ -7,7 +7,7 @@ from data_factory import create_satellites, create_jobs
 parser = argparse.ArgumentParser(description="Run GP Scheduler")
 parser.add_argument("--population", type=int, default=100, help="Population size")
 parser.add_argument("--generations", type=int, default=200, help="Number of generations")
-parser.add_argument("--print-every", type=int, default=-1, help="Print progress every N generations")
+parser.add_argument("--print-every", type=int, default=50, help="Print progress every N generations")
 args = parser.parse_args()
 
 
@@ -24,7 +24,7 @@ def run_genetic_algorithm(generations: int, population_size: int, print_every: i
     for generation in range(generations):
         # Regenerate the world every iteration
         satellites = create_satellites(n=10)
-        jobs       = create_jobs(n=100, start_minute=generation * 5.0)
+        jobs       = create_jobs(n=100, start_minute=generation * 5.0, arrival_spread=5)
         current_minute = generation * 5.0
         snapshot = SimulationSnapshot(current_minute, satellites, jobs)
 
@@ -48,4 +48,9 @@ def run_genetic_algorithm(generations: int, population_size: int, print_every: i
 
 
 if __name__ == "__main__":
+    import os
+    print(f"PID: {os.getpid()} — attach GDB now if you want to debug the C++ code.")
+    print("Press Enter to start the genetic algorithm...")
+    input()
+
     run_genetic_algorithm(args.generations, args.population, args.print_every)

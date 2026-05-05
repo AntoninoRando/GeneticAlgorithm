@@ -181,10 +181,10 @@ public:
              << " | Best fitness: "  << fixed << setprecision(2) << best.fitness
              << " | Best tree: " << best.tree.toString(registry_) << "\n";
 
-        printRandomPopulationTrees(population);
+        // printRandomPopulationTrees(population);
     }
 
-    const vector<GPIndividual>& getPopulation() const {
+    vector<GPIndividual>& getPopulation() {
         return population;
     }
 

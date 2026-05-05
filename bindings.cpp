@@ -8,6 +8,7 @@
 
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>   // needed for vector conversion
+#include <pybind11/stl_bind.h>   // ← add this include
 
 #include "scheduler/expr_tree.h"
 #include "scheduler/registry.h"
@@ -22,8 +23,12 @@
 
 namespace py = pybind11;
 
+PYBIND11_MAKE_OPAQUE(std::vector<GPIndividual>);
 PYBIND11_MODULE(scheduler, m) {
     m.doc() = "Python bindings for the Scheduler GP module";
+
+    // Inside PYBIND11_MODULE, before the SchedulerGP binding:
+    py::bind_vector<std::vector<GPIndividual>>(m, "Population");
 
     py::enum_<NodeType>(m, "NodeType", "Enum representing the type of operation or value in an expression tree node")
         .value("ADD", NodeType::ADD, "Addition operator")
@@ -95,8 +100,11 @@ PYBIND11_MODULE(scheduler, m) {
                py::arg("elitismCount") = 2,
                "Initialize the GP population with parameters")
            .def("solveNextGeneration", &SchedulerGP::solveNextGeneration, "Evaluate the current population and evolve to the next generation")
-           .def("getPopulation", &SchedulerGP::getPopulation,
-               py::return_value_policy::reference_internal, "Get the current population of individuals")
+           .def("getPopulation",
+                static_cast<vector<GPIndividual>& (SchedulerGP::*)()>(
+                    &SchedulerGP::getPopulation),
+                py::return_value_policy::reference_internal,
+                "Get the current population of individuals (mutable reference).")
            .def("printSchedule", &SchedulerGP::printSchedule, "Print the best schedule found so far");
     
            // ── SimulationSnapshot ────────────────────────────────────────────────────

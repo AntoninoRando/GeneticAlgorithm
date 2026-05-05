@@ -11,7 +11,6 @@
 - `docs`: Contains documentation files for the `schedulerlib` python library.
 - `include`: Contains the header files (`.h`) that implement the logic of the `schedulerlib` library.
 - `scripts`: Contains bash script to run some functionalities (e.g., build the project, run the project, run the project in debug mode, or make the documentation).
-- `src`: Contains some C++ files (`.cpp`) to run project examples.
 
 
 # Building the Project
@@ -47,6 +46,44 @@ cp scheduler*.so ..
 ```
 
 The `scheduler*.so` file is the module that can be used by Python.
+
+# Debugging
+
+## Build the project
+
+```
+# Option 1
+cd build && cmake -DCMAKE_BUILD_TYPE=Debug .. && make
+
+# Option 2
+cd scripts && ./build-debug.sh
+```
+
+## Run the Debugger
+
+There are different options. 
+
+1. **VS Code**: Use the `(debug) Launch main.py` "run and debug" configuration. This option will launch the script and it can be debugged via VS Code. Killing the "run and debug" process will also kill the python script.
+2. **VS Code**: Run the `main.py` scrip (`python3 main.py`) and then use the `(debug) Attach to main.py`. The python script prints the PID of the process, so select the right process when asked to do so. This option will attach the debugger to the script, thus terminating the "run and debug" process will not kil the python script.
+
+Options 1 and 2 allows to use VS Code UI to debug. Otherwise, it can be managed via the terminal using the GDB commands to add breakpoints, continue the execution and logging variables.
+
+3. Run the python script in debug mode:
+    ```
+    gdb python3
+
+    (gdb) set breakpoint pending on
+    (gdb) run main.py
+    ```
+
+4. Attach the debugger.
+    ```
+    # Terminal 1
+    python3 main.py
+
+    # Terminal 2 (once you see the PID printed)
+    gdb -p <PID>
+    ```
 
 # Task Fields
 

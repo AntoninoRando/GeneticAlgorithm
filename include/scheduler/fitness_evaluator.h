@@ -242,8 +242,7 @@ inline void greedyDecode(const ExprNode&               tree,
         satStates[bestSat].freeAtMinute = completion;
         sats[bestSat].activeTasks      += 1;
 
-        double rate = (epm > 0.0) ? epm
-                                  : snap.energyPerMinute[bestSat];
+        double rate = snap.energyPerMinute.empty() ? 1.0 : snap.energyPerMinute[bestSat];
         satStates[bestSat].energySpent += rate * duration;
 
         scheduled[bestJob] = true;
@@ -398,30 +397,31 @@ public:
                                           energies[i]);
         }
 
-        // ── Step 2: normalise each objective across the population ────────
+        // ── Step 2: normalise penalty objectives only ─────────────────────────
         auto normalise = [&](vector<double>& v) {
-            double lo = *min_element(v.begin(), v.end());
-            double hi = *max_element(v.begin(), v.end());
+            double lo    = *min_element(v.begin(), v.end());
+            double hi    = *max_element(v.begin(), v.end());
             double range = hi - lo;
             if (range < 1e-12) {
+                // Uniform across population: zero out the penalty (no info to act on)
                 fill(v.begin(), v.end(), 0.0);
             } else {
                 for (auto& x : v) x = (x - lo) / range;
             }
         };
 
-        // compRatio is already ∈ [0,1] but we still normalise relative to
-        // the population so the reward has the same scale as the penalties.
-        normalise(compRatios);
+        // compRatio stays absolute — preserves selection pressure when the
+        // whole population ties (everyone gets their true [0,1] reward).
+        // Only the cost terms are population-relative.
         normalise(meanResps);
         normalise(energies);
 
-        // ── Step 3: write fitness ─────────────────────────────────────────
+        // ── Step 3: write fitness ─────────────────────────────────────────────
         for (int i = 0; i < n; ++i) {
             population[i].fitness =
-                  weightJobs   * compRatios[i]
-                - weightTime   * meanResps[i]
-                - weightEnergy * energies[i];
+                weightJobs   * compRatios[i]   // absolute ∈ [0,1]
+                - weightTime   * meanResps[i]    // normalised ∈ [0,1]
+                - weightEnergy * energies[i];    // normalised ∈ [0,1]
         }
     }
 
