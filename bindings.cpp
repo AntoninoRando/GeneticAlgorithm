@@ -96,6 +96,8 @@ PYBIND11_MODULE(scheduler, m) {
                py::arg("crossoverRate") = 0.80,
                py::arg("mutationRate") = 0.08,
                py::arg("elitismCount") = 2,
+               py::arg("maxDepth")     = 7,
+               py::arg("hoistRate")    = 0.05,
                "Initialize the GP population with parameters")
            .def("solveNextGeneration", &SchedulerGP::solveNextGeneration, "Evaluate the current population and evolve to the next generation")
            .def("getPopulation",

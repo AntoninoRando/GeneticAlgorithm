@@ -101,6 +101,127 @@ struct ExprNode {
 
 
     #pragma region UTILITIES ---------------------------------------------------
+    /// @brief Returns true iff the two subtrees are structurally identical
+    /// (same topology, same node types, same terminal indices / const values).
+    static bool structurallyEqual(const ExprNode& a, const ExprNode& b) {
+        if (a.nodeType != b.nodeType)              return false;
+        if (a.nodeType == NodeType::TERMINAL)      return a.terminalIndex == b.terminalIndex;
+        if (a.nodeType == NodeType::CONST)         return a.constValue    == b.constValue;
+        if (a.children.size() != b.children.size()) return false;
+        for (size_t i = 0; i < a.children.size(); ++i)
+            if (!structurallyEqual(a.children[i], b.children[i])) return false;
+        return true;
+    }
+
+    /// @brief Returns a semantically equivalent, simplified copy of this
+    /// subtree, collapsing provably redundant operation patterns bottom-up.
+    ///
+    /// Rules applied (in order, after children are already simplified):
+    ///
+    /// Unary identity chains
+    ///   NEG(NEG(x))  → x
+    ///   ABS(ABS(x))  → ABS(x)
+    ///   ABS(NEG(x))  → ABS(x)
+    ///   INV(INV(x))  → x
+    ///
+    /// Same-child binary idempotency
+    ///   MAX(x, x)    → x
+    ///   MIN(x, x)    → x
+    ///   SUB(x, x)    → CONST(0)
+    ///   DIV(x, x)    → CONST(1)   (inherits guarded-div: if x≈0 eval→0, not 1;
+    ///                               but that pre-existing corner case is unchanged)
+    ///
+    /// @return The simplified node (may be a different node type / shape).
+    ExprNode simplify() const {
+        // --- 1. Recurse: build a copy with simplified children first.
+        ExprNode node = *this;
+        for (auto& child : node.children)
+            child = child.simplify();
+
+        // --- 2. Apply local rules on the (now-simplified) node.
+        switch (node.nodeType) {
+
+            // ── NEG ──────────────────────────────────────────────────────────
+            case NodeType::NEG: {
+                const ExprNode& inner = node.children[0];
+                // NEG(NEG(x)) → x
+                if (inner.nodeType == NodeType::NEG)
+                    return inner.children[0];
+                break;
+            }
+
+            // ── ABS ──────────────────────────────────────────────────────────
+            case NodeType::ABS: {
+                const ExprNode& inner = node.children[0];
+                // ABS(ABS(x)) → ABS(x)
+                if (inner.nodeType == NodeType::ABS)
+                    return inner;
+                // ABS(NEG(x)) → ABS(x)
+                if (inner.nodeType == NodeType::NEG) {
+                    ExprNode simplified;
+                    simplified.nodeType = NodeType::ABS;
+                    simplified.children.push_back(inner.children[0]);
+                    return simplified;
+                }
+                break;
+            }
+
+            // ── INV ──────────────────────────────────────────────────────────
+            case NodeType::INV: {
+                const ExprNode& inner = node.children[0];
+                // INV(INV(x)) → x
+                if (inner.nodeType == NodeType::INV)
+                    return inner.children[0];
+                break;
+            }
+
+            // ── MAX ──────────────────────────────────────────────────────────
+            case NodeType::MAX_OP: {
+                // MAX(x, x) → x
+                if (structurallyEqual(node.children[0], node.children[1]))
+                    return node.children[0];
+                break;
+            }
+
+            // ── MIN ──────────────────────────────────────────────────────────
+            case NodeType::MIN_OP: {
+                // MIN(x, x) → x
+                if (structurallyEqual(node.children[0], node.children[1]))
+                    return node.children[0];
+                break;
+            }
+
+            // ── SUB ──────────────────────────────────────────────────────────
+            case NodeType::SUB: {
+                // SUB(x, x) → CONST(0)
+                if (structurallyEqual(node.children[0], node.children[1])) {
+                    ExprNode zero;
+                    zero.nodeType   = NodeType::CONST;
+                    zero.constValue = 0.0;
+                    return zero;
+                }
+                break;
+            }
+
+            // ── DIV ──────────────────────────────────────────────────────────
+            case NodeType::DIV: {
+                // DIV(x, x) → CONST(1)
+                if (structurallyEqual(node.children[0], node.children[1])) {
+                    ExprNode one;
+                    one.nodeType   = NodeType::CONST;
+                    one.constValue = 1.0;
+                    return one;
+                }
+                break;
+            }
+
+            default:
+                break;
+        }
+
+        return node;
+    }
+
     /// @brief Count the number of nodes in the subtree.
     /// @return The number of nodes.
     int size() const {

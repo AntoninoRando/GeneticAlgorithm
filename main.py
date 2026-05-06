@@ -8,19 +8,28 @@ parser = argparse.ArgumentParser(description="Run GP Scheduler")
 parser.add_argument("--population", type=int, default=100, help="Population size")
 parser.add_argument("--generations", type=int, default=200, help="Number of generations")
 parser.add_argument("--print-every", type=int, default=50, help="Print progress every N generations")
+parser.add_argument("--max-depth", type=int, default=7,
+                    help="Maximum expression tree depth. Shallower trees are faster and simpler "
+                         "(e.g. --max-depth 4). Max nodes ≈ 2^(depth+1), so depth 7 → ≤256 nodes.")
+parser.add_argument("--hoist-rate", type=float, default=0.05,
+                    help="Probability [0..1] that each new offspring undergoes a hoist mutation, "
+                         "which replaces the whole tree with one of its own subtrees to fight bloat "
+                         "(e.g. --hoist-rate 0.20 for aggressive pruning).")
 args = parser.parse_args()
 
 
 
-def run_genetic_algorithm(generations: int, population_size: int, print_every: int):
+def run_genetic_algorithm(generations: int, population_size: int, print_every: int,
+                          max_depth: int, hoist_rate: float):
     satellites = create_satellites()
     jobs = create_jobs()
 
     genetic_algorithm   = SchedulerGP(satellites, jobs)
-    genetic_algorithm.initialize(populationSize=population_size)
+    genetic_algorithm.initialize(populationSize=population_size, maxDepth=max_depth,
+                                 hoistRate=hoist_rate)
     fitness_evaluator = FitnessEvaluator(buildTerminalRegistry())
     snapshot = None
-
+    
     for generation in range(generations):
         # Regenerate the world every iteration
         satellites = create_satellites(n=10)
@@ -55,4 +64,5 @@ if __name__ == "__main__":
     print("Press Enter to start the genetic algorithm...")
     input()
 
-    run_genetic_algorithm(args.generations, args.population, args.print_every)
+    run_genetic_algorithm(args.generations, args.population, args.print_every,
+                          args.max_depth, args.hoist_rate)

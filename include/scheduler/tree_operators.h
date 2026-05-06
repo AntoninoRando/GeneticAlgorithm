@@ -70,6 +70,9 @@ public:
         if (childA.size() > maxTreeSize()) childA = builder_.grow(maxTreeDepth_);
         if (childB.size() > maxTreeSize()) childB = builder_.grow(maxTreeDepth_);
 
+        childA = childA.simplify();
+        childB = childB.simplify();
+
         return {childA, childB};
     }
 
@@ -108,6 +111,7 @@ public:
     void mutate(ExprNode& tree, double mutationRate) {
         tree = mutateNode(move(tree), mutationRate);
         if (tree.size() > maxTreeSize()) tree = builder_.grow(maxTreeDepth_);
+        tree = tree.simplify();
     }
 
     // ── Hoist mutation ───────────────────────────────────────────────────────
@@ -125,6 +129,7 @@ public:
     }
 
     void setTerminalCount(int n) { terminalCount_ = n; }
+    void setMaxDepth(int d)      { maxTreeDepth_  = std::max(1, d); }
     #pragma endregion ----------------------------------------------------------
 
     

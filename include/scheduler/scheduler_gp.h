@@ -104,17 +104,22 @@ public:
     void initialize(int populationSize,
                     double crossoverRate, 
                     double mutationRate,
-                    int elitismCount = 2)
+                    int elitismCount = 2,
+                    int maxDepth     = 7,
+                    double hoistRate = 0.05)
     {
         this->populationSize = populationSize;
         this->crossoverRate  = crossoverRate;
         this->mutationRate   = mutationRate;
         this->elitismCount   = std::max(0, std::min(elitismCount, populationSize));
+        this->maxDepth_      = std::max(1, maxDepth);
+        this->hoistRate_     = std::max(0.0, std::min(1.0, hoistRate));
+        ops_.setMaxDepth(this->maxDepth_);
 
         gen = -1;
         
         // Initialize population with random expression trees.
-        vector<ExprNode> seeds = builder_.rampedHalfAndHalf(populationSize, 2, 6);
+        vector<ExprNode> seeds = builder_.rampedHalfAndHalf(populationSize, 2, this->maxDepth_);
         population.resize(populationSize);
         for (int i = 0; i < populationSize; ++i) {
             population[i].tree   = move(seeds[i]);
@@ -160,8 +165,8 @@ public:
             ops_.mutate(childB.tree, mutationRate);
 
             // Occasional hoist to fight bloat.
-            if (randomReal() < 0.05) ops_.hoist(childA.tree);
-            if (randomReal() < 0.05) ops_.hoist(childB.tree);
+            if (randomReal() < hoistRate_) ops_.hoist(childA.tree);
+            if (randomReal() < hoistRate_) ops_.hoist(childB.tree);
 
             next.push_back(move(childA));
             if (static_cast<int>(next.size()) < populationSize)
@@ -217,7 +222,13 @@ private:
     double mutationRate   = 0.08;
     /// @brief Number of top individuals to carry over unchanged to next 
     /// generation.
-    int    elitismCount     = 2;
+    int    elitismCount   = 2;
+    /// @brief Maximum depth of expression trees. Controls tree size cap 
+    /// (max nodes ≈ 2^(maxDepth+1)).
+    int    maxDepth_      = 7;
+    /// @brief Probability per offspring that a hoist mutation is applied, 
+    /// replacing the whole tree with one of its own subtrees to fight bloat.
+    double hoistRate_     = 0.05;
     
     /*
         Current state of the algorithm.
