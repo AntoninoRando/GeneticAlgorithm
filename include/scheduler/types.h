@@ -12,27 +12,36 @@ using namespace std;
 
 
 struct Job {
-    int    id;
-    string name;
-    
-    int    durationMinutes;
-    int    dueMinute;
-    double priority;
-    time_t arrivalTime      = 0;
-    double taskSize         = 0.0;
-    double initialDeadline  = 0.0;
-    double remainingDeadline = 0.0;
+    int id;
+    int arrivalTime;
+    string type;
+    double ram;
+    double disk;
+    double imageSize;
+    int executionTime;
+    int transferTime;
+    int numberOfHops;
+    string executionServerName;
 };
 
 struct Satellite {
-    int    id;
+    int id;
     string name;
 
-    /// @brief Set of satellites that this satellite can communicate with.
-    vector<Satellite> listeningDome;
-
-    int    activeTasks          = 0;
-    double RemainingEnergy      = 0.0;
-    double ComputingLoad        = 0.0;
-    double ComputingCapability  = 0.0;
+    string orbitalSunset;
+    bool isAccessPoint;
+    double elevationAngle;
+    vector<int> neighbors;
+    double latency;
+    double bandwidth;
+    int completedTasks;
+    int cpuBusyUntil;
+    int networkBusyUntil;
+    double cpuCapacity;
+    double networkCapacity;
+    double energyReserved;
+    vector<int> rejectedTasks;
+    double remainingEnergy;
+    vector<int> tasks;
+    vector<int> deadTasks;
 };

@@ -44,33 +44,32 @@ struct TerminalDef {
 /// and Satellite and return a double.
 /// @return A vector of terminals.
 static vector<TerminalDef> buildTerminalRegistry() {
-    // ── Job fields ────────────────────────────────────────────────────────
     vector<TerminalDef> reg = {
-        { "job.durationMinutes",   [](const Job& j, const Satellite&) { return static_cast<double>(j.durationMinutes);   } },
-        { "job.dueMinute",         [](const Job& j, const Satellite&) { return static_cast<double>(j.dueMinute);         } },
-        { "job.priority",          [](const Job& j, const Satellite&) { return j.priority;                               } },
+    // ── Job fields ────────────────────────────────────────────────────────
         { "job.arrivalTime",       [](const Job& j, const Satellite&) { return static_cast<double>(j.arrivalTime);       } },
-        { "job.taskSize",          [](const Job& j, const Satellite&) { return j.taskSize;                               } },
-        { "job.initialDeadline",   [](const Job& j, const Satellite&) { return j.initialDeadline;                        } },
-        { "job.remainingDeadline", [](const Job& j, const Satellite&) { return j.remainingDeadline;                      } },
+        { "job.ram",               [](const Job& j, const Satellite&) { return j.ram;                                    } },
+        { "job.disk",              [](const Job& j, const Satellite&) { return j.disk;                                   } },
+        { "job.imageSize",         [](const Job& j, const Satellite&) { return j.imageSize;                              } },
+        { "job.executionTime",     [](const Job& j, const Satellite&) { return static_cast<double>(j.executionTime);     } },
+        { "job.transferTime",      [](const Job& j, const Satellite&) { return static_cast<double>(j.transferTime);      } },
+        { "job.numberOfHops",      [](const Job& j, const Satellite&) { return static_cast<double>(j.numberOfHops);      } },
     // ── Satellite fields ──────────────────────────────────────────────────
-        { "sat.activeTasks",         [](const Job&, const Satellite& s) { return static_cast<double>(s.activeTasks);       } },
-        { "sat.RemainingEnergy",     [](const Job&, const Satellite& s) { return s.RemainingEnergy;                        } },
-        { "sat.ComputingLoad",       [](const Job&, const Satellite& s) { return s.ComputingLoad;                          } },
-        { "sat.ComputingCapability", [](const Job&, const Satellite& s) { return s.ComputingCapability;                    } },
-    // ── Derived / cross-domain signals ────────────────────────────────────
-        { "job.slack",             [](const Job& j, const Satellite&) {
-            // slack = dueMinute – durationMinutes  (static urgency proxy)
-            return static_cast<double>(j.dueMinute - j.durationMinutes);
-        }},
+        { "sat.elevationAngle",    [](const Job&, const Satellite& s) { return s.elevationAngle;                         } },
+        { "sat.latency",           [](const Job&, const Satellite& s) { return s.latency;                                } },
+        { "sat.bandwidth",         [](const Job&, const Satellite& s) { return s.bandwidth;                              } },
+        { "sat.completedTasks",    [](const Job&, const Satellite& s) { return static_cast<double>(s.completedTasks);    } },
+        { "sat.cpuBusyUntil",      [](const Job&, const Satellite& s) { return static_cast<double>(s.cpuBusyUntil);      } },
+        { "sat.networkBusyUntil",  [](const Job&, const Satellite& s) { return static_cast<double>(s.networkBusyUntil);  } },
+        { "sat.cpuCapacity",       [](const Job&, const Satellite& s) { return s.cpuCapacity;                            } },
+        { "sat.networkCapacity",   [](const Job&, const Satellite& s) { return s.networkCapacity;                        } },
+        { "sat.energyReserved",    [](const Job&, const Satellite& s) { return s.energyReserved;                         } },
+        { "sat.remainingEnergy",   [](const Job&, const Satellite& s) { return s.remainingEnergy;                        } },
         { "sat.loadRatio",         [](const Job&, const Satellite& s) {
-            return (s.ComputingCapability > 0.0)
-                ? s.ComputingLoad / s.ComputingCapability
+            return (s.cpuCapacity > 0.0)
+                ? s.tasks.size() / s.cpuCapacity
                 : 0.0;
         }},
     };
-    // ── Adding a new field is ONE line here, e.g.:
-    // reg.push_back({ "job.myNewField", [](const Job& j, const Satellite&){ return j.myNewField; } });
     return reg;
 }
 #pragma endregion --------------------------------------------------------------

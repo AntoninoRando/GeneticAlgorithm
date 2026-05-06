@@ -38,7 +38,9 @@ def run_genetic_algorithm(generations: int, population_size: int, print_every: i
         if print_every <= 0:
             continue
         if (generation + 1) % print_every == 0 or generation == generations - 1:
+            print("SCHEDULE SNAPSHOT " + "-" * 50)
             genetic_algorithm.printSchedule()
+            print("\n")
 
     # After evolution: inspect the winner
     best = max(genetic_algorithm.getPopulation(), key=lambda ind: ind.fitness)

@@ -200,18 +200,11 @@ inline void greedyDecode(const ExprNode&               tree,
         for (int j = 0; j < nJob; ++j) {
             if (scheduled[j]) continue;
 
-            // Refresh the job's remaining deadline for the tree's benefit.
-            jobs[j].remainingDeadline =
-                static_cast<double>(jobs[j].dueMinute) - snap.currentMinute;
-
             for (int s = 0; s < nSat; ++s) {
                 // Only consider the satellite if it can finish the job in time.
                 double startTime      = satStates[s].freeAtMinute;
-                double completionTime = startTime +
-                                        static_cast<double>(jobs[j].durationMinutes);
+                double completionTime = startTime + static_cast<double>(jobs[j].executionTime + jobs[j].transferTime);
 
-                if (completionTime > static_cast<double>(jobs[j].dueMinute))
-                    continue;   // would miss the deadline — skip
 
                 double score = tree.eval(jobs[j], sats[s], registry);
 
@@ -228,7 +221,7 @@ inline void greedyDecode(const ExprNode&               tree,
 
         // ── Commit assignment ─────────────────────────────────────────────
         double start      = satStates[bestSat].freeAtMinute;
-        double duration   = static_cast<double>(jobs[bestJob].durationMinutes);
+        double duration   = static_cast<double>(jobs[bestJob].executionTime + jobs[bestJob].transferTime);
         double completion = start + duration;
 
         Assignment a;
@@ -240,7 +233,7 @@ inline void greedyDecode(const ExprNode&               tree,
 
         // Update satellite timeline and energy.
         satStates[bestSat].freeAtMinute = completion;
-        sats[bestSat].activeTasks      += 1;
+        sats[bestSat].completedTasks += 1;
 
         double rate = snap.energyPerMinute.empty() ? 1.0 : snap.energyPerMinute[bestSat];
         satStates[bestSat].energySpent += rate * duration;

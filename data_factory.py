@@ -64,17 +64,29 @@ def create_satellites(
 
     satellites = []
     for i in range(n):
-        sat                    = Satellite(i, name_pool[i])
-        sat.activeTasks        = 0
-        sat.RemainingEnergy    = rng.uniform(*energy_range)
-        sat.ComputingCapability= rng.uniform(*capability_range)
-        # Load is expressed as an absolute value ≤ capability.
-        sat.ComputingLoad      = rng.uniform(*load_range) * sat.ComputingCapability
+        sat                    = Satellite()
+        sat.id                 = i
+        sat.name               = name_pool[i]
+        sat.completedTasks     = 0
+        sat.remainingEnergy    = rng.uniform(*energy_range)
+        sat.cpuCapacity        = rng.uniform(*capability_range)
+        sat.cpuBusyUntil       = 0
+        sat.networkCapacity    = 100.0
+        sat.networkBusyUntil   = 0
+        sat.latency            = rng.uniform(10.0, 50.0)
+        sat.bandwidth          = rng.uniform(50.0, 200.0)
+        sat.elevationAngle     = 45.0
+        sat.isAccessPoint      = False
+        sat.orbitalSunset      = ""
+        sat.energyReserved     = 0.0
+        sat.rejectedTasks      = []
+        sat.tasks              = []
+        sat.deadTasks          = []
         satellites.append(sat)
 
     # Fully-connected listening dome (every satellite hears all others).
     for sat in satellites:
-        sat.listeningDome = [other for other in satellites if other.id != sat.id]
+        sat.neighbors = [other.id for other in satellites if other.id != sat.id]
 
     return satellites
 
@@ -150,12 +162,17 @@ def create_jobs(
         prefix    = _JOB_PREFIXES[i % len(_JOB_PREFIXES)]
         name      = f"{prefix}-{i+1:02d}"
 
-        job                   = Job(i, name, duration, due)
+        job                   = Job()
+        job.id                = i
         job.arrivalTime       = arrivals[i]
-        job.taskSize          = rng.uniform(*task_size_range)
-        job.priority          = rng.uniform(*priority_range)
-        job.initialDeadline   = float(due)
-        job.remainingDeadline = float(due)
+        job.type              = prefix
+        job.ram               = rng.uniform(1.0, 16.0)
+        job.disk              = rng.uniform(10.0, 100.0)
+        job.imageSize         = rng.uniform(*task_size_range)
+        job.executionTime     = duration
+        job.transferTime      = rng.randint(1, 5)
+        job.numberOfHops      = rng.randint(1, 3)
+        job.executionServerName = ""
         jobs.append(job)
 
     return jobs

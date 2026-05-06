@@ -51,40 +51,38 @@ PYBIND11_MODULE(scheduler, m) {
         .def("size", &ExprNode::size, "Get the size of the subtree rooted at this node");
 
     py::class_<Satellite>(m, "Satellite", "Represents a computing satellite resource")
-        .def(py::init([](int id, std::string name) {
-            Satellite s;
-            s.id   = id;
-            s.name = std::move(name);
-            return s;
-        }), py::arg("id"), py::arg("name"), "Initialize a new satellite with an ID and name")
-        .def_readwrite("id",                 &Satellite::id, "Unique identifier of the satellite")
-        .def_readwrite("name",               &Satellite::name, "Name of the satellite")
-        .def_readwrite("listeningDome",      &Satellite::listeningDome, "The listening dome availability state")
-        .def_readwrite("activeTasks",        &Satellite::activeTasks, "Number of active tasks running on the satellite")
-        .def_readwrite("RemainingEnergy",    &Satellite::RemainingEnergy, "Remaining energy available for computation")
-        .def_readwrite("ComputingLoad",      &Satellite::ComputingLoad, "Current computing load")
-        .def_readwrite("ComputingCapability",&Satellite::ComputingCapability, "Max computing capability of the satellite");
+        .def(py::init<>())
+        .def_readwrite("id",                &Satellite::id)
+        .def_readwrite("name",              &Satellite::name)
+        .def_readwrite("orbitalSunset",      &Satellite::orbitalSunset)
+        .def_readwrite("isAccessPoint",      &Satellite::isAccessPoint)
+        .def_readwrite("elevationAngle",     &Satellite::elevationAngle)
+        .def_readwrite("neighbors",          &Satellite::neighbors)
+        .def_readwrite("latency",            &Satellite::latency)
+        .def_readwrite("bandwidth",          &Satellite::bandwidth)
+        .def_readwrite("completedTasks",     &Satellite::completedTasks)
+        .def_readwrite("cpuBusyUntil",       &Satellite::cpuBusyUntil)
+        .def_readwrite("networkBusyUntil",   &Satellite::networkBusyUntil)
+        .def_readwrite("cpuCapacity",        &Satellite::cpuCapacity)
+        .def_readwrite("networkCapacity",    &Satellite::networkCapacity)
+        .def_readwrite("energyReserved",     &Satellite::energyReserved)
+        .def_readwrite("rejectedTasks",      &Satellite::rejectedTasks)
+        .def_readwrite("remainingEnergy",    &Satellite::remainingEnergy)
+        .def_readwrite("tasks",              &Satellite::tasks)
+        .def_readwrite("deadTasks",          &Satellite::deadTasks);
 
-    // Job constructor argument order matches main.py: (id, name, durationMinutes, dueMinute, priority).
     py::class_<Job>(m, "Job", "Represents a job/task to be scheduled")
-        .def(py::init([](int id, std::string name, int durationMinutes, int dueMinute) {
-            Job j;
-            j.id              = id;
-            j.name            = std::move(name);
-            j.durationMinutes = durationMinutes;
-            j.dueMinute       = dueMinute;
-            j.priority        = 1.0;  // Default priority
-            return j;
-        }), py::arg("id"), py::arg("name"), py::arg("durationMinutes"), py::arg("dueMinute"), "Initialize a new Job")
-        .def_readwrite("id",                &Job::id, "Unique identifier of the job")
-        .def_readwrite("name",              &Job::name, "Name of the job")
-        .def_readwrite("durationMinutes",   &Job::durationMinutes, "Required duration to complete in minutes")
-        .def_readwrite("dueMinute",         &Job::dueMinute, "The minute by which the job is due")
-        .def_readwrite("priority",          &Job::priority, "Priority level of the job")
-        .def_readwrite("arrivalTime",       &Job::arrivalTime, "When the job originally arrived")
-        .def_readwrite("taskSize",          &Job::taskSize, "Size or complexity of the task")
-        .def_readwrite("initialDeadline",   &Job::initialDeadline, "Initial established deadline")
-        .def_readwrite("remainingDeadline", &Job::remainingDeadline, "Remaining time before the deadline is missed");
+        .def(py::init<>())
+        .def_readwrite("id",                 &Job::id)
+        .def_readwrite("arrivalTime",        &Job::arrivalTime)
+        .def_readwrite("type",               &Job::type)
+        .def_readwrite("ram",                &Job::ram)
+        .def_readwrite("disk",               &Job::disk)
+        .def_readwrite("imageSize",          &Job::imageSize)
+        .def_readwrite("executionTime",      &Job::executionTime)
+        .def_readwrite("transferTime",       &Job::transferTime)
+        .def_readwrite("numberOfHops",       &Job::numberOfHops)
+        .def_readwrite("executionServerName",&Job::executionServerName);
 
     py::class_<GPIndividual>(m, "Individual", "Represents a single candidate solution in the Genetic Programming population")
            .def_readwrite("id", &GPIndividual::id, "Unique identifier of the individual")
