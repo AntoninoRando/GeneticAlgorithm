@@ -1,9 +1,46 @@
 # Genetic Algorithm to Solve Scheduling Problem
 
+## DOCUMENTATION
+
+To find more about the library, please read the [documentation](/docs/build/latex/schedulerlib.pdf).
+
 ## The Problem
 
 1. A `job` (or `Task`) is sent to an Access Point;
 2. The access point **schedules** the job among possible SEO satellites.
+
+
+### Task Fields
+
+- id
+- arrival time
+- type
+- ram
+- disk
+- image size
+- execution time
+- transfer time
+- number of hops
+- name of the execution server
+
+### Satellite Fields
+
+- orbital sunset
+- is an access point?
+- evelation angle
+- neighbors
+- latency
+- bandwitdth
+- completed tasks
+- cpu busy until...
+- network busy until...
+- cpu capacity
+- network capacity
+- enery reserved
+- list of rejectde tasks
+- remainig energy
+- list of tasks
+- list of dead tasks
 
 # Project Structure
 
@@ -84,35 +121,3 @@ Options 1 and 2 allows to use VS Code UI to debug. Otherwise, it can be managed 
     # Terminal 2 (once you see the PID printed)
     gdb -p <PID>
     ```
-
-# Task Fields
-
-- id
-- arrival time
-- type
-- ram
-- disk
-- image size
-- execution time
-- transfer time
-- number of hops
-- name of the execution server
-
-# Satellite Fields
-
-- orbital sunset
-- is an access point?
-- evelation angle
-- neighbors
-- latency
-- bandwitdth
-- completed tasks
-- cpu busy until...
-- network busy until...
-- cpu capacity
-- network capacity
-- enery reserved
-- list of rejectde tasks
-- remainig energy
-- list of tasks
-- list of dead tasks

@@ -25,7 +25,7 @@ namespace py = pybind11;
 
 PYBIND11_MAKE_OPAQUE(std::vector<GPIndividual>);
 PYBIND11_MODULE(scheduler, m) {
-    m.doc() = "Python bindings for the Scheduler GP module";
+    m.doc() = "Python library to create satellites and tasks and solve the scheduling problem with a genetic programming algorithm.";
 
     // Inside PYBIND11_MODULE, before the SchedulerGP binding:
     py::bind_vector<std::vector<GPIndividual>>(m, "Population");
@@ -43,17 +43,16 @@ PYBIND11_MODULE(scheduler, m) {
         .value("TERMINAL", NodeType::TERMINAL, "Terminal node (variable)")
         .value("CONST", NodeType::CONST, "Constant value node");
 
-    py::class_<ExprNode>(m, "ExprNode", "A node in the expression tree used by the GP individual")
+    py::class_<ExprNode>(m, "ExprNode", "A node in the expression tree representing an individual in the Genetic Programming population")
         .def_readwrite("nodeType", &ExprNode::nodeType, "Type of the node (e.g., ADD, CONST, TERMINAL)")
         .def_readwrite("terminalIndex", &ExprNode::terminalIndex, "Index of the terminal if the node is a TERMINAL")
-        .def_readwrite("constValue", &ExprNode::constValue, "Constant value if the node is a CONST")
         .def_readwrite("children", &ExprNode::children, "List of child nodes")
         .def("size", &ExprNode::size, "Get the size of the subtree rooted at this node");
 
     py::class_<Satellite>(m, "Satellite", "Represents a computing satellite resource")
         .def(py::init<>())
-        .def_readwrite("id",                &Satellite::id)
-        .def_readwrite("name",              &Satellite::name)
+        .def_readwrite("id",                 &Satellite::id)
+        .def_readwrite("name",               &Satellite::name)
         .def_readwrite("orbitalSunset",      &Satellite::orbitalSunset)
         .def_readwrite("isAccessPoint",      &Satellite::isAccessPoint)
         .def_readwrite("elevationAngle",     &Satellite::elevationAngle)

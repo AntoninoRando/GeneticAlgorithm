@@ -2,7 +2,6 @@
 \indexentry{scheduler@\spxentry{scheduler}!module@\spxentry{module}|hyperpage}{3}
 \indexentry{ExprNode (class in scheduler)@\spxentry{ExprNode}\spxextra{class in scheduler}|hyperpage}{3}
 \indexentry{children (scheduler.ExprNode property)@\spxentry{children}\spxextra{scheduler.ExprNode property}|hyperpage}{3}
-\indexentry{constValue (scheduler.ExprNode property)@\spxentry{constValue}\spxextra{scheduler.ExprNode property}|hyperpage}{3}
 \indexentry{nodeType (scheduler.ExprNode property)@\spxentry{nodeType}\spxextra{scheduler.ExprNode property}|hyperpage}{3}
 \indexentry{size() (scheduler.ExprNode method)@\spxentry{size()}\spxextra{scheduler.ExprNode method}|hyperpage}{3}
 \indexentry{terminalIndex (scheduler.ExprNode property)@\spxentry{terminalIndex}\spxextra{scheduler.ExprNode property}|hyperpage}{3}
@@ -18,14 +17,15 @@
 \indexentry{tree (scheduler.Individual property)@\spxentry{tree}\spxextra{scheduler.Individual property}|hyperpage}{5}
 \indexentry{Job (class in scheduler)@\spxentry{Job}\spxextra{class in scheduler}|hyperpage}{5}
 \indexentry{arrivalTime (scheduler.Job property)@\spxentry{arrivalTime}\spxextra{scheduler.Job property}|hyperpage}{5}
-\indexentry{dueMinute (scheduler.Job property)@\spxentry{dueMinute}\spxextra{scheduler.Job property}|hyperpage}{5}
-\indexentry{durationMinutes (scheduler.Job property)@\spxentry{durationMinutes}\spxextra{scheduler.Job property}|hyperpage}{5}
+\indexentry{disk (scheduler.Job property)@\spxentry{disk}\spxextra{scheduler.Job property}|hyperpage}{5}
+\indexentry{executionServerName (scheduler.Job property)@\spxentry{executionServerName}\spxextra{scheduler.Job property}|hyperpage}{5}
+\indexentry{executionTime (scheduler.Job property)@\spxentry{executionTime}\spxextra{scheduler.Job property}|hyperpage}{5}
 \indexentry{id (scheduler.Job property)@\spxentry{id}\spxextra{scheduler.Job property}|hyperpage}{5}
-\indexentry{initialDeadline (scheduler.Job property)@\spxentry{initialDeadline}\spxextra{scheduler.Job property}|hyperpage}{5}
-\indexentry{name (scheduler.Job property)@\spxentry{name}\spxextra{scheduler.Job property}|hyperpage}{6}
-\indexentry{priority (scheduler.Job property)@\spxentry{priority}\spxextra{scheduler.Job property}|hyperpage}{6}
-\indexentry{remainingDeadline (scheduler.Job property)@\spxentry{remainingDeadline}\spxextra{scheduler.Job property}|hyperpage}{6}
-\indexentry{taskSize (scheduler.Job property)@\spxentry{taskSize}\spxextra{scheduler.Job property}|hyperpage}{6}
+\indexentry{imageSize (scheduler.Job property)@\spxentry{imageSize}\spxextra{scheduler.Job property}|hyperpage}{5}
+\indexentry{numberOfHops (scheduler.Job property)@\spxentry{numberOfHops}\spxextra{scheduler.Job property}|hyperpage}{5}
+\indexentry{ram (scheduler.Job property)@\spxentry{ram}\spxextra{scheduler.Job property}|hyperpage}{6}
+\indexentry{transferTime (scheduler.Job property)@\spxentry{transferTime}\spxextra{scheduler.Job property}|hyperpage}{6}
+\indexentry{type (scheduler.Job property)@\spxentry{type}\spxextra{scheduler.Job property}|hyperpage}{6}
 \indexentry{NodeType (class in scheduler)@\spxentry{NodeType}\spxextra{class in scheduler}|hyperpage}{6}
 \indexentry{ABS (scheduler.NodeType attribute)@\spxentry{ABS}\spxextra{scheduler.NodeType attribute}|hyperpage}{6}
 \indexentry{ADD (scheduler.NodeType attribute)@\spxentry{ADD}\spxextra{scheduler.NodeType attribute}|hyperpage}{6}
@@ -38,27 +38,44 @@
 \indexentry{NEG (scheduler.NodeType attribute)@\spxentry{NEG}\spxextra{scheduler.NodeType attribute}|hyperpage}{6}
 \indexentry{SUB (scheduler.NodeType attribute)@\spxentry{SUB}\spxextra{scheduler.NodeType attribute}|hyperpage}{6}
 \indexentry{TERMINAL (scheduler.NodeType attribute)@\spxentry{TERMINAL}\spxextra{scheduler.NodeType attribute}|hyperpage}{6}
-\indexentry{value (scheduler.NodeType property)@\spxentry{value}\spxextra{scheduler.NodeType property}|hyperpage}{7}
+\indexentry{value (scheduler.NodeType property)@\spxentry{value}\spxextra{scheduler.NodeType property}|hyperpage}{6}
+\indexentry{Population (class in scheduler)@\spxentry{Population}\spxextra{class in scheduler}|hyperpage}{6}
+\indexentry{append() (scheduler.Population method)@\spxentry{append()}\spxextra{scheduler.Population method}|hyperpage}{7}
+\indexentry{clear() (scheduler.Population method)@\spxentry{clear()}\spxextra{scheduler.Population method}|hyperpage}{7}
+\indexentry{extend() (scheduler.Population method)@\spxentry{extend()}\spxextra{scheduler.Population method}|hyperpage}{7}
+\indexentry{insert() (scheduler.Population method)@\spxentry{insert()}\spxextra{scheduler.Population method}|hyperpage}{7}
+\indexentry{pop() (scheduler.Population method)@\spxentry{pop()}\spxextra{scheduler.Population method}|hyperpage}{7}
 \indexentry{Satellite (class in scheduler)@\spxentry{Satellite}\spxextra{class in scheduler}|hyperpage}{7}
-\indexentry{ComputingCapability (scheduler.Satellite property)@\spxentry{ComputingCapability}\spxextra{scheduler.Satellite property}|hyperpage}{7}
-\indexentry{ComputingLoad (scheduler.Satellite property)@\spxentry{ComputingLoad}\spxextra{scheduler.Satellite property}|hyperpage}{7}
-\indexentry{RemainingEnergy (scheduler.Satellite property)@\spxentry{RemainingEnergy}\spxextra{scheduler.Satellite property}|hyperpage}{7}
-\indexentry{activeTasks (scheduler.Satellite property)@\spxentry{activeTasks}\spxextra{scheduler.Satellite property}|hyperpage}{7}
+\indexentry{bandwidth (scheduler.Satellite property)@\spxentry{bandwidth}\spxextra{scheduler.Satellite property}|hyperpage}{7}
+\indexentry{completedTasks (scheduler.Satellite property)@\spxentry{completedTasks}\spxextra{scheduler.Satellite property}|hyperpage}{7}
+\indexentry{cpuBusyUntil (scheduler.Satellite property)@\spxentry{cpuBusyUntil}\spxextra{scheduler.Satellite property}|hyperpage}{7}
+\indexentry{cpuCapacity (scheduler.Satellite property)@\spxentry{cpuCapacity}\spxextra{scheduler.Satellite property}|hyperpage}{7}
+\indexentry{deadTasks (scheduler.Satellite property)@\spxentry{deadTasks}\spxextra{scheduler.Satellite property}|hyperpage}{7}
+\indexentry{elevationAngle (scheduler.Satellite property)@\spxentry{elevationAngle}\spxextra{scheduler.Satellite property}|hyperpage}{7}
+\indexentry{energyReserved (scheduler.Satellite property)@\spxentry{energyReserved}\spxextra{scheduler.Satellite property}|hyperpage}{7}
 \indexentry{id (scheduler.Satellite property)@\spxentry{id}\spxextra{scheduler.Satellite property}|hyperpage}{7}
-\indexentry{listeningDome (scheduler.Satellite property)@\spxentry{listeningDome}\spxextra{scheduler.Satellite property}|hyperpage}{7}
+\indexentry{isAccessPoint (scheduler.Satellite property)@\spxentry{isAccessPoint}\spxextra{scheduler.Satellite property}|hyperpage}{7}
+\indexentry{latency (scheduler.Satellite property)@\spxentry{latency}\spxextra{scheduler.Satellite property}|hyperpage}{7}
 \indexentry{name (scheduler.Satellite property)@\spxentry{name}\spxextra{scheduler.Satellite property}|hyperpage}{7}
-\indexentry{SchedulerGP (class in scheduler)@\spxentry{SchedulerGP}\spxextra{class in scheduler}|hyperpage}{7}
-\indexentry{getPopulation() (scheduler.SchedulerGP method)@\spxentry{getPopulation()}\spxextra{scheduler.SchedulerGP method}|hyperpage}{7}
-\indexentry{initialize() (scheduler.SchedulerGP method)@\spxentry{initialize()}\spxextra{scheduler.SchedulerGP method}|hyperpage}{7}
-\indexentry{printSchedule() (scheduler.SchedulerGP method)@\spxentry{printSchedule()}\spxextra{scheduler.SchedulerGP method}|hyperpage}{7}
-\indexentry{solveNextGeneration() (scheduler.SchedulerGP method)@\spxentry{solveNextGeneration()}\spxextra{scheduler.SchedulerGP method}|hyperpage}{7}
-\indexentry{SimulationSnapshot (class in scheduler)@\spxentry{SimulationSnapshot}\spxextra{class in scheduler}|hyperpage}{7}
+\indexentry{neighbors (scheduler.Satellite property)@\spxentry{neighbors}\spxextra{scheduler.Satellite property}|hyperpage}{7}
+\indexentry{networkBusyUntil (scheduler.Satellite property)@\spxentry{networkBusyUntil}\spxextra{scheduler.Satellite property}|hyperpage}{7}
+\indexentry{networkCapacity (scheduler.Satellite property)@\spxentry{networkCapacity}\spxextra{scheduler.Satellite property}|hyperpage}{8}
+\indexentry{orbitalSunset (scheduler.Satellite property)@\spxentry{orbitalSunset}\spxextra{scheduler.Satellite property}|hyperpage}{8}
+\indexentry{rejectedTasks (scheduler.Satellite property)@\spxentry{rejectedTasks}\spxextra{scheduler.Satellite property}|hyperpage}{8}
+\indexentry{remainingEnergy (scheduler.Satellite property)@\spxentry{remainingEnergy}\spxextra{scheduler.Satellite property}|hyperpage}{8}
+\indexentry{tasks (scheduler.Satellite property)@\spxentry{tasks}\spxextra{scheduler.Satellite property}|hyperpage}{8}
+\indexentry{SchedulerGP (class in scheduler)@\spxentry{SchedulerGP}\spxextra{class in scheduler}|hyperpage}{8}
+\indexentry{getPopulation() (scheduler.SchedulerGP method)@\spxentry{getPopulation()}\spxextra{scheduler.SchedulerGP method}|hyperpage}{8}
+\indexentry{initialize() (scheduler.SchedulerGP method)@\spxentry{initialize()}\spxextra{scheduler.SchedulerGP method}|hyperpage}{8}
+\indexentry{printSchedule() (scheduler.SchedulerGP method)@\spxentry{printSchedule()}\spxextra{scheduler.SchedulerGP method}|hyperpage}{8}
+\indexentry{solveNextGeneration() (scheduler.SchedulerGP method)@\spxentry{solveNextGeneration()}\spxextra{scheduler.SchedulerGP method}|hyperpage}{8}
+\indexentry{SimulationSnapshot (class in scheduler)@\spxentry{SimulationSnapshot}\spxextra{class in scheduler}|hyperpage}{8}
 \indexentry{currentMinute (scheduler.SimulationSnapshot property)@\spxentry{currentMinute}\spxextra{scheduler.SimulationSnapshot property}|hyperpage}{8}
 \indexentry{energyPerMinute (scheduler.SimulationSnapshot property)@\spxentry{energyPerMinute}\spxextra{scheduler.SimulationSnapshot property}|hyperpage}{8}
 \indexentry{jobs (scheduler.SimulationSnapshot property)@\spxentry{jobs}\spxextra{scheduler.SimulationSnapshot property}|hyperpage}{8}
 \indexentry{satellites (scheduler.SimulationSnapshot property)@\spxentry{satellites}\spxextra{scheduler.SimulationSnapshot property}|hyperpage}{8}
-\indexentry{TerminalDef (class in scheduler)@\spxentry{TerminalDef}\spxextra{class in scheduler}|hyperpage}{8}
-\indexentry{name (scheduler.TerminalDef property)@\spxentry{name}\spxextra{scheduler.TerminalDef property}|hyperpage}{8}
-\indexentry{buildTerminalRegistry() (in module scheduler)@\spxentry{buildTerminalRegistry()}\spxextra{in module scheduler}|hyperpage}{8}
-\indexentry{module@\spxentry{module}!schedulerlib@\spxentry{schedulerlib}|hyperpage}{8}
-\indexentry{schedulerlib@\spxentry{schedulerlib}!module@\spxentry{module}|hyperpage}{8}
+\indexentry{TerminalDef (class in scheduler)@\spxentry{TerminalDef}\spxextra{class in scheduler}|hyperpage}{9}
+\indexentry{name (scheduler.TerminalDef property)@\spxentry{name}\spxextra{scheduler.TerminalDef property}|hyperpage}{9}
+\indexentry{buildTerminalRegistry() (in module scheduler)@\spxentry{buildTerminalRegistry()}\spxextra{in module scheduler}|hyperpage}{9}
+\indexentry{module@\spxentry{module}!schedulerlib@\spxentry{schedulerlib}|hyperpage}{9}
+\indexentry{schedulerlib@\spxentry{schedulerlib}!module@\spxentry{module}|hyperpage}{9}

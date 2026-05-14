@@ -1,6 +1,6 @@
 import argparse
 from scheduler import SchedulerGP, FitnessEvaluator, SimulationSnapshot, buildTerminalRegistry
-from data_factory import create_satellites, create_jobs
+from data_factory import create_jobs_from_csv, create_satellites, create_jobs
 
 
 
@@ -15,30 +15,53 @@ parser.add_argument("--hoist-rate", type=float, default=0.05,
                     help="Probability [0..1] that each new offspring undergoes a hoist mutation, "
                          "which replaces the whole tree with one of its own subtrees to fight bloat "
                          "(e.g. --hoist-rate 0.20 for aggressive pruning).")
+parser.add_argument("--convergence-threshold", type=int, default=10, 
+                    help="Number of generations without fitness improvement before regenerating satellites and jobs (G).")
 args = parser.parse_args()
 
 
 
 def run_genetic_algorithm(generations: int, population_size: int, print_every: int,
-                          max_depth: int, hoist_rate: float):
+                          max_depth: int, hoist_rate: float, convergence_threshold: int = 10):
+
     satellites = create_satellites()
     jobs = create_jobs()
-
     genetic_algorithm   = SchedulerGP(satellites, jobs)
     genetic_algorithm.initialize(populationSize=population_size, maxDepth=max_depth,
                                  hoistRate=hoist_rate)
     fitness_evaluator = FitnessEvaluator(buildTerminalRegistry())
     snapshot = None
     
-    for generation in range(generations):
-        # Regenerate the world every iteration
-        satellites = create_satellites(n=10)
-        jobs       = create_jobs(n=100, start_minute=generation * 5.0, arrival_spread=5)
-        current_minute = generation * 5.0
-        snapshot = SimulationSnapshot(current_minute, satellites, jobs)
+    # Generate initial world
+    satellites = create_satellites(n=10)
+    jobs = create_jobs_from_csv("data/example.csv", limit=10)
+    current_minute = 0.0
+    snapshot = SimulationSnapshot(current_minute, satellites, jobs)
 
+    best_overall_fitness = float('-inf')
+    generations_without_improvement = 0
+    
+    for generation in range(generations):
         # Evaluare fitness of population by scheduling tasks
         fitness_evaluator.evaluate(genetic_algorithm.getPopulation(), snapshot)
+        
+        # Check convergence
+        current_best = max(genetic_algorithm.getPopulation(), key=lambda ind: ind.fitness)
+        if current_best.fitness > best_overall_fitness:
+            best_overall_fitness = current_best.fitness
+            generations_without_improvement = 0
+        else:
+            generations_without_improvement += 1
+
+        if generations_without_improvement >= convergence_threshold:
+            # Regenerate the world
+            print(f"Convergence detected after {generations_without_improvement} generations without improvement. Regenerating satellites and jobs...")
+            satellites = create_satellites(n=10)
+            jobs = create_jobs_from_csv("data/example.csv", limit=20)
+            current_minute = generation * 5.0
+            snapshot = SimulationSnapshot(current_minute, satellites, jobs)
+            best_overall_fitness = float('-inf')
+            generations_without_improvement = 0
 
         # Evolve the population
         genetic_algorithm.solveNextGeneration()
@@ -65,4 +88,4 @@ if __name__ == "__main__":
     input()
 
     run_genetic_algorithm(args.generations, args.population, args.print_every,
-                          args.max_depth, args.hoist_rate)
+                          args.max_depth, args.hoist_rate, args.convergence_threshold)
