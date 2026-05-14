@@ -57,6 +57,8 @@ To find more about the library, please read the [documentation](/docs/build/late
 - python
 - pybind11
 - CMake
+- numpy
+- matplotlib
 
 If you're running inside a docker container:
 
@@ -83,6 +85,27 @@ cp scheduler*.so ..
 ```
 
 The `scheduler*.so` file is the module that can be used by Python.
+
+# Metrics Instrumentation and Graphs
+
+The main loop now records per-generation metrics and writes three artifacts:
+
+- `<prefix>_metrics.csv`: append-only generation logs.
+- `<prefix>_metrics.npz`: NumPy arrays for post-processing.
+- `<prefix>_metrics.png`: graph built from NumPy data.
+
+Run with metrics enabled (default):
+
+```shell
+python3 main.py --no-start-prompt --generations 200 --population 100 \
+  --metrics-dir metrics --metrics-prefix run_01 --metrics-flush-every 1
+```
+
+Disable metrics when needed:
+
+```shell
+python3 main.py --disable-metrics
+```
 
 # Debugging
 

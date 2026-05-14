@@ -1,6 +1,9 @@
 import argparse
+from datetime import datetime
+
 from scheduler import SchedulerGP, FitnessEvaluator, SimulationSnapshot, buildTerminalRegistry
 from data_factory import create_jobs_from_csv, create_satellites, create_jobs
+from metrics_tracker import GenerationMetrics, MetricsCollector
 
 
 
@@ -17,12 +20,27 @@ parser.add_argument("--hoist-rate", type=float, default=0.05,
                          "(e.g. --hoist-rate 0.20 for aggressive pruning).")
 parser.add_argument("--convergence-threshold", type=int, default=10, 
                     help="Number of generations without fitness improvement before regenerating satellites and jobs (G).")
+parser.add_argument("--metrics-dir", type=str, default="metrics",
+                    help="Directory where metrics artifacts are written.")
+parser.add_argument("--metrics-prefix", type=str, default="",
+                    help="Output prefix for metrics files. Defaults to a timestamp.")
+parser.add_argument("--metrics-flush-every", type=int, default=1,
+                    help="How often (in generations) to refresh the NumPy metrics dump.")
+parser.add_argument("--disable-metrics", action="store_true",
+                    help="Disable metrics collection and graph generation.")
+parser.add_argument("--no-start-prompt", action="store_true",
+                    help="Start immediately without waiting for Enter.")
 args = parser.parse_args()
 
 
 
 def run_genetic_algorithm(generations: int, population_size: int, print_every: int,
-                          max_depth: int, hoist_rate: float, convergence_threshold: int = 10):
+                          max_depth: int, hoist_rate: float, convergence_threshold: int = 10,
+                          metrics_dir: str = "metrics", metrics_prefix: str = "",
+                          metrics_flush_every: int = 1, collect_metrics: bool = True):
+    if generations <= 0:
+        print("No generations requested; nothing to optimize.")
+        return
 
     satellites = create_satellites()
     jobs = create_jobs()
@@ -31,11 +49,16 @@ def run_genetic_algorithm(generations: int, population_size: int, print_every: i
                                  hoistRate=hoist_rate)
     fitness_evaluator = FitnessEvaluator(buildTerminalRegistry())
     snapshot = None
+    last_evaluation_snapshot = None
+    metrics_collector = None
+    if collect_metrics:
+        run_prefix = metrics_prefix.strip() or datetime.now().strftime("ga_%Y%m%d_%H%M%S")
+        metrics_collector = MetricsCollector(metrics_dir, run_prefix, metrics_flush_every)
     
     # Generate initial world
     satellites = create_satellites(n=10)
-    jobs = create_jobs_from_csv("data/example.csv", limit=10)
     current_minute = 0.0
+    jobs = create_jobs_from_csv("data/example.csv", limit=10, snapshot_minute=current_minute)
     snapshot = SimulationSnapshot(current_minute, satellites, jobs)
 
     best_overall_fitness = float('-inf')
@@ -43,49 +66,84 @@ def run_genetic_algorithm(generations: int, population_size: int, print_every: i
     
     for generation in range(generations):
         # Evaluare fitness of population by scheduling tasks
-        fitness_evaluator.evaluate(genetic_algorithm.getPopulation(), snapshot)
+        population = genetic_algorithm.getPopulation()
+        fitness_evaluator.evaluate(population, snapshot)
+        evaluation_snapshot = snapshot
+        last_evaluation_snapshot = evaluation_snapshot
         
         # Check convergence
-        current_best = max(genetic_algorithm.getPopulation(), key=lambda ind: ind.fitness)
+        current_best = max(population, key=lambda ind: ind.fitness)
         if current_best.fitness > best_overall_fitness:
             best_overall_fitness = current_best.fitness
             generations_without_improvement = 0
         else:
             generations_without_improvement += 1
 
+        world_reset = 0
         if generations_without_improvement >= convergence_threshold:
             # Regenerate the world
             print(f"Convergence detected after {generations_without_improvement} generations without improvement. Regenerating satellites and jobs...")
             satellites = create_satellites(n=10)
-            jobs = create_jobs_from_csv("data/example.csv", limit=20)
             current_minute = generation * 5.0
+            jobs = create_jobs_from_csv("data/example.csv", limit=20, snapshot_minute=current_minute)
             snapshot = SimulationSnapshot(current_minute, satellites, jobs)
             best_overall_fitness = float('-inf')
             generations_without_improvement = 0
+            world_reset = 1
 
-        # Evolve the population
-        genetic_algorithm.solveNextGeneration()
+        if metrics_collector is not None:
+            fitness_values = [individual.fitness for individual in population]
+            mean_fitness = sum(fitness_values) / len(fitness_values)
+            variance = sum((value - mean_fitness) ** 2 for value in fitness_values) / len(fitness_values)
+            ratio, resp, energy = fitness_evaluator.evaluate_single(current_best, evaluation_snapshot)
+
+            metrics_collector.record(
+                GenerationMetrics(
+                    generation=generation + 1,
+                    best_fitness=current_best.fitness,
+                    mean_fitness=mean_fitness,
+                    fitness_std=variance ** 0.5,
+                    best_completion_ratio=ratio,
+                    best_mean_response=resp,
+                    best_energy=energy,
+                    jobs_in_snapshot=len(evaluation_snapshot.jobs),
+                    satellites_in_snapshot=len(evaluation_snapshot.satellites),
+                    stagnation_generations=generations_without_improvement,
+                    world_reset=world_reset,
+                )
+            )
 
         # Print progress
-        if print_every <= 0:
-            continue
-        if (generation + 1) % print_every == 0 or generation == generations - 1:
+        if print_every > 0 and ((generation + 1) % print_every == 0 or generation == generations - 1):
             print("SCHEDULE SNAPSHOT " + "-" * 50)
             genetic_algorithm.printSchedule()
             print("\n")
 
+        # Evolve the population
+        if generation < generations - 1:
+            genetic_algorithm.solveNextGeneration()
+
     # After evolution: inspect the winner
     best = max(genetic_algorithm.getPopulation(), key=lambda ind: ind.fitness)
-    ratio, resp, energy = fitness_evaluator.evaluate_single(best, snapshot)
+    ratio, resp, energy = fitness_evaluator.evaluate_single(best, last_evaluation_snapshot)
     print(f"Jobs scheduled: {ratio:.0%}  |  Mean response: {resp:.1f} min  |  Energy: {energy:.1f} Wmin")
+
+    if metrics_collector is not None:
+        metrics_collector.close()
+        print(f"Metrics CSV: {metrics_collector.csv_path}")
+        print(f"Metrics NumPy: {metrics_collector.npz_path}")
+        print(f"Metrics graph: {metrics_collector.plot_path}")
 
 
 
 if __name__ == "__main__":
     import os
     print(f"PID: {os.getpid()} — attach GDB now if you want to debug the C++ code.")
-    print("Press Enter to start the genetic algorithm...")
-    input()
+    if not args.no_start_prompt:
+        print("Press Enter to start the genetic algorithm...")
+        input()
 
     run_genetic_algorithm(args.generations, args.population, args.print_every,
-                          args.max_depth, args.hoist_rate, args.convergence_threshold)
+                          args.max_depth, args.hoist_rate, args.convergence_threshold,
+                          args.metrics_dir, args.metrics_prefix, args.metrics_flush_every,
+                          not args.disable_metrics)

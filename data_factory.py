@@ -93,7 +93,11 @@ def _rescale(value: float, src_min: float, src_max: float, dst_min: float, dst_m
     return dst_min + ratio * (dst_max - dst_min)
 
 
-def create_jobs_from_csv(csv_path: str = "data/example.csv", limit: Optional[int] = None) -> list:
+def create_jobs_from_csv(
+    csv_path: str = "data/example.csv",
+    limit: Optional[int] = None,
+    snapshot_minute: float = 0.0,
+) -> list:
     base_dir = Path(__file__).resolve().parent
     path = Path(csv_path)
     if not path.is_absolute():
@@ -152,7 +156,8 @@ def create_jobs_from_csv(csv_path: str = "data/example.csv", limit: Optional[int
 
         job = Job()
         job.id = idx
-        job.arrivalTime = 0  # arrival-time columns are explicitly ignored.
+        # Keep task arrivals aligned with the snapshot minute used by the evaluator.
+        job.arrivalTime = int(snapshot_minute)
         job.type = row["task_type"]
         job.imageSize = image_size
         job.executionTime = max(1, execution_time)
