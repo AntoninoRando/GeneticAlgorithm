@@ -1,9 +1,11 @@
 import argparse
+import random
 from datetime import datetime
 
 from scheduler import SchedulerGP, FitnessEvaluator, SimulationSnapshot, buildTerminalRegistry
-from data_factory import create_jobs_from_csv, create_satellites, create_jobs
+from data_factory import create_jobs_from_csv, create_satellites_from_csv
 from metrics_tracker import GenerationMetrics, MetricsCollector
+from snapshot_inspector import print_simulation_snapshot_summary, save_simulation_snapshot
 
 
 
@@ -28,6 +30,14 @@ parser.add_argument("--metrics-flush-every", type=int, default=1,
                     help="How often (in generations) to refresh the NumPy metrics dump.")
 parser.add_argument("--disable-metrics", action="store_true",
                     help="Disable metrics collection and graph generation.")
+parser.add_argument("--inspect-snapshots", action="store_true",
+                    help="Print readable summaries for initial/reset/final simulation snapshots.")
+parser.add_argument("--save-snapshots", action="store_true",
+                    help="Persist inspected snapshots as JSON files.")
+parser.add_argument("--snapshots-dir", type=str, default="snapshots",
+                    help="Directory where snapshot JSON files are written.")
+parser.add_argument("--snapshots-prefix", type=str, default="",
+                    help="Output prefix for snapshot JSON files. Defaults to a timestamp.")
 parser.add_argument("--no-start-prompt", action="store_true",
                     help="Start immediately without waiting for Enter.")
 args = parser.parse_args()
@@ -37,32 +47,72 @@ args = parser.parse_args()
 def run_genetic_algorithm(generations: int, population_size: int, print_every: int,
                           max_depth: int, hoist_rate: float, convergence_threshold: int = 10,
                           metrics_dir: str = "metrics", metrics_prefix: str = "",
-                          metrics_flush_every: int = 1, collect_metrics: bool = True):
+                          metrics_flush_every: int = 1, collect_metrics: bool = True,
+                          inspect_snapshots: bool = False, save_snapshots: bool = False,
+                          snapshots_dir: str = "snapshots", snapshots_prefix: str = ""):
     if generations <= 0:
         print("No generations requested; nothing to optimize.")
         return
 
-    satellites = create_satellites()
-    jobs = create_jobs()
-    genetic_algorithm   = SchedulerGP(satellites, jobs)
+    csv_path = "data/example.csv"
+    initial_job_limit = 50
+    current_minute = 0.0
+    world_rng = random.Random()
+    snapshot_prefix_value = snapshots_prefix.strip() or datetime.now().strftime("snapshot_%Y%m%d_%H%M%S")
+
+    def inspect_snapshot(active_snapshot: SimulationSnapshot, generation: int, reset_count: int, label: str):
+        if not (inspect_snapshots or save_snapshots):
+            return
+
+        print(f"\n[{label}]")
+        if inspect_snapshots:
+            print_simulation_snapshot_summary(active_snapshot)
+
+        if save_snapshots:
+            snapshot_path = save_simulation_snapshot(
+                active_snapshot,
+                output_dir=snapshots_dir,
+                prefix=snapshot_prefix_value,
+                generation=generation,
+                reset_count=reset_count,
+            )
+            print(f"Snapshot JSON: {snapshot_path}")
+
+    def build_world(job_limit: int, minute: float):
+        world_seed = world_rng.randrange(0, 2_147_483_647)
+        satellites_local = create_satellites_from_csv(
+            csv_path,
+            limit=job_limit,
+            seed=world_seed,
+            random_sample=True,
+            sample_seed=world_seed,
+        )
+        jobs_local = create_jobs_from_csv(
+            csv_path,
+            limit=job_limit,
+            snapshot_minute=minute,
+            random_sample=True,
+            sample_seed=world_seed,
+        )
+        return satellites_local, jobs_local, world_seed
+
+    satellites, jobs, _ = build_world(initial_job_limit, current_minute)
+
+    genetic_algorithm = SchedulerGP(satellites, jobs)
     genetic_algorithm.initialize(populationSize=population_size, maxDepth=max_depth,
                                  hoistRate=hoist_rate)
     fitness_evaluator = FitnessEvaluator(buildTerminalRegistry())
-    snapshot = None
+    snapshot = SimulationSnapshot(current_minute, satellites, jobs)
+    inspect_snapshot(snapshot, generation=0, reset_count=0, label="Initial simulation snapshot")
     last_evaluation_snapshot = None
     metrics_collector = None
     if collect_metrics:
         run_prefix = metrics_prefix.strip() or datetime.now().strftime("ga_%Y%m%d_%H%M%S")
         metrics_collector = MetricsCollector(metrics_dir, run_prefix, metrics_flush_every)
-    
-    # Generate initial world
-    satellites = create_satellites(n=10)
-    current_minute = 0.0
-    jobs = create_jobs_from_csv("data/example.csv", limit=10, snapshot_minute=current_minute)
-    snapshot = SimulationSnapshot(current_minute, satellites, jobs)
 
     best_overall_fitness = float('-inf')
     generations_without_improvement = 0
+    total_resets = 0
     
     for generation in range(generations):
         # Evaluare fitness of population by scheduling tasks
@@ -83,10 +133,18 @@ def run_genetic_algorithm(generations: int, population_size: int, print_every: i
         if generations_without_improvement >= convergence_threshold:
             # Regenerate the world
             print(f"Convergence detected after {generations_without_improvement} generations without improvement. Regenerating satellites and jobs...")
-            satellites = create_satellites(n=10)
+            reset_job_limit = 50
             current_minute = generation * 5.0
-            jobs = create_jobs_from_csv("data/example.csv", limit=20, snapshot_minute=current_minute)
+            satellites, jobs, world_seed = build_world(reset_job_limit, current_minute)
+            print(f"Loaded new CSV sample for reset (seed={world_seed}).")
             snapshot = SimulationSnapshot(current_minute, satellites, jobs)
+            total_resets += 1
+            inspect_snapshot(
+                snapshot,
+                generation=generation + 1,
+                reset_count=total_resets,
+                label=f"World reset #{total_resets} at generation {generation + 1}",
+            )
             best_overall_fitness = float('-inf')
             generations_without_improvement = 0
             world_reset = 1
@@ -127,6 +185,12 @@ def run_genetic_algorithm(generations: int, population_size: int, print_every: i
     best = max(genetic_algorithm.getPopulation(), key=lambda ind: ind.fitness)
     ratio, resp, energy = fitness_evaluator.evaluate_single(best, last_evaluation_snapshot)
     print(f"Jobs scheduled: {ratio:.0%}  |  Mean response: {resp:.1f} min  |  Energy: {energy:.1f} Wmin")
+    inspect_snapshot(
+        last_evaluation_snapshot,
+        generation=generations,
+        reset_count=total_resets,
+        label="Final evaluation snapshot",
+    )
 
     if metrics_collector is not None:
         metrics_collector.close()
@@ -146,4 +210,5 @@ if __name__ == "__main__":
     run_genetic_algorithm(args.generations, args.population, args.print_every,
                           args.max_depth, args.hoist_rate, args.convergence_threshold,
                           args.metrics_dir, args.metrics_prefix, args.metrics_flush_every,
-                          not args.disable_metrics)
+                          not args.disable_metrics, args.inspect_snapshots, args.save_snapshots,
+                          args.snapshots_dir, args.snapshots_prefix)

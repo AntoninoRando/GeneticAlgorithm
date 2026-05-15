@@ -107,6 +107,36 @@ Disable metrics when needed:
 python3 main.py --disable-metrics
 ```
 
+# Snapshot Inspection
+
+You can inspect the full simulation snapshot (initial world, every world reset, and final evaluation snapshot) directly from `main.py`.
+
+Print readable summaries:
+
+```shell
+python3 main.py --inspect-snapshots
+```
+
+Save snapshots to JSON:
+
+```shell
+python3 main.py --inspect-snapshots --save-snapshots \
+  --snapshots-dir snapshots --snapshots-prefix run_01
+```
+
+Build a timeline graph from one snapshot (red dots: satellites, blue dots: tasks):
+
+```shell
+python3 snapshot_timeline_plot.py snapshots/<snapshot_file>.json
+```
+
+Specify output file:
+
+```shell
+python3 snapshot_timeline_plot.py snapshots/<snapshot_file>.json \
+  --output snapshots/<snapshot_file>_timeline.png
+```
+
 # Debugging
 
 ## Build the project

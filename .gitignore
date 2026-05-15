@@ -12,3 +12,6 @@ _deps
 CMakeUserPresets.json
 __pycache__
 /data
+/skills
+/metrics
+/snapshots
