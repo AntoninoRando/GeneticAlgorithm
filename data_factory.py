@@ -1,29 +1,13 @@
-import csv
 import random
 from collections import defaultdict
-from pathlib import Path
 from typing import Optional, Tuple
 from scheduler import Satellite, Job
 
+from utils import _parse_csv_number, _rescale, _load_csv_rows
 
-"""
-// NON CONSIDERARE (“Feature” “Colonna”)
-// taskId A 
-// status C
-// arrivalTime D
-// arrivalTime E
-// startTime F
-// endTime G
-// timeInTheSystem J
-// serverName L
-// execAfterSet R
-// remainingEnergy% W
-// rejectionReason X
-// routingInitTime Y
-// routingEndTime Z
 
-"""
 
+#region CONSTANTS
 # ── Satellite name pool ───────────────────────────────────────────────────────
 _SAT_NAMES = [
     "SEO-A", "SEO-B", "SEO-C", "SEO-D", "SEO-E",
@@ -51,76 +35,10 @@ _IGNORED_CSV_COLUMNS = {
     "Routing Init Time",
     "Routing End Time",
 }
+#endregion
 
 
-def _parse_csv_number(raw_value: Optional[str]) -> Optional[float]:
-    if raw_value is None:
-        return None
-
-    value = raw_value.strip().replace('"', "")
-    if not value:
-        return None
-
-    upper = value.upper()
-    if upper in {"N/A", "NA", "NONE", "NULL"}:
-        return None
-
-    value = value.replace(" ", "")
-
-    # The dataset uses locale formatting (e.g. 12.345.678 and "2,17E+10").
-    if "," in value:
-        if "E" in upper:
-            value = value.replace(".", "").replace(",", ".")
-        elif "." in value and value.rfind(",") > value.rfind("."):
-            value = value.replace(".", "").replace(",", ".")
-        elif "." not in value:
-            value = value.replace(",", ".")
-        else:
-            value = value.replace(",", "")
-    elif value.count(".") > 1:
-        value = value.replace(".", "")
-
-    try:
-        return float(value)
-    except ValueError:
-        return None
-
-
-def _rescale(value: float, src_min: float, src_max: float, dst_min: float, dst_max: float) -> float:
-    if src_max <= src_min:
-        return (dst_min + dst_max) / 2.0
-    ratio = (value - src_min) / (src_max - src_min)
-    ratio = max(0.0, min(1.0, ratio))
-    return dst_min + ratio * (dst_max - dst_min)
-
-
-def _load_csv_rows(
-    csv_path: str,
-    limit: Optional[int] = None,
-    random_sample: bool = False,
-    sample_seed: Optional[int] = None,
-) -> list:
-    base_dir = Path(__file__).resolve().parent
-    path = Path(csv_path)
-    if not path.is_absolute():
-        path = base_dir / path
-
-    with path.open(newline="", encoding="utf-8-sig") as csv_file:
-        reader = csv.DictReader(csv_file)
-        rows = list(reader)
-
-    if limit is not None:
-        limit = max(0, limit)
-        if limit < len(rows):
-            if random_sample:
-                rng = random.Random(sample_seed)
-                rows = rng.sample(rows, limit)
-            else:
-                rows = rows[:limit]
-
-    return rows
-
-
+#region CSV-BASED DATA FACTORY
 def create_jobs_from_csv(
     csv_path: str = "data/example.csv",
     limit: Optional[int] = None,
@@ -210,7 +128,7 @@ def create_satellites_from_csv(
     csv_path: str = "data/example.csv",
     limit: Optional[int] = None,
     max_satellites: Optional[int] = None,
-    seed: int = None,
+    seed: Optional[int] = None,
     random_sample: bool = False,
     sample_seed: Optional[int] = None,
 ) -> list:
@@ -322,28 +240,28 @@ def create_satellites_from_csv(
         sat.completedTasks = 0
 
         if profile["remaining_energy_mean"] is None:
-            sat.remainingEnergy = _rescale(float(profile["count"]), float(count_min), float(count_max), 80.0, 120.0)
+            sat.remainingEnergy = _rescale(float(profile["count"]), float(count_min), float(count_max), 80.0, 120.0) * 0.2
         else:
-            sat.remainingEnergy = _rescale(profile["remaining_energy_mean"], energy_min, energy_max, 70.0, 130.0)
+            sat.remainingEnergy = _rescale(profile["remaining_energy_mean"], energy_min, energy_max, 70.0, 130.0) * 0.2
 
         if profile["execution_mean"] is None:
-            sat.cpuCapacity = _rescale(float(profile["count"]), float(count_min), float(count_max), 22.0, 12.0)
+            sat.cpuCapacity = _rescale(float(profile["count"]), float(count_min), float(count_max), 22.0, 12.0) * 0.22
         else:
-            sat.cpuCapacity = _rescale(profile["execution_mean"], execution_min, execution_max, 26.0, 10.0)
+            sat.cpuCapacity = _rescale(profile["execution_mean"], execution_min, execution_max, 26.0, 10.0) * 0.2
 
         if profile["transfer_mean"] is None:
             sat.networkCapacity = 120.0
             sat.latency = 25.0
             sat.bandwidth = 120.0
         else:
-            sat.networkCapacity = _rescale(profile["transfer_mean"], transfer_min, transfer_max, 180.0, 70.0)
-            sat.latency = _rescale(profile["transfer_mean"], transfer_min, transfer_max, 8.0, 70.0)
-            sat.bandwidth = _rescale(profile["transfer_mean"], transfer_min, transfer_max, 220.0, 50.0)
+            sat.networkCapacity = _rescale(profile["transfer_mean"], transfer_min, transfer_max, 180.0, 70.0) * 0.2
+            sat.latency = _rescale(profile["transfer_mean"], transfer_min, transfer_max, 8.0, 70.0) * 0.2
+            sat.bandwidth = _rescale(profile["transfer_mean"], transfer_min, transfer_max, 220.0, 50.0) * 0.2
 
         if profile["queue_mean"] is None:
             sat.elevationAngle = 45.0
         else:
-            sat.elevationAngle = _rescale(profile["queue_mean"], queue_min, queue_max, 65.0, 30.0)
+            sat.elevationAngle = _rescale(profile["queue_mean"], queue_min, queue_max, 65.0, 30.0) * 0.2
 
         sat.cpuBusyUntil = 0
         sat.networkBusyUntil = 0
@@ -356,10 +274,10 @@ def create_satellites_from_csv(
 
         # Tiny deterministic perturbation keeps satellites distinct even when
         # all source stats collapse to a single point.
-        sat.cpuCapacity *= (1.0 + rng.uniform(-0.02, 0.02))
-        sat.networkCapacity *= (1.0 + rng.uniform(-0.02, 0.02))
-        sat.latency *= (1.0 + rng.uniform(-0.02, 0.02))
-        sat.bandwidth *= (1.0 + rng.uniform(-0.02, 0.02))
+        sat.cpuCapacity *= (1.0 + rng.uniform(-0.02, 0.02)) * 0.22
+        sat.networkCapacity *= (1.0 + rng.uniform(-0.02, 0.02)) * 0.22
+        sat.latency *= (1.0 + rng.uniform(-0.02, 0.02)) * 0.22
+        sat.bandwidth *= (1.0 + rng.uniform(-0.02, 0.02)) * 0.22
 
         satellites.append(sat)
 
@@ -367,14 +285,17 @@ def create_satellites_from_csv(
         sat.neighbors = [other.id for other in satellites if other.id != sat.id]
 
     return satellites
+#endregion
 
 
+
+#region DUMMY DATA GENERATORS
 def create_satellites(
     n:                  int   = 3,
     energy_range:       tuple = (80.0, 120.0),
     load_range:         tuple = (0.10, 0.40),
     capability_range:   tuple = (12.0, 24.0),
-    seed:               int   = None,
+    seed:               Optional[int] = None,
 ) -> list:
     rng = random.Random(seed)
 
@@ -416,10 +337,9 @@ def create_jobs(
     duration_range:  tuple = (5, 15),
     window_range:    tuple = (60, 120),
     task_size_range: tuple = (8.0, 20.0),
-    priority_range:  tuple = (0.5, 2.0),
     start_minute:    float = 0.0,
     arrival_spread:  int   = 200,
-    seed:            int   = None,
+    seed:            Optional[int] = None,
 ) -> list:
     rng = random.Random(seed)
 
@@ -452,3 +372,4 @@ def create_jobs(
         jobs.append(job)
 
     return jobs
+#endregion

@@ -1,0 +1,177 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+cd "$SCRIPT_DIR"
+
+usage() {
+  cat <<'EOF'
+Usage: ./run <CONFIG_NAME> [EXTRA_MAIN_ARGS...]
+
+Runs main.py using runConfigurations/<CONFIG_NAME>.json.
+You can still pass extra main.py CLI flags after the config name.
+EOF
+}
+
+if [[ $# -lt 1 ]]; then
+  usage
+  exit 1
+fi
+
+config_name="${1%.json}"
+shift
+
+config_path="runConfigurations/${config_name}.json"
+if [[ ! -f "$config_path" ]]; then
+  echo "Error: configuration not found: $config_path" >&2
+  echo "Available configurations:" >&2
+  find runConfigurations -maxdepth 1 -type f -name '*.json' -exec basename {} .json \; | sort >&2 || true
+  exit 1
+fi
+
+python_bin="${PYTHON_BIN:-python3}"
+if ! command -v "$python_bin" >/dev/null 2>&1; then
+  echo "Error: Python interpreter not found: $python_bin" >&2
+  exit 1
+fi
+
+declare -a config_args=()
+while IFS= read -r token; do
+  config_args+=("$token")
+done < <("$python_bin" - "$config_path" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+
+def fail(message: str) -> None:
+    print(f"Configuration error: {message}", file=sys.stderr)
+    raise SystemExit(1)
+
+
+def to_flag(name: str) -> str:
+    if name.startswith("--"):
+        return name
+    normalized = name.strip().replace("_", "-")
+    return f"--{normalized}"
+
+
+def append_flag_value(target, flag: str, value) -> None:
+    if value is None:
+        return
+    target.extend([flag, str(value)])
+
+
+def append_bool_flag(target, flag: str, value) -> None:
+    if bool(value):
+        target.append(flag)
+
+
+config_file = Path(sys.argv[1])
+
+try:
+    config = json.loads(config_file.read_text(encoding="utf-8"))
+except FileNotFoundError:
+    fail(f"File not found: {config_file}")
+except json.JSONDecodeError as exc:
+    fail(f"Invalid JSON in {config_file}: {exc}")
+
+if not isinstance(config, dict):
+    fail("Top-level JSON value must be an object.")
+
+args = []
+
+explicit_args = config.get("args")
+if explicit_args is not None:
+    if not isinstance(explicit_args, list):
+        fail('"args" must be an array of CLI tokens.')
+    for item in explicit_args:
+        if item is None:
+            continue
+        if isinstance(item, (str, int, float, bool)):
+            args.append(str(item))
+        else:
+            fail(f'Unsupported token type in "args": {type(item).__name__}')
+else:
+    script_cfg = config.get("script", {})
+    if isinstance(script_cfg, dict):
+        start_with_prompt = script_cfg.get("startWithPrompt")
+        if start_with_prompt is False:
+            args.append("--no-start-prompt")
+
+    ga_cfg = config.get("geneticAlgorithm", {})
+    if isinstance(ga_cfg, dict):
+        ga_map = {
+            "PopulationSize": "--population",
+            "Generations": "--generations",
+            "PrintEvery": "--print-every",
+            "MaxDepth": "--max-depth",
+            "HoistRate": "--hoist-rate",
+            "ConvergenceThreshold": "--convergence-threshold",
+        }
+        for key, flag in ga_map.items():
+            append_flag_value(args, flag, ga_cfg.get(key))
+
+    metrics_cfg = config.get("metrics", {})
+    if isinstance(metrics_cfg, dict):
+        if metrics_cfg.get("Enabled") is False:
+            args.append("--disable-metrics")
+
+        metrics_dir = (
+            metrics_cfg.get("Dir")
+            or metrics_cfg.get("OutputDir")
+            or metrics_cfg.get("MetricsDir")
+        )
+        metrics_prefix = (
+            metrics_cfg.get("Prefix")
+            or metrics_cfg.get("OutputPrefix")
+            or metrics_cfg.get("MetricsPrefix")
+        )
+
+        output_path_raw = metrics_cfg.get("OutputPath")
+        if output_path_raw and not metrics_prefix:
+            output_path = Path(str(output_path_raw))
+            metrics_prefix = output_path.stem or metrics_prefix
+            if output_path.parent.as_posix() not in (".", "") and not metrics_dir:
+                metrics_dir = output_path.parent.as_posix()
+
+        append_flag_value(args, "--metrics-dir", metrics_dir)
+        append_flag_value(args, "--metrics-prefix", metrics_prefix)
+        append_flag_value(args, "--metrics-flush-every", metrics_cfg.get("FlushEvery"))
+
+    snapshots_cfg = config.get("snapshots", {})
+    if isinstance(snapshots_cfg, dict):
+        if snapshots_cfg.get("Enabled"):
+            args.append("--save-snapshots")
+        if snapshots_cfg.get("Inspect"):
+            args.append("--inspect-snapshots")
+        append_flag_value(args, "--snapshots-dir", snapshots_cfg.get("OutputDir"))
+        append_flag_value(args, "--snapshots-prefix", snapshots_cfg.get("Prefix"))
+
+    append_bool_flag(args, "--no-start-prompt", config.get("noStartPrompt"))
+    append_bool_flag(args, "--inspect-snapshots", config.get("inspectSnapshots"))
+    append_bool_flag(args, "--save-snapshots", config.get("saveSnapshots"))
+    append_flag_value(args, "--snapshots-dir", config.get("snapshotsDir"))
+    append_flag_value(args, "--snapshots-prefix", config.get("snapshotsPrefix"))
+
+    main_args_cfg = config.get("mainArgs")
+    if main_args_cfg is not None:
+        if not isinstance(main_args_cfg, dict):
+            fail('"mainArgs" must be an object (flag -> value).')
+        for name, value in main_args_cfg.items():
+            flag = to_flag(name)
+            if isinstance(value, bool):
+                if value:
+                    args.append(flag)
+            elif isinstance(value, list):
+                for list_item in value:
+                    append_flag_value(args, flag, list_item)
+            else:
+                append_flag_value(args, flag, value)
+
+for token in args:
+    print(token)
+PY
+)
+
+exec "$python_bin" main.py "${config_args[@]}" "$@"

@@ -175,11 +175,6 @@ public:
 
         population = move(next);
     }
-
-    void solveWhile()
-    {
-        
-    }
     #pragma endregion ----------------------------------------------------------
 
 

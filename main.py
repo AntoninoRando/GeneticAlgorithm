@@ -9,7 +9,11 @@ from snapshot_inspector import print_simulation_snapshot_summary, save_simulatio
 
 
 
+#region ARGS
 parser = argparse.ArgumentParser(description="Run GP Scheduler")
+
+
+#region GA parameters
 parser.add_argument("--population", type=int, default=100, help="Population size")
 parser.add_argument("--generations", type=int, default=200, help="Number of generations")
 parser.add_argument("--print-every", type=int, default=50, help="Print progress every N generations")
@@ -22,6 +26,11 @@ parser.add_argument("--hoist-rate", type=float, default=0.05,
                          "(e.g. --hoist-rate 0.20 for aggressive pruning).")
 parser.add_argument("--convergence-threshold", type=int, default=10, 
                     help="Number of generations without fitness improvement before regenerating satellites and jobs (G).")
+#endregion
+
+
+
+#region Metrics
 parser.add_argument("--metrics-dir", type=str, default="metrics",
                     help="Directory where metrics artifacts are written.")
 parser.add_argument("--metrics-prefix", type=str, default="",
@@ -30,6 +39,11 @@ parser.add_argument("--metrics-flush-every", type=int, default=1,
                     help="How often (in generations) to refresh the NumPy metrics dump.")
 parser.add_argument("--disable-metrics", action="store_true",
                     help="Disable metrics collection and graph generation.")
+#endregion
+
+
+
+#region Snapshots
 parser.add_argument("--inspect-snapshots", action="store_true",
                     help="Print readable summaries for initial/reset/final simulation snapshots.")
 parser.add_argument("--save-snapshots", action="store_true",
@@ -38,9 +52,14 @@ parser.add_argument("--snapshots-dir", type=str, default="snapshots",
                     help="Directory where snapshot JSON files are written.")
 parser.add_argument("--snapshots-prefix", type=str, default="",
                     help="Output prefix for snapshot JSON files. Defaults to a timestamp.")
+#endregion
+
+
+#region Miscellaneous
 parser.add_argument("--no-start-prompt", action="store_true",
                     help="Start immediately without waiting for Enter.")
-args = parser.parse_args()
+#endregion
+#endregion
 
 
 
@@ -55,7 +74,7 @@ def run_genetic_algorithm(generations: int, population_size: int, print_every: i
         return
 
     csv_path = "data/example.csv"
-    initial_job_limit = 50
+    initial_job_limit = 300
     current_minute = 0.0
     world_rng = random.Random()
     snapshot_prefix_value = snapshots_prefix.strip() or datetime.now().strftime("snapshot_%Y%m%d_%H%M%S")
@@ -84,14 +103,14 @@ def run_genetic_algorithm(generations: int, population_size: int, print_every: i
             csv_path,
             limit=job_limit,
             seed=world_seed,
-            random_sample=True,
+            random_sample=False,
             sample_seed=world_seed,
         )
         jobs_local = create_jobs_from_csv(
             csv_path,
             limit=job_limit,
             snapshot_minute=minute,
-            random_sample=True,
+            random_sample=False,
             sample_seed=world_seed,
         )
         return satellites_local, jobs_local, world_seed
@@ -133,7 +152,7 @@ def run_genetic_algorithm(generations: int, population_size: int, print_every: i
         if generations_without_improvement >= convergence_threshold:
             # Regenerate the world
             print(f"Convergence detected after {generations_without_improvement} generations without improvement. Regenerating satellites and jobs...")
-            reset_job_limit = 50
+            reset_job_limit = 300
             current_minute = generation * 5.0
             satellites, jobs, world_seed = build_world(reset_job_limit, current_minute)
             print(f"Loaded new CSV sample for reset (seed={world_seed}).")
@@ -203,6 +222,9 @@ def run_genetic_algorithm(generations: int, population_size: int, print_every: i
 if __name__ == "__main__":
     import os
     print(f"PID: {os.getpid()} — attach GDB now if you want to debug the C++ code.")
+
+    args = parser.parse_args()
+
     if not args.no_start_prompt:
         print("Press Enter to start the genetic algorithm...")
         input()

@@ -1,0 +1,56 @@
+{
+    "args": [
+        "--no-start-prompt",
+        "--population",
+        "100",
+        "--generations",
+        "50",
+        "--metrics-dir",
+        "metrics",
+        "--metrics-prefix",
+        "run_01",
+        "--save-snapshots",
+        "--snapshots-dir",
+        "snapshots",
+        "--snapshots-prefix",
+        "run_01"
+    ],
+    "script": {
+        "startWithPrompt": false
+    },
+    "geneticAlgorithm": {
+        "PopulationSize": 100,
+        "Generations": 50,
+        "CrossoverRate": 0.8,
+        "MutationRate": 0.1,
+        "TournamentSize": 5,
+        "RandomSeed": 42,
+        "ConvergenceThreshold": 10
+    },
+    "jobsCSV": {
+        "IgnoredColumns": [
+            "Task ID",
+            "Status",
+            "Arrival Time (System)",
+            "Arrival Time (Queue)",
+            "Start Time",
+            "End Time",
+            "Time in system",
+            "Server Name",
+            "Exec_after_set",
+            "Remaining_energy [%]",
+            "Rejection Reason",
+            "Routing Init Time",
+            "Routing End Time"
+        ]
+    },
+    "metrics": {
+        "Enabled": true,
+        "OutputPath": "metrics_output.csv"
+    },
+    "snapshots": {
+        "Enabled": true,
+        "Interval": 10,
+        "OutputDir": "snapshots"
+    }
+}
