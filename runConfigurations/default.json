@@ -1,10 +1,10 @@
 {
-    "generations":          500,
-    "population_size":      30,
+    "generations":          5000,
+    "population_size":      100,
     "max_depth":            4,
     "hoist_rate":           0.05,
     "convergence_threshold": 10,
-    "csv_row_limit":        200,
+    "csv_row_limit":        500,
     "metrics_dir":          "metrics",
     "metrics_prefix":       "",
     "metrics_flush_every":  1,
@@ -13,7 +13,7 @@
     "save_snapshots":       false,
     "snapshots_dir":        "snapshots",
     "snapshots_prefix":     "",
-    "print_every":          50,
+    "print_every":          1000,
     
 
     "jobsCSV": {

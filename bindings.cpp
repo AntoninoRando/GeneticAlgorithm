@@ -44,6 +44,7 @@ PYBIND11_MODULE(scheduler, m) {
         .value("CONST", NodeType::CONST, "Constant value node");
 
     py::class_<ExprNode>(m, "ExprNode", "A node in the expression tree representing an individual in the Genetic Programming population")
+        .def(py::init<>(), "Construct an empty node (fields set afterwards).")
         .def_readwrite("nodeType", &ExprNode::nodeType, "Type of the node (e.g., ADD, CONST, TERMINAL)")
         .def_readwrite("terminalIndex", &ExprNode::terminalIndex, "Index of the terminal if the node is a TERMINAL")
         .def_readwrite("children", &ExprNode::children, "List of child nodes")
@@ -106,7 +107,12 @@ is available for the entire simulation horizon.
                py::arg("maxDepth")     = 7,
                py::arg("hoistRate")    = 0.05,
                "Initialize the GP population with parameters")
-           .def("solveNextGeneration", &SchedulerGP::solveNextGeneration, "Evaluate the current population and evolve to the next generation")
+           .def("solveNextGeneration", &SchedulerGP::solveNextGeneration,
+                // Pure C++/OpenMP work over the opaque population vector; no
+                // Python objects are touched, so the GIL can be released to let
+                // the offspring loop run fully parallel.
+                py::call_guard<py::gil_scoped_release>(),
+                "Evaluate the current population and evolve to the next generation")
            .def("getPopulation",
                 static_cast<vector<GPIndividual>& (SchedulerGP::*)()>(
                     &SchedulerGP::getPopulation),
@@ -259,6 +265,10 @@ Increase this to make the GP prefer energy-efficient satellite assignments.
              &FitnessEvaluator::evaluate,
              py::arg("population"),
              py::arg("snap"),
+             // Release the GIL: evaluate() runs a pure-C++, OpenMP-parallel
+             // workload over an opaque std::vector<GPIndividual> and touches no
+             // Python objects, so holding the GIL would needlessly serialize it.
+             py::call_guard<py::gil_scoped_release>(),
              R"doc(
 Score every individual in *population* and write the result into each
 individual's ``fitness`` field.

@@ -8,6 +8,10 @@
 #include <utility>
 #include <vector>
 
+#ifdef _OPENMP
+#include <omp.h>
+#endif
+
 #include "registry.h"
 #include "tree_builder.h"
 #include "tree_operators.h"
@@ -132,45 +136,82 @@ public:
         ++gen;
 
         // Sort current population by fitness (ascending).
-        sort(population.begin(), population.end()); 
+        sort(population.begin(), population.end());
 
-        // Prepare next generation.
-        vector<GPIndividual> next;
-        next.reserve(populationSize);
-        
+        const int popSize = static_cast<int>(population.size());
+
+        // Prepare the next generation with a *fixed* layout so it can be filled
+        // concurrently: slots [0, elitismCount) hold the elites, and every
+        // remaining slot is produced independently by the parallel offspring
+        // loop below.  Pre-sizing (instead of push_back) is what makes the
+        // write targets disjoint and therefore thread-safe.
+        vector<GPIndividual> next(popSize);
+
         // --- 1. Elitism: keep top individuals unchanged.
         for (int i = 0; i < elitismCount; ++i) {
-            next.push_back(population[population.size() - 1 - i]);
+            next[i] = population[popSize - 1 - i];
         }
 
-        // --- 2. Generate offspring until we have a full next generation.
-        while (static_cast<int>(next.size()) < populationSize) {
-            const GPIndividual& pA = tournamentSelect(population, 5);
-            const GPIndividual& pB = tournamentSelect(population, 5);
+        // --- 2. Generate offspring in parallel.
+        // One crossover yields two children, so we iterate over child *pairs*;
+        // pair p writes to the two distinct, pre-allocated slots 2p and 2p+1.
+        // The only shared state read inside the loop is `population` (read-only
+        // during selection/copy) and `next` (each iteration writes its own two
+        // slots), so the loop is data-race free.
+        const int firstChild = elitismCount;
+        const int nChildren  = popSize - elitismCount;   // may be 0
+        const int nPairs     = (nChildren + 1) / 2;
 
-            GPIndividual childA, childB;
+        // Derive a base seed from the master RNG (consumed once, serially) so
+        // that successive generations and separate runs keep producing fresh
+        // offspring streams while each thread gets an independent sub-stream.
+        const unsigned baseSeed = rng_();
 
-            double roll = randomReal();
-            if (roll < crossoverRate) {
-                auto [tA, tB] = ops_.crossover(pA.tree, pB.tree);
-                childA.tree   = move(tA);
-                childB.tree   = move(tB);
-            } else {
-                childA.tree = pA.tree;
-                childB.tree = pB.tree;
+        #pragma omp parallel
+        {
+            // Per-thread RNG + operators, constructed once per thread (not per
+            // iteration).  mt19937 is not thread-safe, so each thread owns its
+            // own; the terminal registry is read-only and safely shared.
+            mt19937       localRng(baseSeed +
+                                   0x9E3779B9u * static_cast<unsigned>(ompThreadNum() + 1));
+            TreeBuilder   localBuilder(registry_, localRng);
+            TreeOperators localOps(localRng, localBuilder, maxDepth_);
+            localOps.setTerminalCount(static_cast<int>(registry_.size()));
+
+            uniform_real_distribution<double> unit(0.0, 1.0);
+
+            // Runtimes vary per pair (tree sizes differ), so dynamic scheduling
+            // keeps the cores evenly loaded.
+            #pragma omp for schedule(dynamic)
+            for (int p = 0; p < nPairs; ++p) {
+                const int slotA = firstChild + 2 * p;
+                const int slotB = slotA + 1;
+
+                const GPIndividual& pA = tournamentSelectRng(population, 5, localRng);
+                const GPIndividual& pB = tournamentSelectRng(population, 5, localRng);
+
+                GPIndividual childA, childB;
+
+                if (unit(localRng) < crossoverRate) {
+                    auto [tA, tB] = localOps.crossover(pA.tree, pB.tree);
+                    childA.tree   = move(tA);
+                    childB.tree   = move(tB);
+                } else {
+                    childA.tree = pA.tree;
+                    childB.tree = pB.tree;
+                }
+
+                // Mutation
+                localOps.mutate(childA.tree, mutationRate);
+                localOps.mutate(childB.tree, mutationRate);
+
+                // Occasional hoist to fight bloat.
+                if (unit(localRng) < hoistRate_) localOps.hoist(childA.tree);
+                if (unit(localRng) < hoistRate_) localOps.hoist(childB.tree);
+
+                next[slotA] = move(childA);
+                if (slotB < popSize) next[slotB] = move(childB);
             }
-
-            // Mutation
-            ops_.mutate(childA.tree, mutationRate);
-            ops_.mutate(childB.tree, mutationRate);
-
-            // Occasional hoist to fight bloat.
-            if (randomReal() < hoistRate_) ops_.hoist(childA.tree);
-            if (randomReal() < hoistRate_) ops_.hoist(childB.tree);
-
-            next.push_back(move(childA));
-            if (static_cast<int>(next.size()) < populationSize)
-                next.push_back(move(childB));
         }
 
         population = move(next);
@@ -247,6 +288,30 @@ private:
             if (pop[cand].fitness > pop[best].fitness) best = cand;
         }
         return pop[best];
+    }
+
+    /// @brief Tournament selection driven by a caller-supplied RNG so it can run
+    /// concurrently: each thread passes its own private mt19937. Functionally
+    /// identical to tournamentSelect() but with no shared RNG state.
+    static const GPIndividual& tournamentSelectRng(const vector<GPIndividual>& pop,
+                                                   int k, mt19937& rng) {
+        uniform_int_distribution<int> pick(0, static_cast<int>(pop.size()) - 1);
+        int best = pick(rng);
+        for (int i = 1; i < k; ++i) {
+            int cand = pick(rng);
+            if (pop[cand].fitness > pop[best].fitness) best = cand;
+        }
+        return pop[best];
+    }
+
+    /// @brief Current OpenMP thread id (0 when built without OpenMP). Used only
+    /// to derive an independent RNG sub-stream per thread.
+    static int ompThreadNum() {
+#ifdef _OPENMP
+        return omp_get_thread_num();
+#else
+        return 0;
+#endif
     }
 
 

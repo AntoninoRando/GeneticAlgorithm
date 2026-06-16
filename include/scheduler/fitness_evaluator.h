@@ -7,6 +7,10 @@
 #include <numeric>
 #include <vector>
 
+#ifdef _OPENMP
+#include <omp.h>
+#endif
+
 #include "expr_tree.h"
 #include "registry.h"
 #include "scheduler_gp.h"
@@ -211,6 +215,31 @@ inline void greedyDecode(const ExprNode&               tree,
         }
     }
 
+    // ── Score cache ───────────────────────────────────────────────────────
+    // tree.eval(job j, sat s) is a pure function of the job and the satellite.
+    // The job objects never change during a decode, and a satellite only
+    // changes when a job is *committed* to it (completedTasks += 1 and
+    // remainingEnergy -= cost).  Committing therefore invalidates only the
+    // scores in that one satellite's column; every other cached score is still
+    // exact.  We compute the full J×S matrix once and then refresh a single
+    // column per commit, collapsing the original O(J²·S) tree evaluations into
+    // O(J·S + J²) — the tree walk is by far the most expensive thing here.
+    //
+    // The constraint checks (operational window, energy) stay inside the loop:
+    // they are cheap and depend on per-iteration satellite state, so the
+    // selection below remains byte-for-byte identical to the un-cached version
+    // (same scan order, same strict-greater tie-break, same feasibility gate).
+    //
+    // Layout is row-major in j (index j*nSat + s) so each iteration's argmax
+    // scan reads a job's row contiguously.
+    vector<double> score(static_cast<size_t>(nJob) * static_cast<size_t>(nSat));
+    for (int j = 0; j < nJob; ++j) {
+        if (scheduled[j]) continue;                 // never read for these jobs
+        const size_t base = static_cast<size_t>(j) * static_cast<size_t>(nSat);
+        for (int s = 0; s < nSat; ++s)
+            score[base + s] = tree.eval(jobs[j], sats[s], registry);
+    }
+
     while (remaining > 0) {
         double bestScore = -numeric_limits<double>::infinity();
         int    bestJob   = -1;
@@ -221,6 +250,7 @@ inline void greedyDecode(const ExprNode&               tree,
 
             const double duration = static_cast<double>(
                 jobs[j].executionTime + jobs[j].transferTime);
+            const size_t base = static_cast<size_t>(j) * static_cast<size_t>(nSat);
 
             for (int s = 0; s < nSat; ++s) {
                 const double startTime      = satStates[s].freeAtMinute;
@@ -242,11 +272,12 @@ inline void greedyDecode(const ExprNode&               tree,
                 if (energyCost > sats[s].remainingEnergy) continue;
 
                 // ── Priority score ────────────────────────────────────────
+                // Read the cached tree evaluation instead of recomputing it.
                 // The GP maximises this score; both constraints above must
-                // pass before the tree is even evaluated.
-                const double score = tree.eval(jobs[j], sats[s], registry);
-                if (score > bestScore) {
-                    bestScore = score;
+                // pass before the cached score is considered.
+                const double sc = score[base + s];
+                if (sc > bestScore) {
+                    bestScore = sc;
                     bestJob   = j;
                     bestSat   = s;
                 }
@@ -286,6 +317,17 @@ inline void greedyDecode(const ExprNode&               tree,
 
         scheduled[bestJob] = true;
         --remaining;
+
+        // ── Refresh the one invalidated column ─────────────────────────────
+        // Only sats[bestSat] changed, so only the (job, bestSat) scores can
+        // have changed.  Recompute them for the still-unscheduled jobs (the
+        // scores of scheduled jobs are never read again).
+        for (int j = 0; j < nJob; ++j) {
+            if (scheduled[j]) continue;
+            score[static_cast<size_t>(j) * static_cast<size_t>(nSat)
+                  + static_cast<size_t>(bestSat)] =
+                tree.eval(jobs[j], sats[bestSat], registry);
+        }
     }
 }
 
@@ -417,6 +459,17 @@ public:
         // ── Step 1: decode every individual ──────────────────────────────
         vector<double> compRatios(n), meanResps(n), energies(n);
 
+        // Each individual is decoded independently: greedyDecode takes its own
+        // working copies of the satellites/jobs, the expression tree and the
+        // terminal registry are read-only, and every result is written to a
+        // distinct index (compRatios[i] / meanResps[i] / energies[i]). There is
+        // therefore no shared mutable state and the loop is data-race free.
+        //
+        // `assignments` and `satStates` are declared inside the loop body, so
+        // OpenMP makes them private to each thread automatically. Runtimes
+        // differ per individual (tree size and number of feasible jobs vary),
+        // so dynamic scheduling keeps the cores evenly loaded.
+        #pragma omp parallel for schedule(dynamic)
         for (int i = 0; i < n; ++i) {
             vector<detail::Assignment> assignments;
             vector<detail::SatState>   satStates;
