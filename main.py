@@ -5,6 +5,7 @@ from typing import TypedDict
 
 from scheduler import SchedulerGP, FitnessEvaluator, SimulationSnapshot, buildTerminalRegistry
 from data_processing.data_factory import create_jobs_from_csv, create_satellites_from_csv
+from data_processing.csv_preprocessing import load_world_paths
 from metrics_tracker import GenerationMetrics, MetricsCollector
 from snapshot_inspector import print_simulation_snapshot_summary, save_simulation_snapshot
 
@@ -143,7 +144,23 @@ def run_genetic_algorithm(config: GAConfig):
 
 
     #region > Initialization
-    csv_path = "data/example.csv"
+    # Pre-processed worlds: one CSV per simulation time window, with arrival
+    # times already normalized relatively (see data_processing.csv_preprocessing).
+    # Each GA "world reset" advances to the next world so the population faces a
+    # genuinely different scenario rather than a re-sample of a single CSV.
+    world_paths = [str(path) for path in load_world_paths("data/worlds")]
+    if world_paths:
+        print(f"Loaded {len(world_paths)} pre-processed world(s) from data/worlds/.")
+    else:
+        world_paths = ["data/example.csv"]
+        print("No pre-processed worlds in data/worlds/; falling back to "
+              "data/example.csv. Run "
+              "`python -m data_processing.csv_preprocessing.world_splitter` "
+              "to generate worlds.")
+
+    def select_world_path(world_index: int) -> str:
+        return world_paths[world_index % len(world_paths)]
+
     initial_job_limit = csv_row_limit
     current_minute = 0.0
     world_rng = random.Random()
@@ -167,26 +184,34 @@ def run_genetic_algorithm(config: GAConfig):
             )
             print(f"Snapshot JSON: {snapshot_path}")
 
-    def build_world(job_limit: int, minute: float):
+    def build_world(world_path: str, job_limit: int):
         world_seed = world_rng.randrange(0, 2_147_483_647)
+        # A non-positive limit means "load the whole world" (matches the
+        # --csv-row-limit help text); pre-split worlds are small by design.
+        effective_limit = job_limit if (job_limit and job_limit > 0) else None
+        # Jobs first: arrivals are relative (earliest task at minute 0), so the
+        # snapshot's "now" is derived from them rather than fixed in advance.
+        jobs_local = create_jobs_from_csv(
+            world_path,
+            limit=effective_limit,
+            random_sample=False,
+            sample_seed=world_seed,
+        )
+        # Evaluate at the end of the arrival window so every task has already
+        # arrived (the evaluator drops jobs whose arrivalTime exceeds the
+        # snapshot minute).  Response time stays = completion - arrivalTime.
+        minute = float(max((job.arrivalTime for job in jobs_local), default=0))
         satellites_local = create_satellites_from_csv(
-            csv_path,
-            limit=job_limit,
+            world_path,
+            limit=effective_limit,
             seed=world_seed,
             random_sample=False,
             sample_seed=world_seed,
             snapshot_minute=minute,
         )
-        jobs_local = create_jobs_from_csv(
-            csv_path,
-            limit=job_limit,
-            snapshot_minute=minute,
-            random_sample=False,
-            sample_seed=world_seed,
-        )
-        return satellites_local, jobs_local, world_seed
+        return satellites_local, jobs_local, minute, world_seed
 
-    satellites, jobs, _ = build_world(initial_job_limit, current_minute)
+    satellites, jobs, current_minute, _ = build_world(select_world_path(0), initial_job_limit)
 
     genetic_algorithm = SchedulerGP(satellites, jobs)
     genetic_algorithm.initialize(populationSize=population_size, maxDepth=max_depth,
@@ -241,9 +266,9 @@ def run_genetic_algorithm(config: GAConfig):
             # Regenerate the world
             print(f"Convergence detected after {generations_without_improvement} generations without improvement. Regenerating satellites and jobs...")
             reset_job_limit = initial_job_limit
-            current_minute = generation * 5.0
-            satellites, jobs, world_seed = build_world(reset_job_limit, current_minute)
-            print(f"Loaded new CSV sample for reset (seed={world_seed}).")
+            next_world_path = select_world_path(total_resets + 1)
+            satellites, jobs, current_minute, world_seed = build_world(next_world_path, reset_job_limit)
+            print(f"Loaded world '{next_world_path}' for reset (seed={world_seed}).")
             snapshot = SimulationSnapshot(current_minute, satellites, jobs)
             total_resets += 1
             inspect_snapshot(

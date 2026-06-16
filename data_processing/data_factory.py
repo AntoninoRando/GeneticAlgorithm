@@ -35,6 +35,13 @@ _IGNORED_CSV_COLUMNS = {
     "Routing Init Time",
     "Routing End Time",
 }
+
+# Arrival-time columns.  "(System)" is the raw absolute arrival from the source
+# simulation; "(Normalized)" is the per-world relative arrival written by
+# data_processing.csv_preprocessing (earliest task shifted to 0, gaps kept).
+# Names mirror the splitter's constants to avoid a hard import dependency.
+_SYSTEM_ARRIVAL_COLUMN = "Arrival Time (System)"
+_NORMALIZED_ARRIVAL_COLUMN = "Arrival Time (Normalized)"
 #endregion
 
 
@@ -70,6 +77,10 @@ def create_jobs_from_csv(
             "hops_raw": _parse_csv_number(filtered.get("Num Hops Routing")) or _parse_csv_number(filtered.get("Num Hops")),
             "queue_raw": _parse_csv_number(filtered.get("Queue length")),
             "server_name": (row.get("Server Name") or "").strip(),
+            # Arrival columns are intentionally read from the full row (they are
+            # in _IGNORED_CSV_COLUMNS, so they are absent from ``filtered``).
+            "arrival_norm_raw": _parse_csv_number(row.get(_NORMALIZED_ARRIVAL_COLUMN)),
+            "arrival_sys_raw": _parse_csv_number(row.get(_SYSTEM_ARRIVAL_COLUMN)),
         })
 
     def collect(key: str, fallback: float) -> Tuple[float, float]:
@@ -82,6 +93,24 @@ def create_jobs_from_csv(
     transfer_min, transfer_max = collect("transfer_raw", 1.0)
     image_min, image_max = collect("image_raw", 1.0)
     queue_min, queue_max = collect("queue_raw", 1.0)
+
+    # ── Relative arrival times ────────────────────────────────────────────────
+    # Absolute arrival minutes carry no information for the scheduler; only the
+    # *relative* evolution (ordering + inter-arrival gaps) matters.  Prefer the
+    # pre-computed per-world "(Normalized)" column; otherwise normalize the raw
+    # "(System)" arrivals on the fly by shifting the earliest task to zero.
+    _has_normalized = any(r["arrival_norm_raw"] is not None for r in task_rows)
+    _system_values = [r["arrival_sys_raw"] for r in task_rows if r["arrival_sys_raw"] is not None]
+    _system_min = min(_system_values) if _system_values else 0.0
+
+    def relative_arrival(task_row) -> float:
+        if task_row["arrival_norm_raw"] is not None:
+            return task_row["arrival_norm_raw"]
+        if _has_normalized:
+            return 0.0  # pre-split world file, but this row lacks a value
+        if task_row["arrival_sys_raw"] is not None:
+            return task_row["arrival_sys_raw"] - _system_min
+        return 0.0
 
     jobs = []
     for idx, row in enumerate(task_rows):
@@ -100,8 +129,14 @@ def create_jobs_from_csv(
 
         job = Job()
         job.id = idx
-        # Keep task arrivals aligned with the snapshot minute used by the evaluator.
-        job.arrivalTime = int(snapshot_minute)
+        # Relative arrival: ``snapshot_minute`` acts only as an optional base
+        # offset (default 0).  The earliest task of a world arrives at the base
+        # and the rest keep their real inter-arrival gaps.  The evaluator scores
+        # response time as (completion - arrivalTime), so preserving these gaps
+        # lets the relative arrival evolution drive the fitness.
+        # NOTE: Job.arrivalTime is an ``int`` in the C++ model, so sub-minute
+        # spacing is rounded to whole minutes here.
+        job.arrivalTime = int(round(snapshot_minute + relative_arrival(row)))
         job.type = row["task_type"]
         job.imageSize = image_size
         job.executionTime = max(1, execution_time)
