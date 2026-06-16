@@ -1,0 +1,4 @@
+# Python libraries needed at runtime by main.py and its helper modules.
+# Installed automatically inside the dev container (see .devcontainer/postCreate.sh).
+numpy
+matplotlib

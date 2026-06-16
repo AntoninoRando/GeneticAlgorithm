@@ -131,6 +131,8 @@ def create_satellites_from_csv(
     seed: Optional[int] = None,
     random_sample: bool = False,
     sample_seed: Optional[int] = None,
+    snapshot_minute: float = 0.0,
+    operational_window_range: tuple = (300.0, 600.0),
 ) -> list:
     rows = _load_csv_rows(
         csv_path,
@@ -139,8 +141,15 @@ def create_satellites_from_csv(
         sample_seed=sample_seed,
     )
     if not rows:
-        return create_satellites(n=max_satellites or 3, seed=seed)
-
+        print("No data rows found in CSV.  Falling back to dummy satellite generation.")
+        return create_satellites(
+            n=max_satellites or 3,
+            seed=seed,
+            snapshot_minute=snapshot_minute,
+            operational_window_range=operational_window_range,
+        )
+    
+    print(f"Extracting satellite profiles from CSV data ({len(rows)} rows)...")
     per_server = defaultdict(lambda: {
         "count": 0,
         "execution_sum": 0.0,
@@ -182,8 +191,15 @@ def create_satellites_from_csv(
             stats["remaining_energy_count"] += 1
 
     if not per_server:
-        return create_satellites(n=max_satellites or 3, seed=seed)
+        print("No valid server profiles found in CSV.  Falling back to dummy satellite generation.")
+        return create_satellites(
+            n=max_satellites or 3,
+            seed=seed,
+            snapshot_minute=snapshot_minute,
+            operational_window_range=operational_window_range,
+        )
 
+    print(f"Found {len(per_server)} unique server profiles in CSV.  Creating satellites...")
     profiles = []
     for server_name, stats in per_server.items():
         execution_mean = (
@@ -266,7 +282,10 @@ def create_satellites_from_csv(
         sat.cpuBusyUntil = 0
         sat.networkBusyUntil = 0
         sat.isAccessPoint = False
-        sat.orbitalSunset = ""
+        # Draw a randomised operational window so that satellites become
+        # unavailable at different times.  The decoder enforces this as a hard
+        # constraint, so satellites with short windows create real scarcity.
+        sat.operationalUntil = snapshot_minute + rng.uniform(*operational_window_range)
         sat.energyReserved = 0.0
         sat.rejectedTasks = []
         sat.tasks = []
@@ -291,11 +310,13 @@ def create_satellites_from_csv(
 
 #region DUMMY DATA GENERATORS
 def create_satellites(
-    n:                  int   = 3,
-    energy_range:       tuple = (80.0, 120.0),
-    load_range:         tuple = (0.10, 0.40),
-    capability_range:   tuple = (12.0, 24.0),
-    seed:               Optional[int] = None,
+    n:                        int   = 3,
+    energy_range:             tuple = (80.0, 120.0),
+    load_range:               tuple = (0.10, 0.40),
+    capability_range:         tuple = (12.0, 24.0),
+    seed:                     Optional[int] = None,
+    snapshot_minute:          float = 0.0,
+    operational_window_range: tuple = (300.0, 600.0),
 ) -> list:
     rng = random.Random(seed)
 
@@ -318,7 +339,10 @@ def create_satellites(
         sat.bandwidth          = rng.uniform(50.0, 200.0)
         sat.elevationAngle     = 45.0
         sat.isAccessPoint      = False
-        sat.orbitalSunset      = ""
+        # Each satellite has a randomised operational window starting from the
+        # current snapshot minute.  This creates real scarcity: the decoder
+        # rejects assignments that would complete after this deadline.
+        sat.operationalUntil   = snapshot_minute + rng.uniform(*operational_window_range)
         sat.energyReserved     = 0.0
         sat.rejectedTasks      = []
         sat.tasks              = []

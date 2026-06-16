@@ -142,13 +142,31 @@ struct Assignment {
 ///
 /// Algorithm
 /// ---------
-/// 1. Build a mutable copy of satellites and jobs from the snapshot.
-/// 2. While unscheduled jobs remain:
-///    a. For every (unscheduled job, satellite) pair evaluate the tree.
-///    b. Pick the pair with the *highest* score.
-///    c. Assign that job to that satellite: update the satellite's
-///       `freeAtMinute` and `activeTasks`; mark the job as scheduled.
-/// 3. Return the list of assignments plus per-satellite energy totals.
+/// 1. Build mutable working copies of satellites and jobs from the snapshot.
+/// 2. Mark jobs that have not arrived yet as unavailable.
+/// 3. While unscheduled, available jobs remain:
+///    a. For every (unscheduled job, satellite) pair:
+///       - Skip if the satellite would finish the job after its
+///         `operationalUntil` sunset (orbital window constraint).
+///       - Skip if the satellite does not have enough `remainingEnergy` to
+///         cover the job's energy cost at the configured rate (energy
+///         constraint).
+///       - Evaluate the expression tree to obtain a priority score.
+///    b. Pick the (job, satellite) pair with the *highest* score.
+///    c. Commit the assignment: advance `freeAtMinute`, deduct
+///       `remainingEnergy` from the working satellite copy, and accumulate
+///       energy in `satStates`.
+/// 4. Return the list of assignments and per-satellite energy totals.
+///
+/// Feasibility constraints
+/// -----------------------
+///  - **Operational window**: `freeAtMinute + duration ≤ satellite.operationalUntil`
+///  - **Energy budget**:      `energyRate * duration  ≤ satellite.remainingEnergy`
+///
+/// Both constraints are checked before scoring, so unfeasible pairs are never
+/// considered regardless of what score the tree would produce.  Jobs for which
+/// no feasible satellite exists in a given iteration are left unscheduled and
+/// contribute to a lower completion ratio.
 ///
 /// @param  tree        Expression tree used as a priority function.
 /// @param  registry    Terminal registry shared with the tree builder.
@@ -163,9 +181,8 @@ inline void greedyDecode(const ExprNode&               tree,
                           vector<SatState>&             satStates)
 {
     // ── Working copies ────────────────────────────────────────────────────
-    // We mutate activeTasks / freeAtMinute locally so that each individual
-    // gets an identical, clean world.
-
+    // Each individual decoded in the same generation must see an identical,
+    // clean world.  We therefore copy both lists and mutate only the copies.
     vector<Satellite> sats = snap.satellites;
     vector<Job>       jobs = snap.jobs;
 
@@ -177,17 +194,19 @@ inline void greedyDecode(const ExprNode&               tree,
         satStates[s].satIndex     = s;
         satStates[s].freeAtMinute = snap.currentMinute;
         satStates[s].energySpent  = 0.0;
+        // remainingEnergy is read directly from sats[s] and deducted there
+        // as jobs are committed, so no separate mirror is needed here.
     }
-
-    const double epm = snap.energyPerMinute.empty() ? 1.0 : 0.0; // fallback flag
 
     vector<bool> scheduled(nJob, false);
     int remaining = nJob;
 
-    // Filter out jobs that have not arrived yet.
+    // Jobs whose arrivalTime is in the future are treated as unavailable for
+    // this snapshot.  We exclude them up-front rather than inside the inner
+    // loop to avoid redundant checks.
     for (int j = 0; j < nJob; ++j) {
         if (static_cast<double>(jobs[j].arrivalTime) > snap.currentMinute) {
-            scheduled[j] = true;   // treat as unavailable
+            scheduled[j] = true;
             --remaining;
         }
     }
@@ -200,14 +219,32 @@ inline void greedyDecode(const ExprNode&               tree,
         for (int j = 0; j < nJob; ++j) {
             if (scheduled[j]) continue;
 
+            const double duration = static_cast<double>(
+                jobs[j].executionTime + jobs[j].transferTime);
+
             for (int s = 0; s < nSat; ++s) {
-                // Only consider the satellite if it can finish the job in time.
-                double startTime      = satStates[s].freeAtMinute;
-                double completionTime = startTime + static_cast<double>(jobs[j].executionTime + jobs[j].transferTime);
+                const double startTime      = satStates[s].freeAtMinute;
+                const double completionTime = startTime + duration;
 
+                // ── Constraint 1: operational window ─────────────────────
+                // Reject the pair if the satellite would still be executing
+                // this job after its orbital sunset.
+                if (completionTime > sats[s].operationalUntil) continue;
 
-                double score = tree.eval(jobs[j], sats[s], registry);
+                // ── Constraint 2: energy budget ───────────────────────────
+                // Reject the pair if the satellite does not have enough
+                // remaining energy to sustain computation for the full
+                // job duration.
+                const double rate       = snap.energyPerMinute.empty()
+                                            ? 1.0
+                                            : snap.energyPerMinute[s];
+                const double energyCost = rate * duration;
+                if (energyCost > sats[s].remainingEnergy) continue;
 
+                // ── Priority score ────────────────────────────────────────
+                // The GP maximises this score; both constraints above must
+                // pass before the tree is even evaluated.
+                const double score = tree.eval(jobs[j], sats[s], registry);
                 if (score > bestScore) {
                     bestScore = score;
                     bestJob   = j;
@@ -216,27 +253,36 @@ inline void greedyDecode(const ExprNode&               tree,
             }
         }
 
-        // No feasible (job, satellite) pair found — stop early.
+        // No feasible (job, satellite) pair exists — stop early.
+        // Remaining jobs are left unscheduled and lower the completion ratio.
         if (bestJob == -1) break;
 
         // ── Commit assignment ─────────────────────────────────────────────
-        double start      = satStates[bestSat].freeAtMinute;
-        double duration   = static_cast<double>(jobs[bestJob].executionTime + jobs[bestJob].transferTime);
-        double completion = start + duration;
+        const double start    = satStates[bestSat].freeAtMinute;
+        const double duration = static_cast<double>(
+            jobs[bestJob].executionTime + jobs[bestJob].transferTime);
+        const double completion = start + duration;
 
         Assignment a;
-        a.jobIndex        = bestJob;
-        a.satIndex        = bestSat;
-        a.startMinute     = start;
-        a.completionMinute= completion;
+        a.jobIndex         = bestJob;
+        a.satIndex         = bestSat;
+        a.startMinute      = start;
+        a.completionMinute = completion;
         assignments.push_back(a);
 
-        // Update satellite timeline and energy.
+        // Advance the satellite's timeline.
         satStates[bestSat].freeAtMinute = completion;
-        sats[bestSat].completedTasks += 1;
+        sats[bestSat].completedTasks   += 1;
 
-        double rate = snap.energyPerMinute.empty() ? 1.0 : snap.energyPerMinute[bestSat];
-        satStates[bestSat].energySpent += rate * duration;
+        // Deduct energy from the working copy so that subsequent iterations
+        // of this decoder run see the reduced budget.  This is the key fix:
+        // without it every satellite appears to have unlimited energy.
+        const double rate       = snap.energyPerMinute.empty()
+                                    ? 1.0
+                                    : snap.energyPerMinute[bestSat];
+        const double energyCost = rate * duration;
+        satStates[bestSat].energySpent    += energyCost;
+        sats[bestSat].remainingEnergy     -= energyCost;
 
         scheduled[bestJob] = true;
         --remaining;

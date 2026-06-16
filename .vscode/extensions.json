@@ -1,0 +1,8 @@
+{
+  // When you open this folder, VS Code recommends installing the Dev Containers
+  // extension. It's what lets VS Code build and reopen the project inside the
+  // Docker container defined in .devcontainer/.
+  "recommendations": [
+    "ms-vscode-remote.remote-containers"
+  ]
+}

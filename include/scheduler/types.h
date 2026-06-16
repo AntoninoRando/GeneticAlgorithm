@@ -28,7 +28,13 @@ struct Satellite {
     int id;
     string name;
 
-    string orbitalSunset;
+    /// @brief  Simulation minute at which this satellite enters its orbital
+    ///         sunset and becomes unavailable.  Any job whose completion time
+    ///         would exceed this value is rejected for this satellite.
+    ///         Set to a large value (e.g. numeric_limits<double>::max()) to
+    ///         model a satellite that is always available within the horizon.
+    double operationalUntil = numeric_limits<double>::max();
+
     bool isAccessPoint;
     double elevationAngle;
     vector<int> neighbors;

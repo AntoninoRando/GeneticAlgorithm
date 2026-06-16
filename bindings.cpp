@@ -53,7 +53,15 @@ PYBIND11_MODULE(scheduler, m) {
         .def(py::init<>())
         .def_readwrite("id",                 &Satellite::id)
         .def_readwrite("name",               &Satellite::name)
-        .def_readwrite("orbitalSunset",      &Satellite::orbitalSunset)
+        .def_readwrite("operationalUntil",   &Satellite::operationalUntil,
+            R"doc(
+Simulation minute at which this satellite enters its orbital sunset and
+becomes unavailable for new work.  Any job whose projected completion time
+would exceed this value is rejected for this satellite by the greedy decoder.
+
+Set to ``float('inf')`` (or a very large number) to model a satellite that
+is available for the entire simulation horizon.
+            )doc")
         .def_readwrite("isAccessPoint",      &Satellite::isAccessPoint)
         .def_readwrite("elevationAngle",     &Satellite::elevationAngle)
         .def_readwrite("neighbors",          &Satellite::neighbors)

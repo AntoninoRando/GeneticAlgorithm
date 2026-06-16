@@ -30,6 +30,7 @@ def _load_csv_rows(
     with path.open(newline="", encoding="utf-8-sig") as csv_file:
         reader = csv.DictReader(csv_file)
         rows = list(reader)
+        
 
     if limit is not None:
         limit = max(0, limit)
@@ -39,7 +40,7 @@ def _load_csv_rows(
                 rows = rng.sample(rows, limit)
             else:
                 rows = rows[:limit]
-
+    rows = [{(k.strip() if k else k): v for k, v in r.items()} for r in rows]
     return rows
 
 def _parse_csv_number(raw_value: Optional[str]) -> Optional[float]:

@@ -5,18 +5,24 @@
 	"build": {
 		"dockerfile": "Dockerfile"
 	},
-	
-	// Features to add to the dev container. More info: https://containers.dev/features.
-	// "features": {},
-	
-	// Use 'forwardPorts' to make a list of ports inside the container available locally.
-	// "forwardPorts": [],
-	
-	// Use 'postCreateCommand' to run commands after the container is created.
-	"postCreateCommand": "sudo apt-get install -y gdb gdbserver python3-dbg" // Used for debugging
 
-	// Configure tool-specific properties.
-	// "customizations": {},
+	// Runs once when the container is first created. Installs the Python
+	// libraries main.py needs (numpy, matplotlib), the pybind11/Python build
+	// headers + debug tooling, and builds the native "scheduler" module so the
+	// project is runnable immediately. See .devcontainer/postCreate.sh.
+	"postCreateCommand": "bash .devcontainer/postCreate.sh",
+
+	// Extensions installed automatically inside the container.
+	"customizations": {
+		"vscode": {
+			"extensions": [
+				"ms-python.python",
+				"ms-vscode.cpptools",
+				"ms-vscode.cpptools-extension-pack",
+				"ms-vscode.cmake-tools"
+			]
+		}
+	}
 
 	// Uncomment to connect as root instead. More info: https://aka.ms/dev-containers-non-root.
 	// "remoteUser": "root"

@@ -1,11 +1,54 @@
 import argparse
 import random
 from datetime import datetime
+from typing import TypedDict
 
 from scheduler import SchedulerGP, FitnessEvaluator, SimulationSnapshot, buildTerminalRegistry
-from data_factory import create_jobs_from_csv, create_satellites_from_csv
+from data_processing.data_factory import create_jobs_from_csv, create_satellites_from_csv
 from metrics_tracker import GenerationMetrics, MetricsCollector
 from snapshot_inspector import print_simulation_snapshot_summary, save_simulation_snapshot
+
+
+class GAConfig(TypedDict):
+    # GA parameters
+    generations: int
+    population_size: int
+    max_depth: int
+    hoist_rate: float
+    convergence_threshold: int
+    csv_row_limit: int
+    # Metrics
+    metrics_dir: str
+    metrics_prefix: str
+    metrics_flush_every: int
+    collect_metrics: bool
+    # Snapshots
+    inspect_snapshots: bool
+    save_snapshots: bool
+    snapshots_dir: str
+    snapshots_prefix: str
+    # Miscellaneous
+    print_every: int
+
+
+def default_config() -> GAConfig:
+    return GAConfig(
+        generations=200,
+        population_size=100,
+        max_depth=7,
+        hoist_rate=0.05,
+        convergence_threshold=10,
+        csv_row_limit=100,
+        metrics_dir="metrics",
+        metrics_prefix="",
+        metrics_flush_every=1,
+        collect_metrics=True,
+        inspect_snapshots=False,
+        save_snapshots=False,
+        snapshots_dir="snapshots",
+        snapshots_prefix="",
+        print_every=50,
+    )
 
 
 
@@ -16,7 +59,6 @@ parser = argparse.ArgumentParser(description="Run GP Scheduler")
 #region GA parameters
 parser.add_argument("--population", type=int, default=100, help="Population size")
 parser.add_argument("--generations", type=int, default=200, help="Number of generations")
-parser.add_argument("--print-every", type=int, default=50, help="Print progress every N generations")
 parser.add_argument("--max-depth", type=int, default=7,
                     help="Maximum expression tree depth. Shallower trees are faster and simpler "
                          "(e.g. --max-depth 4). Max nodes ≈ 2^(depth+1), so depth 7 → ≤256 nodes.")
@@ -26,6 +68,9 @@ parser.add_argument("--hoist-rate", type=float, default=0.05,
                          "(e.g. --hoist-rate 0.20 for aggressive pruning).")
 parser.add_argument("--convergence-threshold", type=int, default=10, 
                     help="Number of generations without fitness improvement before regenerating satellites and jobs (G).")
+parser.add_argument("--csv-row-limit", type=int, default=100,
+                    help="Maximum number of rows to load from the CSV file for satellites and jobs. "
+                         "Set to 0 or a negative number to load all rows (e.g. --csv-row-limit 50).")
 #endregion
 
 
@@ -58,23 +103,48 @@ parser.add_argument("--snapshots-prefix", type=str, default="",
 #region Miscellaneous
 parser.add_argument("--no-start-prompt", action="store_true",
                     help="Start immediately without waiting for Enter.")
+parser.add_argument("--print-every", type=int, default=50, help="Print progress every N generations")
+#endregion
+
+
+#region Config file
+parser.add_argument("-c", "--config", type=str, default=None,
+                    help="Name of a run configuration (without extension) in the runConfigurations/ "
+                         "directory, e.g. '--config default' loads runConfigurations/default.json. "
+                         "Known keys override the built-in defaults; unrecognized keys are ignored. "
+                         "Explicit CLI flags always take precedence over the JSON values.")
 #endregion
 #endregion
 
 
 
-def run_genetic_algorithm(generations: int, population_size: int, print_every: int,
-                          max_depth: int, hoist_rate: float, convergence_threshold: int = 10,
-                          metrics_dir: str = "metrics", metrics_prefix: str = "",
-                          metrics_flush_every: int = 1, collect_metrics: bool = True,
-                          inspect_snapshots: bool = False, save_snapshots: bool = False,
-                          snapshots_dir: str = "snapshots", snapshots_prefix: str = ""):
+#region Main loop
+def run_genetic_algorithm(config: GAConfig):
+    generations        = config["generations"]
+    population_size    = config["population_size"]
+    max_depth          = config["max_depth"]
+    hoist_rate         = config["hoist_rate"]
+    convergence_threshold = config["convergence_threshold"]
+    csv_row_limit      = config["csv_row_limit"]
+    metrics_dir        = config["metrics_dir"]
+    metrics_prefix     = config["metrics_prefix"]
+    metrics_flush_every = config["metrics_flush_every"]
+    collect_metrics    = config["collect_metrics"]
+    inspect_snapshots  = config["inspect_snapshots"]
+    save_snapshots     = config["save_snapshots"]
+    snapshots_dir      = config["snapshots_dir"]
+    snapshots_prefix   = config["snapshots_prefix"]
+    print_every        = config["print_every"]
+
     if generations <= 0:
         print("No generations requested; nothing to optimize.")
         return
 
+
+
+    #region > Initialization
     csv_path = "data/example.csv"
-    initial_job_limit = 300
+    initial_job_limit = csv_row_limit
     current_minute = 0.0
     world_rng = random.Random()
     snapshot_prefix_value = snapshots_prefix.strip() or datetime.now().strftime("snapshot_%Y%m%d_%H%M%S")
@@ -105,6 +175,7 @@ def run_genetic_algorithm(generations: int, population_size: int, print_every: i
             seed=world_seed,
             random_sample=False,
             sample_seed=world_seed,
+            snapshot_minute=minute,
         )
         jobs_local = create_jobs_from_csv(
             csv_path,
@@ -130,20 +201,37 @@ def run_genetic_algorithm(generations: int, population_size: int, print_every: i
         metrics_collector = MetricsCollector(metrics_dir, run_prefix, metrics_flush_every)
 
     best_overall_fitness = float('-inf')
+    best_world_fitness = float('-inf')
     generations_without_improvement = 0
     total_resets = 0
-    
+    #endregion
+
+
+
+    #region > Evolution loop
     for generation in range(generations):
+        
+
+
+        #region >> Evaluation
         # Evaluare fitness of population by scheduling tasks
         population = genetic_algorithm.getPopulation()
         fitness_evaluator.evaluate(population, snapshot)
         evaluation_snapshot = snapshot
         last_evaluation_snapshot = evaluation_snapshot
-        
-        # Check convergence
+        #endregion
+
+
+
+        #region >> Convergence
         current_best = max(population, key=lambda ind: ind.fitness)
         if current_best.fitness > best_overall_fitness:
+            print(f"New best overall fitness: {current_best.fitness:.4f} (previous: {best_overall_fitness:.4f})")
             best_overall_fitness = current_best.fitness
+        
+        if current_best.fitness > best_world_fitness:
+            print(f"New best fitness in world: {current_best.fitness:.4f} (previous: {best_world_fitness:.4f})")
+            best_world_fitness = current_best.fitness
             generations_without_improvement = 0
         else:
             generations_without_improvement += 1
@@ -152,7 +240,7 @@ def run_genetic_algorithm(generations: int, population_size: int, print_every: i
         if generations_without_improvement >= convergence_threshold:
             # Regenerate the world
             print(f"Convergence detected after {generations_without_improvement} generations without improvement. Regenerating satellites and jobs...")
-            reset_job_limit = 300
+            reset_job_limit = initial_job_limit
             current_minute = generation * 5.0
             satellites, jobs, world_seed = build_world(reset_job_limit, current_minute)
             print(f"Loaded new CSV sample for reset (seed={world_seed}).")
@@ -164,10 +252,14 @@ def run_genetic_algorithm(generations: int, population_size: int, print_every: i
                 reset_count=total_resets,
                 label=f"World reset #{total_resets} at generation {generation + 1}",
             )
-            best_overall_fitness = float('-inf')
+            best_world_fitness = float('-inf')
             generations_without_improvement = 0
             world_reset = 1
+        #endregion
 
+
+
+        #region >> Metrics 
         if metrics_collector is not None:
             fitness_values = [individual.fitness for individual in population]
             mean_fitness = sum(fitness_values) / len(fitness_values)
@@ -189,17 +281,29 @@ def run_genetic_algorithm(generations: int, population_size: int, print_every: i
                     world_reset=world_reset,
                 )
             )
+        #endregion
 
-        # Print progress
+
+
+        #region >> Logs
         if print_every > 0 and ((generation + 1) % print_every == 0 or generation == generations - 1):
             print("SCHEDULE SNAPSHOT " + "-" * 50)
             genetic_algorithm.printSchedule()
             print("\n")
+        #endregion
 
+
+
+        #region >> Evolution
         # Evolve the population
         if generation < generations - 1:
             genetic_algorithm.solveNextGeneration()
+        #endregion
+    #endregion
 
+
+
+    #region > Post-evolution analysis
     # After evolution: inspect the winner
     best = max(genetic_algorithm.getPopulation(), key=lambda ind: ind.fitness)
     ratio, resp, energy = fitness_evaluator.evaluate_single(best, last_evaluation_snapshot)
@@ -216,21 +320,68 @@ def run_genetic_algorithm(generations: int, population_size: int, print_every: i
         print(f"Metrics CSV: {metrics_collector.csv_path}")
         print(f"Metrics NumPy: {metrics_collector.npz_path}")
         print(f"Metrics graph: {metrics_collector.plot_path}")
+    #endregion
+#endregion
 
 
 
+#region Entry point
 if __name__ == "__main__":
-    import os
+    import os, json
     print(f"PID: {os.getpid()} — attach GDB now if you want to debug the C++ code.")
 
     args = parser.parse_args()
+
+    # --- Build config: defaults → JSON file (if -c given) → explicit CLI flags ---
+    _known_keys = set(GAConfig.__annotations__)
+
+    config = default_config()
+
+    if args.config is not None:
+        config_path = os.path.join("runConfigurations", f"{args.config}.json")
+        with open(config_path) as f:
+            json_data = json.load(f)
+        for key, value in json_data.items():
+            if key in _known_keys:
+                config[key] = value   # type: ignore[literal-required]
+        print(f"Loaded run configuration: {config_path}")
+
+    # CLI flags that differ from their argparse defaults override the JSON.
+    # We detect explicit overrides by comparing against argparse defaults.
+    _cli_overrides: dict = {}
+    _defaults = {a.dest: a.default for a in parser._actions if a.dest != "help"}
+    for dest, default in _defaults.items():
+        cli_value = getattr(args, dest, None)
+        if cli_value != default:
+            _cli_overrides[dest] = cli_value
+
+    _dest_to_key = {
+        "generations":          "generations",
+        "population":           "population_size",
+        "max_depth":            "max_depth",
+        "hoist_rate":           "hoist_rate",
+        "convergence_threshold": "convergence_threshold",
+        "csv_row_limit":        "csv_row_limit",
+        "metrics_dir":          "metrics_dir",
+        "metrics_prefix":       "metrics_prefix",
+        "metrics_flush_every":  "metrics_flush_every",
+        "disable_metrics":      None,   # handled separately below
+        "inspect_snapshots":    "inspect_snapshots",
+        "save_snapshots":       "save_snapshots",
+        "snapshots_dir":        "snapshots_dir",
+        "snapshots_prefix":     "snapshots_prefix",
+        "print_every":          "print_every",
+    }
+    for dest, key in _dest_to_key.items():
+        if dest in _cli_overrides and key is not None:
+            config[key] = _cli_overrides[dest]  # type: ignore[literal-required]
+    if "disable_metrics" in _cli_overrides:
+        config["collect_metrics"] = not _cli_overrides["disable_metrics"]
+    # -------------------------------------------------------------------------
 
     if not args.no_start_prompt:
         print("Press Enter to start the genetic algorithm...")
         input()
 
-    run_genetic_algorithm(args.generations, args.population, args.print_every,
-                          args.max_depth, args.hoist_rate, args.convergence_threshold,
-                          args.metrics_dir, args.metrics_prefix, args.metrics_flush_every,
-                          not args.disable_metrics, args.inspect_snapshots, args.save_snapshots,
-                          args.snapshots_dir, args.snapshots_prefix)
+    run_genetic_algorithm(config)
+#endregion

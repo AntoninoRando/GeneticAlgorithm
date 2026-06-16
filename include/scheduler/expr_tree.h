@@ -67,30 +67,59 @@ struct ExprNode {
     {
         switch (nodeType) {
             case NodeType::TERMINAL:
-                return registry[terminalIndex].accessor(job, sat);
+            {
+                double result = registry[terminalIndex].accessor(job, sat);
+                return result;
+            }
             case NodeType::CONST:
-                return constValue;
+            {
+                double result = constValue;
+                return result;
+            }
             case NodeType::ADD:
-                return children[0].eval(job, sat, registry) + children[1].eval(job, sat, registry);
+            {
+                double result = children[0].eval(job, sat, registry) + children[1].eval(job, sat, registry);
+                return result;
+            }
             case NodeType::SUB:
-                return children[0].eval(job, sat, registry) - children[1].eval(job, sat, registry);
+            {
+                double result = children[0].eval(job, sat, registry) - children[1].eval(job, sat, registry);
+                return result;
+            }
             case NodeType::MUL:
-                return children[0].eval(job, sat, registry) * children[1].eval(job, sat, registry);
+            {
+                double result = children[0].eval(job, sat, registry) * children[1].eval(job, sat, registry);
+                return result;
+            }
             case NodeType::DIV: {
                 double denom = children[1].eval(job, sat, registry);
-                return (abs(denom) < 1e-9) ? 0.0 : children[0].eval(job, sat, registry) / denom;
+                double result = (abs(denom) < 1e-9) ? 0.0 : children[0].eval(job, sat, registry) / denom;
+                return result;
             }
             case NodeType::MAX_OP:
-                return max(children[0].eval(job, sat, registry), children[1].eval(job, sat, registry));
+            {
+                double result = max(children[0].eval(job, sat, registry), children[1].eval(job, sat, registry));
+                return result;
+            }
             case NodeType::MIN_OP:
-                return min(children[0].eval(job, sat, registry), children[1].eval(job, sat, registry));
+            {
+                double result = min(children[0].eval(job, sat, registry), children[1].eval(job, sat, registry));
+                return result;
+            }
             case NodeType::NEG:
-                return -children[0].eval(job, sat, registry);
+            {
+                double result = -children[0].eval(job, sat, registry);
+                return result;
+            }
             case NodeType::ABS:
-                return abs(children[0].eval(job, sat, registry));
+            {
+                double result = abs(children[0].eval(job, sat, registry));
+                return result;
+            }
             case NodeType::INV: {
                 double v = children[0].eval(job, sat, registry);
-                return (abs(v) < 1e-9) ? 0.0 : 1.0 / v;
+                double result = (abs(v) < 1e-9) ? 0.0 : 1.0 / v;
+                return result;
             }
         }
 

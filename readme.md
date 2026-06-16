@@ -139,6 +139,13 @@ You can still append extra flags if needed:
 ./run default --generations 10
 ```
 
+## Algorithm Parameters
+
+- **Population**: number of scheduling algorithms to evolve each generation.
+- **Generations**: number of training generations.
+- **Max depth**: maximum depth of each individual.
+- **Convergence treshold**: limit number of generations after which, if the fitness did not improve significantly, a new simulation is used.
+
 ## Metrics Instrumentation and Graphs
 
 The main loop now records per-generation metrics and writes three artifacts:
