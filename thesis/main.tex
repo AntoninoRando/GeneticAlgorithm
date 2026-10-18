@@ -1,0 +1,55 @@
+\documentclass[11pt,a4paper,oneside]{report}
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage[english]{babel}
+\usepackage[margin=2.5cm]{geometry}
+\usepackage{amsmath,amssymb}
+\usepackage{booktabs}
+\usepackage{graphicx}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{algorithm}
+\usepackage{algpseudocode}
+\usepackage[hidelinks]{hyperref}
+\usepackage[numbers]{natbib}
+
+\lstset{basicstyle=\ttfamily\small, breaklines=true, frame=single, columns=fullflexible}
+\newcommand{\todo}[1]{\textcolor{red}{[TODO: #1]}}
+
+\title{Genetic Programming for Task Scheduling\\in Satellite Edge Computing}
+\author{Antonino Rando}
+\date{\today}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+Satellite Edge Computing (SEC) places computational nodes on Low Earth Orbit (LEO)
+satellites. These nodes have limited CPU, memory and energy, and each one sees a
+ground user for only a short window, so deciding which satellite serves which
+task is hard. Hand-designed scheduling heuristics need considerable domain
+knowledge. This thesis instead evolves the scheduling heuristic with Genetic
+Programming (GP). Each individual is an expression tree that scores a
+(task, satellite) pair; a greedy decoder uses these scores to build a schedule,
+and the schedule's completion ratio, response time and energy consumption define
+the individual's fitness. A C++ core exposed to Python through \texttt{pybind11}
+implements the algorithm. On held-out worlds the evolved rules lower the mean response time by about 18\% with respect to the best hand-written baseline, but not the completion ratio, which exposes a misalignment in the fitness definition.
+\end{abstract}
+
+\tableofcontents
+
+\input{chapters/introduction}
+\input{chapters/background}
+\input{chapters/related_work}
+\input{chapters/problem}
+\input{chapters/method}
+\input{chapters/implementation}
+\input{chapters/experiments}
+\input{chapters/conclusions}
+
+\bibliographystyle{plainnat}
+\bibliography{references}
+
+\end{document}

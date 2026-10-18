@@ -1,0 +1,68 @@
+\chapter{Genetic Scheduling Algorithm}
+\label{ch:method}
+
+\section{Overview}
+The algorithm evolves a population of expression trees. Each generation:
+(1) take a snapshot of the world (satellites and tasks); (2) decode a schedule
+with every tree and compute its fitness; (3) breed the next population.
+
+\section{Individual Representation}
+An individual is one tree $T$. Internal nodes are operators
+$\{+,-,\times,\div,\max,\min\}$ (binary) and $\{\text{neg},|\cdot|,\text{inv}\}$
+(unary); leaves are terminals read from a \emph{registry}.
+Ephemeral constants are disabled. The terminals are:
+\begin{itemize}
+  \item task: arrival time, RAM, disk, image size, execution time, transfer time, number of hops;
+  \item satellite: elevation angle, latency, bandwidth, completed tasks, CPU/network busy-until,
+        CPU/network capacity, reserved and remaining energy, load ratio.
+\end{itemize}
+The tree evaluated on $(j,s)$ returns a score: a higher score means the pair is preferred.
+
+\section{Greedy Decoder}
+\begin{algorithm}[h]
+\caption{Greedy decoding of a tree $T$}
+\begin{algorithmic}[1]
+\State mark tasks arrived after the snapshot time as unavailable
+\State compute $score[j][s] \gets T(j,s)$ for all available $j$, all $s$
+\While{unscheduled available tasks remain}
+  \State among feasible pairs $(j,s)$ pick the one with highest $score[j][s]$
+  \If{none} \textbf{break} \EndIf
+  \State assign $j$ to $s$; update $f_s$, $E_s$, completed tasks of $s$
+  \State recompute column $score[\cdot][s]$ for unscheduled tasks
+\EndWhile
+\end{algorithmic}
+\end{algorithm}
+Only the committed satellite changes, so only its column of the score matrix is
+refreshed. Tree evaluations drop from $O(J^2 S)$ to $O(JS + J^2)$ for $J$ tasks
+and $S$ satellites, with identical results.
+
+\section{Fitness}
+For individual $i$ with raw objectives $(C_i, R_i, \mathcal{E}_i)$, the response
+time and energy are normalised across the population and
+\begin{equation}
+  f_i = w_C\, C_i - w_R\, \hat R_i - w_E\, \hat{\mathcal{E}}_i ,
+\end{equation}
+with default weights $w_C=0.60$, $w_R=0.25$, $w_E=0.15$.
+
+\section{Evolution}
+\begin{description}
+  \item[Initialisation] ramped half-and-half, depths from 2 to the maximum depth.
+  \item[Elitism] the top 2 individuals are copied unchanged.
+  \item[Selection] tournament of size 5.
+  \item[Crossover] subtree swap, applied with probability 0.80.
+  \item[Mutation] per-node probability 0.08: terminals are redrawn; operators are
+        swapped for another of the same arity, or (10\% of cases) the subtree is
+        replaced by a fresh \emph{grow} tree of depth 3.
+  \item[Hoist] with probability 0.05 per offspring, to fight bloat.
+\end{description}
+Every offspring satisfies $\text{depth}\le D_{\max}$ and
+$\text{size}\le 2^{D_{\max}+1}$; a child that violates a cap is replaced by a copy
+of its parent. Trees are algebraically simplified after mutation to remove redundancy.
+
+\section{Changing Worlds and Convergence}
+The population is evaluated on a snapshot of one world. In \texttt{main.py}, if the best fitness
+in the current world does not improve for a number of generations (the \emph{convergence
+threshold}, default 10), the next pre-processed world is loaded. The population therefore faces
+different scenarios over time, which should limit overfitting to one instance. Because fitness is
+normalised within the population, it is comparable only inside one world; for this reason the
+experiments of Chapter~\ref{ch:exp} use a fixed switching schedule and held-out test worlds.

@@ -1,0 +1,39 @@
+\chapter{Problem Formulation}
+\label{ch:problem}
+
+\section{System Model}
+An access point receives tasks from ground users and assigns each one to a
+satellite. Each task $j$ has an arrival time $a_j$, RAM, disk and image-size
+requirements, an execution time $e_j$, a transfer time $t_j$ and a number of
+hops. Each satellite $s$ has a CPU capacity, network capacity, latency,
+bandwidth, elevation angle, remaining energy and an \emph{operational-until}
+time $\omega_s$ (orbital sunset).
+
+\section{Constraints}
+A task $j$ placed on satellite $s$ starting at $f_s$ (the time $s$ becomes free)
+with duration $d_j = e_j + t_j$ is feasible only if
+\begin{align}
+  f_s + d_j &\le \omega_s && \text{(operational window)}\\
+  \rho_s\, d_j &\le E_s   && \text{(energy budget)}
+\end{align}
+where $\rho_s$ is the energy rate and $E_s$ the remaining energy. A task is
+processed by one satellite and cannot be interrupted.
+
+\section{Objectives}
+Given a schedule $\mathcal{A}$ over $N$ tasks:
+\begin{align}
+  \text{completion ratio}\;\; C &= |\mathcal{A}|/N,\\
+  \text{mean response time}\;\; R &= \tfrac{1}{|\mathcal{A}|}\sum_{(j,s)\in\mathcal{A}} (c_j - a_j),\\
+  \text{energy}\;\; \mathcal{E} &= \sum_{(j,s)\in\mathcal{A}} \rho_s d_j,
+\end{align}
+where $c_j$ is the completion time. We maximise $C$ while minimising $R$ and
+$\mathcal{E}$.
+
+\section{Simulation Data}
+The raw dataset is the task log of one 300-minute LEO simulation (2960 rows, about 92 distinct
+servers) produced by the DES simulator of \citet{magliarisi2025orbit}. It is split into 30
+consecutive 10-minute windows (``worlds'', 2959 tasks in total, roughly 100 per world). In each
+world the arrival times are shifted so that the earliest task arrives at minute 0, keeping the gaps:
+the scheduler only depends on the relative arrival pattern. Satellites are built from the server
+profiles found in the world's rows. The snapshot time is set to the last arrival, so every task of
+the world is available to the decoder. Chapter~\ref{ch:impl} describes the pipeline.

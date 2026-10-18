@@ -1,0 +1,36 @@
+\chapter{Related Work}
+\label{ch:related}
+
+\section{Task Scheduling in Satellite Edge Computing}
+\citet{magliarisi2025orbit} propose a distributed, orbit-aware scheduler for SEC.
+Their system model captures satellite motion and visibility (sunset), models
+each SEN as an M/M/1 non-preemptive priority queue, and minimises the average
+response time under resource, deadline and visibility constraints.
+\citet{icdcs_sc} jointly treat offloading, satellite selection and routing under
+energy and deadline constraints; they propose $O(n\log n)$ heuristics and
+compare them with an ILP baseline, finding that the heuristics give better
+response time and success rate while the ILP gives better load balancing and
+lower energy use.
+
+Scheduling in SEC has two parts: a \emph{routing rule}, which selects the
+satellite for a task, and a \emph{queuing rule}, which fixes the processing
+order on that satellite.
+
+\section{GP for Scheduling}
+\begin{description}
+  \item[Multi-tree GP with elite recombination (MTGPER).] Each individual holds
+        several trees (routing and queuing rules). Plain MTGP evolves each rule
+        independently; sMTGP swaps the other rule during crossover; MTGPER
+        evaluates all combinations of the elite set and keeps the best. \todo{cite the MTGPER paper (``Multi-Tree Genetic Programming with Elite Recombination for dynamic task scheduling of satellite edge computing''); it is not in the Drive folder}
+  \item[Dual-tree GP with adaptive mutation (DTGPAM).] For dynamic workflow
+        scheduling in the cloud, it biases which tree and which terminals are
+        mutated, since trees and terminals do not contribute equally to fitness
+        \citep{dtgpam}.
+  \item[GP for workflow scheduling in fog and multi-cloud environments.]
+        Evolve VM-selection and task-selection rules \citep{gp_fog,mtgp_multicloud}; the fog-computing paper uses a multi-tree GP with routing and sequencing decision points, and the multi-cloud one adds a cloud-selection rule.
+\end{description}
+
+\section{Positioning of This Work}
+We use a \emph{single} tree per individual, a priority function over
+(task, satellite) pairs, decoded greedily. This is simpler than the multi-tree
+approaches; Section~\ref{sec:future} discusses the extension.

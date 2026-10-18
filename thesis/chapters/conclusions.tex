@@ -1,0 +1,22 @@
+\chapter{Conclusions and Future Work}
+\label{ch:concl}
+
+We formulated task scheduling in satellite edge computing as a genetic-programming
+hyper-heuristic and implemented it as a parallel C++ library. On held-out worlds,
+the evolved rules reduce the mean response time of scheduled tasks by about 18\%
+with respect to the best hand-written baseline (shortest job first), but the
+current fitness does not reward scheduling more tasks: longer training produces
+trivial rules and a lower completion ratio. Larger populations and a
+completion-only fitness give a higher completion ratio ($0.25$), still below
+SJF ($0.27$). The main next step is therefore to redefine the objectives (e.g.\ response time
+including unscheduled tasks as penalty) before drawing conclusions on GP versus heuristics.
+
+\section{Future Work}
+\label{sec:future}
+\begin{itemize}
+  \item Multi-tree individuals: separate routing and queuing rules, with elite recombination.
+  \item Structured requests: tasks as directed acyclic graphs of dependent services.
+  \item Adaptive mutation biased by tree and terminal importance.
+  \item Realistic dynamics: NHPP arrivals, moving topology, ISL routing.
+  \item Validation on held-out worlds and comparison with the heuristics and ILP of \citet{icdcs_sc}.
+\end{itemize}

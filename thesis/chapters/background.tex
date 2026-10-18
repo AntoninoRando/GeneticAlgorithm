@@ -1,0 +1,41 @@
+\chapter{Background: Genetic Programming}
+\label{ch:background}
+
+\section{Evolutionary Algorithms}
+Genetic algorithms evolve a population of candidate solutions with biologically
+motivated operators. They need no gradient information, use probabilistic
+rather than deterministic search, and work well on non-linear, non-convex and
+multimodal problems. A generic run has these components: a genetic
+representation of a solution (the \emph{genome}), a way to create new solutions,
+a \emph{fitness function}, a \emph{selection} function, \emph{crossover} and
+\emph{mutation}. The set of solutions at a given step is a \emph{generation}.
+
+As an example, in the knapsack problem a genome is a 0/1 array saying which items
+are packed, the fitness is the total value if the weight limit is respected
+(and 0 otherwise), single-point crossover swaps the tails of two parents, and
+\emph{elitism} copies the best solutions unchanged into the next generation so
+they are not destroyed by crossover.
+
+\section{Genetic Programming}
+Genetic Programming \citep{koza1994gp} applies the same loop to \emph{programs},
+usually represented as trees: internal nodes are functions and leaves are
+terminals. Fitness is measured by running the program on the problem.
+
+\subsection{Initialisation: ramped half-and-half}
+Half of the trees are built with the \emph{full} method (every leaf at the
+maximum depth), the other half with the \emph{grow} method (random shapes within
+the maximum depth), with the depth ramped across the population to obtain
+diverse sizes and shapes.
+
+\subsection{Selection, crossover, mutation}
+\emph{Tournament selection} draws $k$ individuals and keeps the fittest.
+\emph{Subtree crossover} swaps random subtrees between two parents.
+\emph{Mutation} perturbs a node or replaces a subtree with a new random one.
+\emph{Hoist mutation} replaces a tree by one of its own subtrees and is used to
+fight \emph{bloat}, the uncontrolled growth of trees.
+
+\section{Genetic Programming Hyper-Heuristics}
+In a hyper-heuristic, GP does not solve the problem directly; it evolves the
+\emph{heuristic} (here a priority function) that then solves instances of the
+problem. The evolved rule is evaluated on training instances and should
+generalise to unseen ones.

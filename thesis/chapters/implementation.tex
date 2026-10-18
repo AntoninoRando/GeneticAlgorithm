@@ -1,0 +1,48 @@
+\chapter{Implementation}
+\label{ch:impl}
+
+\section{Architecture}
+The core is a header-only C++ library (\texttt{include/scheduler}), built with CMake
+into a Python extension module \texttt{scheduler} through \texttt{pybind11}.
+Python (\texttt{main.py}) loads the worlds, drives the generation loop and records metrics.
+\begin{center}
+\begin{tabular}{ll}
+\toprule
+File & Role\\
+\midrule
+\texttt{types.h} & \texttt{Job}, \texttt{Satellite}\\
+\texttt{registry.h} & terminal registry\\
+\texttt{expr\_tree.h} & expression tree and evaluation\\
+\texttt{tree\_builder.h} & grow / full / ramped half-and-half\\
+\texttt{tree\_operators.h} & crossover, mutation, hoist\\
+\texttt{scheduler\_gp.h} & GP loop (\texttt{SchedulerGP})\\
+\texttt{fitness\_evaluator.h} & snapshot, greedy decoder, fitness\\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\section{Public API}
+\begin{lstlisting}[language=Python]
+ga = SchedulerGP(satellites, jobs)
+ga.initialize(populationSize=..., maxDepth=..., hoistRate=...)
+fe = FitnessEvaluator(buildTerminalRegistry())
+for g in range(generations):
+    fe.evaluate(ga.getPopulation(), SimulationSnapshot(t, sats, jobs))
+    ga.solveNextGeneration()
+\end{lstlisting}
+
+\section{Performance}
+Fitness evaluation and offspring generation are parallel over the population
+with OpenMP. Offspring use per-pair RNG streams, so a seeded run is
+bit-reproducible whatever the thread count. Measured on a 4-core machine with a
+population of 150 and a 50-satellite, 100-task world, one \texttt{evaluate()}
+call went from about 1893\,ms to 27.5\,ms ($\approx 69\times$) with identical
+fitness values (OpenMP: $3.3\times$; score caching: further $\approx 18.6\times$ on one thread).
+
+\section{Data Pipeline and Tooling}
+CSV worlds are split and loaded by \texttt{data\_processing}. Per-generation
+metrics are written to CSV/NPZ/PNG, and simulation snapshots can be inspected
+and plotted. The raw log (\texttt{data/example.csv}) is pre-split once by \texttt{world\_splitter.py} into
+time-window files \texttt{data/worlds/world\_NNN.csv} plus a \texttt{manifest.json}, with an added
+column of per-world relative arrival times. At run time \texttt{main.py} loads the worlds in order and
+builds a \texttt{SimulationSnapshot} from each one.

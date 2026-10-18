@@ -1,0 +1,43 @@
+\chapter{Introduction}
+
+\section{Motivation}
+Terrestrial networks cover only a fraction of the Earth's land area, and cloud
+data centres are usually far from user devices. Mega-constellations of LEO
+satellites, combined with high-speed inter-satellite links (ISL), make it
+possible to deploy \emph{Satellite Edge Nodes} (SENs) that offer low-latency
+computing almost everywhere \citep{icdcs_sc,magliarisi2025orbit}.
+
+SENs are constrained: CPU, memory and storage are scarce, the energy budget can
+only be recharged in sunlight, and the high orbital speed means a satellite
+remains visible to a ground user for a limited time (25--176\,s for an elevation
+threshold of $40^\circ$ \citep{magliarisi2025orbit}). A high load therefore
+leads quickly to congestion, longer delays and a lower success rate. Task
+scheduling is crucial to mitigate these limits.
+
+\section{Problem and Proposed Approach}
+Existing heuristics (FCFS, HEFT, HADRT, \dots) work in specific scenarios but
+take significant time and domain knowledge to design. Deep reinforcement
+learning is an alternative but is costly to train and hard to interpret. This
+thesis follows the \emph{genetic programming hyper-heuristic} (GPHH) idea: let
+evolution discover a scheduling rule automatically, as a human-readable
+expression over task and satellite features.
+
+\section{Contributions}
+\begin{itemize}
+  \item A formulation of satellite task scheduling as a GP problem, with an
+        expression-tree representation of the scheduling rule.
+  \item A greedy decoder that turns a tree into a feasible schedule under
+        orbital-window and energy constraints.
+  \item A multi-objective fitness combining completion ratio, response time and energy.
+  \item A parallel C++ implementation with Python bindings, together with a
+        performance analysis (Chapter~\ref{ch:impl}).
+  \item An experimental evaluation against hand-written heuristics, including a parameter study (Chapter~\ref{ch:exp}).
+\end{itemize}
+
+\section{Thesis Outline}
+Chapter~\ref{ch:background} introduces genetic programming.
+Chapter~\ref{ch:related} reviews GP-based scheduling and the SEC scheduling
+literature. Chapter~\ref{ch:problem} formalises the problem.
+Chapter~\ref{ch:method} describes the algorithm and Chapter~\ref{ch:impl} its
+implementation. Chapter~\ref{ch:exp} reports the experiments and
+Chapter~\ref{ch:concl} concludes.
