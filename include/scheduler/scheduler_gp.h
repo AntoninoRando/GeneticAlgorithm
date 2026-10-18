@@ -8,10 +8,6 @@
 #include <utility>
 #include <vector>
 
-#ifdef _OPENMP
-#include <omp.h>
-#endif
-
 #include "registry.h"
 #include "tree_builder.h"
 #include "tree_operators.h"
@@ -61,12 +57,17 @@ using namespace std;
 /// The `<` operator is defined to allow sorting individuals by fitness in 
 /// ascending order.
 struct GPIndividual {
-    int            id;
+    /// @brief Unique identifier, assigned at initialisation and for every
+    /// offspring.  Defaulted so a freshly constructed individual never
+    /// exposes an indeterminate value (reading one is UB).
+    int            id = -1;
     ExprNode       tree;
 
-    /// @brief Amount of jobs successfully scheduled by this individual's tree 
-    /// when used as a priority function during a simulation.
-    double         fitness;
+    /// @brief Scalar fitness written back by FitnessEvaluator::evaluate()
+    /// (weighted composite of completion ratio, mean response time and
+    /// energy).  Defaults to 0.0 so offspring that have not been evaluated
+    /// yet hold a defined value instead of uninitialised memory.
+    double         fitness = 0.0;
 
     /// @brief Comparison operator for sorting individuals by fitness 
     /// (ascending).
@@ -86,14 +87,24 @@ public:
 
 
     #pragma region CONSTRUCTORS ------------------------------------------------
-    SchedulerGP(vector<Satellite> satellites, vector<Job> jobs)
-        : satellites_(move(satellites))
-        , jobs_(move(jobs))
-        , rng_(random_device{}())
+    /// @param satellites / jobs  Accepted for API compatibility but currently
+    ///        unused: the GP only evolves trees, and the world state reaches
+    ///        the fitness evaluation through SimulationSnapshot.  (They were
+    ///        previously copied into never-read members.)
+    /// @param seed  < 0 (default): seed from std::random_device (fresh run
+    ///        every time).  >= 0: fully deterministic, reproducible runs —
+    ///        combined with the per-pair RNG streams in solveNextGeneration()
+    ///        the same seed yields the same evolution regardless of thread
+    ///        count or OpenMP scheduling.
+    SchedulerGP(const vector<Satellite>& satellites, const vector<Job>& jobs,
+                long long seed = -1)
+        : rng_(seedFrom(seed))
         , registry_(buildTerminalRegistry())
         , builder_(registry_, rng_)
         , ops_(rng_, builder_, /*maxDepth=*/7)
     {
+        (void)satellites;
+        (void)jobs;
         ops_.setTerminalCount(static_cast<int>(registry_.size()));
     }
     #pragma endregion ----------------------------------------------------------
@@ -135,8 +146,11 @@ public:
     {
         ++gen;
 
-        // Sort current population by fitness (ascending).
-        sort(population.begin(), population.end());
+        // Sort current population by fitness (ascending).  stable_sort so
+        // that fitness ties keep a deterministic order — with plain sort the
+        // tie order (and therefore tournament selection) varied from run to
+        // run even with a fixed seed.
+        stable_sort(population.begin(), population.end());
 
         const int popSize = static_cast<int>(population.size());
 
@@ -162,56 +176,63 @@ public:
         const int nChildren  = popSize - elitismCount;   // may be 0
         const int nPairs     = (nChildren + 1) / 2;
 
+        // Offspring ids: unique, deterministic, and never colliding with any
+        // id from an earlier generation (elites keep their old, smaller ids).
+        // Previously offspring ids were left uninitialised — reading
+        // Individual.id from Python returned indeterminate memory.
+        const int idBase = (gen + 1) * popSize;
+
         // Derive a base seed from the master RNG (consumed once, serially) so
-        // that successive generations and separate runs keep producing fresh
-        // offspring streams while each thread gets an independent sub-stream.
+        // that successive generations keep producing fresh offspring streams.
         const unsigned baseSeed = rng_();
 
-        #pragma omp parallel
-        {
-            // Per-thread RNG + operators, constructed once per thread (not per
-            // iteration).  mt19937 is not thread-safe, so each thread owns its
-            // own; the terminal registry is read-only and safely shared.
-            mt19937       localRng(baseSeed +
-                                   0x9E3779B9u * static_cast<unsigned>(ompThreadNum() + 1));
-            TreeBuilder   localBuilder(registry_, localRng);
-            TreeOperators localOps(localRng, localBuilder, maxDepth_);
-            localOps.setTerminalCount(static_cast<int>(registry_.size()));
+        // Runtimes vary per pair (tree sizes differ), so dynamic scheduling
+        // keeps the cores evenly loaded.  Each pair owns its own RNG stream
+        // seeded from (baseSeed, p) — mt19937 is not thread-safe, and per-PAIR
+        // (rather than per-thread) streams make the result independent of the
+        // thread count and of how OpenMP happens to assign pairs to threads,
+        // so seeded runs are bit-reproducible.  The registry is read-only and
+        // safely shared; every iteration writes only its own two slots.
+        #pragma omp parallel for schedule(dynamic)
+        for (int p = 0; p < nPairs; ++p) {
+            seed_seq      seq{baseSeed, static_cast<unsigned>(p)};
+            mt19937       pairRng(seq);
+            TreeBuilder   pairBuilder(registry_, pairRng);
+            TreeOperators pairOps(pairRng, pairBuilder, maxDepth_);
+            pairOps.setTerminalCount(static_cast<int>(registry_.size()));
 
             uniform_real_distribution<double> unit(0.0, 1.0);
 
-            // Runtimes vary per pair (tree sizes differ), so dynamic scheduling
-            // keeps the cores evenly loaded.
-            #pragma omp for schedule(dynamic)
-            for (int p = 0; p < nPairs; ++p) {
-                const int slotA = firstChild + 2 * p;
-                const int slotB = slotA + 1;
+            const int slotA = firstChild + 2 * p;
+            const int slotB = slotA + 1;
 
-                const GPIndividual& pA = tournamentSelectRng(population, 5, localRng);
-                const GPIndividual& pB = tournamentSelectRng(population, 5, localRng);
+            const GPIndividual& pA = tournamentSelectRng(population, 5, pairRng);
+            const GPIndividual& pB = tournamentSelectRng(population, 5, pairRng);
 
-                GPIndividual childA, childB;
+            GPIndividual childA, childB;
 
-                if (unit(localRng) < crossoverRate) {
-                    auto [tA, tB] = localOps.crossover(pA.tree, pB.tree);
-                    childA.tree   = move(tA);
-                    childB.tree   = move(tB);
-                } else {
-                    childA.tree = pA.tree;
-                    childB.tree = pB.tree;
-                }
-
-                // Mutation
-                localOps.mutate(childA.tree, mutationRate);
-                localOps.mutate(childB.tree, mutationRate);
-
-                // Occasional hoist to fight bloat.
-                if (unit(localRng) < hoistRate_) localOps.hoist(childA.tree);
-                if (unit(localRng) < hoistRate_) localOps.hoist(childB.tree);
-
-                next[slotA] = move(childA);
-                if (slotB < popSize) next[slotB] = move(childB);
+            if (unit(pairRng) < crossoverRate) {
+                auto [tA, tB] = pairOps.crossover(pA.tree, pB.tree);
+                childA.tree   = move(tA);
+                childB.tree   = move(tB);
+            } else {
+                childA.tree = pA.tree;
+                childB.tree = pB.tree;
             }
+
+            // Mutation
+            pairOps.mutate(childA.tree, mutationRate);
+            pairOps.mutate(childB.tree, mutationRate);
+
+            // Occasional hoist to fight bloat.
+            if (unit(pairRng) < hoistRate_) pairOps.hoist(childA.tree);
+            if (unit(pairRng) < hoistRate_) pairOps.hoist(childB.tree);
+
+            childA.id = idBase + slotA;
+            childB.id = idBase + slotB;
+
+            next[slotA] = move(childA);
+            if (slotB < popSize) next[slotB] = move(childB);
         }
 
         population = move(next);
@@ -234,9 +255,13 @@ public:
         return population;
     }
 
+    /// @brief Returns copies of the best k individuals, best first.
+    /// (The previous version sorted ascending and kept the *first* k
+    /// elements, i.e. it returned the WORST k individuals.)
     vector<GPIndividual> topIndividuals(int k=1) const {
         vector<GPIndividual> topK = population;
-        std::sort(topK.begin(), topK.end());
+        stable_sort(topK.begin(), topK.end(),
+                    [](const GPIndividual& a, const GPIndividual& b) { return b < a; });
         if (k < static_cast<int>(topK.size())) {
             topK.resize(k);
         }
@@ -248,8 +273,6 @@ public:
 
 private:
     #pragma region FIELDS ------------------------------------------------------
-    vector<Satellite>    satellites_;
-    vector<Job>          jobs_;
     mutable mt19937      rng_;
     vector<TerminalDef>  registry_;
     TreeBuilder          builder_;
@@ -281,13 +304,10 @@ private:
 
 
     
-    const GPIndividual& tournamentSelect(const vector<GPIndividual>& pop, int k) {
-        int best = randomInt(0, static_cast<int>(pop.size()) - 1);
-        for (int i = 1; i < k; ++i) {
-            int cand = randomInt(0, static_cast<int>(pop.size()) - 1);
-            if (pop[cand].fitness > pop[best].fitness) best = cand;
-        }
-        return pop[best];
+    /// @brief Seeds the master RNG: negative → non-deterministic
+    /// (random_device), otherwise the given seed for reproducible runs.
+    static unsigned seedFrom(long long seed) {
+        return seed < 0 ? random_device{}() : static_cast<unsigned>(seed);
     }
 
     /// @brief Tournament selection driven by a caller-supplied RNG so it can run
@@ -304,29 +324,8 @@ private:
         return pop[best];
     }
 
-    /// @brief Current OpenMP thread id (0 when built without OpenMP). Used only
-    /// to derive an independent RNG sub-stream per thread.
-    static int ompThreadNum() {
-#ifdef _OPENMP
-        return omp_get_thread_num();
-#else
-        return 0;
-#endif
-    }
-
-
-
     #pragma region UTILITIES ---------------------------------------------------
-    double randomReal() {
-        uniform_real_distribution<double> d{0.0, 1.0};
-        return d(rng_);
-    }
-    int randomInt(int lo, int hi) {
-        std::uniform_int_distribution<int> d{lo, hi};
-        return d(rng_);
-    }
-
-    /// @brief Prints the summary of a few random trees from the population 
+    /// @brief Prints the summary of a few random trees from the population
     /// for insight into diversity.
     void printRandomPopulationTrees(const vector<GPIndividual>& population) const {
         if (population.empty()) return;

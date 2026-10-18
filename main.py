@@ -18,6 +18,9 @@ class GAConfig(TypedDict):
     hoist_rate: float
     convergence_threshold: int
     csv_row_limit: int
+    # Reproducibility: -1 = fresh randomness every run; >= 0 = deterministic
+    # run (seeds both the C++ GP evolution and the Python world sampling).
+    seed: int
     # Metrics
     metrics_dir: str
     metrics_prefix: str
@@ -40,6 +43,7 @@ def default_config() -> GAConfig:
         hoist_rate=0.05,
         convergence_threshold=10,
         csv_row_limit=100,
+        seed=-1,
         metrics_dir="metrics",
         metrics_prefix="",
         metrics_flush_every=1,
@@ -72,6 +76,9 @@ parser.add_argument("--convergence-threshold", type=int, default=10,
 parser.add_argument("--csv-row-limit", type=int, default=100,
                     help="Maximum number of rows to load from the CSV file for satellites and jobs. "
                          "Set to 0 or a negative number to load all rows (e.g. --csv-row-limit 50).")
+parser.add_argument("--seed", type=int, default=-1,
+                    help="Random seed for reproducible runs (seeds both the C++ evolution and the "
+                         "Python world sampling). -1 (default) uses fresh randomness every run.")
 #endregion
 
 
@@ -127,6 +134,7 @@ def run_genetic_algorithm(config: GAConfig):
     hoist_rate         = config["hoist_rate"]
     convergence_threshold = config["convergence_threshold"]
     csv_row_limit      = config["csv_row_limit"]
+    seed               = config["seed"]
     metrics_dir        = config["metrics_dir"]
     metrics_prefix     = config["metrics_prefix"]
     metrics_flush_every = config["metrics_flush_every"]
@@ -163,7 +171,7 @@ def run_genetic_algorithm(config: GAConfig):
 
     initial_job_limit = csv_row_limit
     current_minute = 0.0
-    world_rng = random.Random()
+    world_rng = random.Random(seed if seed >= 0 else None)
     snapshot_prefix_value = snapshots_prefix.strip() or datetime.now().strftime("snapshot_%Y%m%d_%H%M%S")
 
     def inspect_snapshot(active_snapshot: SimulationSnapshot, generation: int, reset_count: int, label: str):
@@ -213,7 +221,7 @@ def run_genetic_algorithm(config: GAConfig):
 
     satellites, jobs, current_minute, _ = build_world(select_world_path(0), initial_job_limit)
 
-    genetic_algorithm = SchedulerGP(satellites, jobs)
+    genetic_algorithm = SchedulerGP(satellites, jobs, seed=seed)
     genetic_algorithm.initialize(populationSize=population_size, maxDepth=max_depth,
                                  hoistRate=hoist_rate)
     fitness_evaluator = FitnessEvaluator(buildTerminalRegistry())
@@ -249,6 +257,10 @@ def run_genetic_algorithm(config: GAConfig):
 
 
         #region >> Convergence
+        # NOTE: fitness is population-relative (penalties are normalised across
+        # the current population) and world-dependent, so best_overall_fitness
+        # is only an informational indicator across world resets; the actual
+        # convergence decision uses best_world_fitness, which resets per world.
         current_best = max(population, key=lambda ind: ind.fitness)
         if current_best.fitness > best_overall_fitness:
             print(f"New best overall fitness: {current_best.fitness:.4f} (previous: {best_overall_fitness:.4f})")
@@ -387,6 +399,7 @@ if __name__ == "__main__":
         "hoist_rate":           "hoist_rate",
         "convergence_threshold": "convergence_threshold",
         "csv_row_limit":        "csv_row_limit",
+        "seed":                 "seed",
         "metrics_dir":          "metrics_dir",
         "metrics_prefix":       "metrics_prefix",
         "metrics_flush_every":  "metrics_flush_every",

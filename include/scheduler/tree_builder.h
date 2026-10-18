@@ -1,6 +1,7 @@
 #pragma once
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <random>
 #include <vector>
@@ -26,14 +27,17 @@ class TreeBuilder {
 public:
     #pragma region CONSTRUCTORS ------------------------------------------------
     explicit TreeBuilder(const vector<TerminalDef>& registry, mt19937& rng)
-        : registry_(registry), rng_(rng)
-    {
-        // Binary operators
-        binaryOps_ = { NodeType::ADD, NodeType::SUB, NodeType::MUL,
-                       NodeType::DIV, NodeType::MAX_OP, NodeType::MIN_OP };
-        // Unary operators
-        unaryOps_  = { NodeType::NEG, NodeType::ABS, NodeType::INV };
-    }
+        : registry_(registry), rng_(rng) {}
+
+    /// Operator sets, shared by every builder (also used by TreeOperators for
+    /// same-arity point mutation).  Static so that constructing a TreeBuilder
+    /// is allocation-free — one is now created per offspring pair in the
+    /// parallel breeding loop.
+    static constexpr array<NodeType, 6> kBinaryOps = {
+        NodeType::ADD, NodeType::SUB, NodeType::MUL,
+        NodeType::DIV, NodeType::MAX_OP, NodeType::MIN_OP };
+    static constexpr array<NodeType, 3> kUnaryOps = {
+        NodeType::NEG, NodeType::ABS, NodeType::INV };
     #pragma endregion ----------------------------------------------------------
 
 
@@ -80,8 +84,6 @@ private:
     #pragma region FIELDS ------------------------------------------------------
     const vector<TerminalDef>& registry_;
     mt19937& rng_;
-    vector<NodeType> binaryOps_;
-    vector<NodeType> unaryOps_;
     #pragma endregion ----------------------------------------------------------
 
 
@@ -111,7 +113,7 @@ private:
         // Choose arity: binary ~70%, unary ~30%.
         bool binary = (randomReal() < 0.70);
         if (binary) {
-            node.nodeType = binaryOps_[randomInt(0, static_cast<int>(binaryOps_.size()) - 1)];
+            node.nodeType = kBinaryOps[randomInt(0, static_cast<int>(kBinaryOps.size()) - 1)];
             if (forceOperator) {
                 node.children.push_back(full(maxDepth - 1));
                 node.children.push_back(full(maxDepth - 1));
@@ -120,7 +122,7 @@ private:
                 node.children.push_back(grow(maxDepth - 1));
             }
         } else {
-            node.nodeType = unaryOps_[randomInt(0, static_cast<int>(unaryOps_.size()) - 1)];
+            node.nodeType = kUnaryOps[randomInt(0, static_cast<int>(kUnaryOps.size()) - 1)];
             if (forceOperator) node.children.push_back(full(maxDepth - 1));
             else               node.children.push_back(grow(maxDepth - 1));
         }

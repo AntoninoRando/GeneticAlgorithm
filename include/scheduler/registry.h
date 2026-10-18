@@ -3,7 +3,6 @@
 #include <vector>
 #include <limits>
 #include <string>
-#include <functional>
 #include "types.h"
 
 using namespace std;
@@ -28,7 +27,12 @@ using namespace std;
 
 
 #pragma region TYPES -----------------------------------------------------------
-using FieldAccessor = function<double(const Job&, const Satellite&)>;
+/// Plain function pointer, not std::function: terminal accessors are called in
+/// the innermost loop of the greedy decoder (once per tree terminal per
+/// (job, satellite) pair), and std::function's type-erased dispatch blocked
+/// inlining there. All registry entries are captureless lambdas, which convert
+/// to function pointers implicitly.
+using FieldAccessor = double (*)(const Job&, const Satellite&);
 
 struct TerminalDef {
     string        name;

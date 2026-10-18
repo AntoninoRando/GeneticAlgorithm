@@ -3,8 +3,11 @@
 #include <algorithm>
 #include <cassert>
 #include <cmath>
+#include <cstdint>
 #include <limits>
 #include <numeric>
+#include <stdexcept>
+#include <string>
 #include <vector>
 
 #ifdef _OPENMP
@@ -184,14 +187,32 @@ inline void greedyDecode(const ExprNode&               tree,
                           vector<Assignment>&           assignments,
                           vector<SatState>&             satStates)
 {
-    // ── Working copies ────────────────────────────────────────────────────
+    // ── Working state ─────────────────────────────────────────────────────
     // Each individual decoded in the same generation must see an identical,
-    // clean world.  We therefore copy both lists and mutate only the copies.
-    vector<Satellite> sats = snap.satellites;
-    vector<Job>       jobs = snap.jobs;
+    // clean world.
+    //
+    // Jobs are strictly READ-ONLY during a decode, so they are used in place:
+    // the previous per-decode copy of snap.jobs allocated two std::strings
+    // per job, per individual, per generation, for nothing.
+    //
+    // Satellites ARE mutated (remainingEnergy / completedTasks — and the
+    // expression-tree terminals read those fields, which is why the score
+    // cache below refreshes a column per commit), so a working copy is
+    // required.  It lives in a thread_local buffer: vector copy-assignment
+    // reuses each element's heap storage (name string, neighbor/task
+    // vectors), so after the first decode on a thread the copy is
+    // allocation-free instead of ~6 heap allocations per satellite.  Safe
+    // under OpenMP: each thread owns its own instance, and nothing here
+    // escapes the call (outputs go to the caller-owned parameters).
+    const vector<Job>& jobs = snap.jobs;
+    thread_local vector<Satellite> sats;
+    sats = snap.satellites;
 
     const int nSat = static_cast<int>(sats.size());
     const int nJob = static_cast<int>(jobs.size());
+
+    assignments.clear();
+    assignments.reserve(nJob);
 
     satStates.resize(nSat);
     for (int s = 0; s < nSat; ++s) {
@@ -202,7 +223,10 @@ inline void greedyDecode(const ExprNode&               tree,
         // as jobs are committed, so no separate mirror is needed here.
     }
 
-    vector<bool> scheduled(nJob, false);
+    // uint8_t instead of vector<bool>: no bit-packing in the hot scan loop,
+    // and the buffer is reused across decodes on the same thread.
+    thread_local vector<uint8_t> scheduled;
+    scheduled.assign(nJob, 0);
     int remaining = nJob;
 
     // Jobs whose arrivalTime is in the future are treated as unavailable for
@@ -210,7 +234,7 @@ inline void greedyDecode(const ExprNode&               tree,
     // loop to avoid redundant checks.
     for (int j = 0; j < nJob; ++j) {
         if (static_cast<double>(jobs[j].arrivalTime) > snap.currentMinute) {
-            scheduled[j] = true;
+            scheduled[j] = 1;
             --remaining;
         }
     }
@@ -231,8 +255,10 @@ inline void greedyDecode(const ExprNode&               tree,
     // (same scan order, same strict-greater tie-break, same feasibility gate).
     //
     // Layout is row-major in j (index j*nSat + s) so each iteration's argmax
-    // scan reads a job's row contiguously.
-    vector<double> score(static_cast<size_t>(nJob) * static_cast<size_t>(nSat));
+    // scan reads a job's row contiguously.  thread_local so the J×S buffer is
+    // allocated once per thread instead of once per decode.
+    thread_local vector<double> score;
+    score.assign(static_cast<size_t>(nJob) * static_cast<size_t>(nSat), 0.0);
     for (int j = 0; j < nJob; ++j) {
         if (scheduled[j]) continue;                 // never read for these jobs
         const size_t base = static_cast<size_t>(j) * static_cast<size_t>(nSat);
@@ -315,7 +341,7 @@ inline void greedyDecode(const ExprNode&               tree,
         satStates[bestSat].energySpent    += energyCost;
         sats[bestSat].remainingEnergy     -= energyCost;
 
-        scheduled[bestJob] = true;
+        scheduled[bestJob] = 1;
         --remaining;
 
         // ── Refresh the one invalidated column ─────────────────────────────
@@ -454,7 +480,15 @@ public:
                   const SimulationSnapshot& snap)
     {
         const int n = static_cast<int>(population.size());
-        if (n == 0 || snap.jobs.empty() || snap.satellites.empty()) return;
+        if (n == 0) return;
+        if (snap.jobs.empty() || snap.satellites.empty()) {
+            // Degenerate world: define every fitness as 0 instead of leaving
+            // whatever the previous generation (or uninitialised memory)
+            // held — callers sort and select on these values.
+            for (auto& ind : population) ind.fitness = 0.0;
+            return;
+        }
+        validateSnapshot(snap);
 
         // ── Step 1: decode every individual ──────────────────────────────
         vector<double> compRatios(n), meanResps(n), energies(n);
@@ -505,7 +539,31 @@ public:
         // compRatio stays absolute — preserves selection pressure when the
         // whole population ties (everyone gets their true [0,1] reward).
         // Only the cost terms are population-relative.
-        normalise(meanResps);
+
+        // Mean response: an individual that scheduled ZERO jobs has no
+        // response time at all.  It used to report meanResp = 0 — the best
+        // possible value — which (a) rewarded empty schedules and (b) dragged
+        // the normalisation minimum to 0, inflating everyone else's penalty.
+        // Empty schedules are now excluded from the min/max and receive the
+        // worst penalty (1.0) instead.
+        {
+            double lo = numeric_limits<double>::infinity();
+            double hi = -numeric_limits<double>::infinity();
+            for (int i = 0; i < n; ++i) {
+                if (compRatios[i] <= 0.0) continue;
+                lo = min(lo, meanResps[i]);
+                hi = max(hi, meanResps[i]);
+            }
+            const double range = hi - lo;   // never read unless some compRatio > 0
+            for (int i = 0; i < n; ++i) {
+                if (compRatios[i] <= 0.0)   meanResps[i] = 1.0;
+                else if (range < 1e-12)     meanResps[i] = 0.0;
+                else                        meanResps[i] = (meanResps[i] - lo) / range;
+            }
+        }
+
+        // Energy: zero consumption is a genuine cost value (scheduling
+        // nothing really does cost nothing), so plain min-max stays correct.
         normalise(energies);
 
         // ── Step 3: write fitness ─────────────────────────────────────────────
@@ -532,6 +590,8 @@ public:
                         double&                   outMeanResp,
                         double&                   outEnergy) const
     {
+        validateSnapshot(snap);
+
         vector<detail::Assignment> assignments;
         vector<detail::SatState>   satStates;
 
@@ -556,5 +616,20 @@ public:
 
 
 private:
+    /// @brief  Rejects malformed snapshots up front.  In particular a
+    ///         non-empty energyPerMinute shorter than the satellite list used
+    ///         to be read out of bounds inside the decoder (undefined
+    ///         behaviour); now it fails loudly at the API boundary.
+    static void validateSnapshot(const SimulationSnapshot& snap) {
+        if (!snap.energyPerMinute.empty() &&
+            snap.energyPerMinute.size() != snap.satellites.size()) {
+            throw invalid_argument(
+                "SimulationSnapshot.energyPerMinute must be empty (uniform "
+                "1.0) or have exactly one entry per satellite: got " +
+                to_string(snap.energyPerMinute.size()) + " entries for " +
+                to_string(snap.satellites.size()) + " satellites.");
+        }
+    }
+
     vector<TerminalDef> registry_;
 };

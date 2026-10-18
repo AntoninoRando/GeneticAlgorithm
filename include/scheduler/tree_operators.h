@@ -13,7 +13,19 @@ using namespace std;
 
 /*
     This file defines the TreeOperators class, which implements the genetic
-    operators for manipulating expression trees in the GP algorithm.
+    operators for manipulating expression trees in the GP algorithm:
+
+      - crossover : swaps two random subtrees between copies of the parents.
+      - mutate    : point mutation (terminal reindex / same-arity operator
+                    swap) plus occasional subtree replacement.
+      - hoist     : replaces the whole tree with one of its own subtrees.
+
+    Offspring invariants, enforced by every operator that can grow a tree:
+      - node count  ≤ maxTreeSize()  ( = 2^(maxDepth+1) )
+      - tree depth  ≤ maxTreeDepth_
+    A child that violates either cap is discarded and replaced by a copy of
+    its parent (standard GP practice), NOT by a fresh random tree — the old
+    behaviour threw away both parents' genetic material.
 */
 
 
@@ -28,51 +40,40 @@ public:
 
 
     #pragma region PUBLIC API --------------------------------------------------
+    // ── Node location ────────────────────────────────────────────────────────
+    // Preorder-index navigation.  Returns a pointer instead of a value so the
+    // located subtree is copied at most once, at the call site (the previous
+    // by-value helpers re-copied the found subtree at every recursion level
+    // on the way back up).
+
+    static ExprNode* locate(ExprNode& root, int target) {
+        int cur = 0;
+        return locateAt(root, target, cur);
+    }
+    static const ExprNode* locate(const ExprNode& root, int target) {
+        return locate(const_cast<ExprNode&>(root), target);
+    }
+
     // ── Subtree crossover ────────────────────────────────────────────────────
-    // Build two new trees by substituting random subtrees.
-    // Uses index-based helpers to avoid raw pointer invalidation.
-
-    static ExprNode getSubtreeAt(const ExprNode& node, int target, int& cur) {
-        if (cur == target) return node;
-        for (const auto& c : node.children) {
-            ++cur;
-            ExprNode r = getSubtreeAt(c, target, cur);
-            if (cur >= target) return r;
-        }
-        return node;
-    }
-    static ExprNode getSubtree(const ExprNode& root, int idx) {
-        int cur = 0; return getSubtreeAt(root, idx, cur);
-    }
-
-    static bool setSubtreeAt(ExprNode& node, int target, const ExprNode& repl, int& cur) {
-        if (cur == target) { node = repl; return true; }
-        for (auto& c : node.children) {
-            ++cur;
-            if (setSubtreeAt(c, target, repl, cur)) return true;
-        }
-        return false;
-    }
-    static ExprNode setSubtree(ExprNode root, int idx, const ExprNode& repl) {
-        int cur = 0; setSubtreeAt(root, idx, repl, cur); return root;
-    }
-
+    // Copy both parents once, then *swap* the two randomly chosen subtrees
+    // between the copies.  This produces exactly the same two children as the
+    // old extract-and-substitute implementation, with zero extra subtree
+    // copies.
     pair<ExprNode, ExprNode> crossover(const ExprNode& a, const ExprNode& b) {
-        int idxA = randomInt(0, a.size() - 1);
-        int idxB = randomInt(0, b.size() - 1);
+        ExprNode childA = a;
+        ExprNode childB = b;
 
-        ExprNode subA = getSubtree(a, idxA);
-        ExprNode subB = getSubtree(b, idxB);
+        ExprNode* nodeA = locate(childA, randomInt(0, childA.size() - 1));
+        ExprNode* nodeB = locate(childB, randomInt(0, childB.size() - 1));
+        swap(*nodeA, *nodeB);
 
-        ExprNode childA = setSubtree(a, idxA, subB);
-        ExprNode childB = setSubtree(b, idxB, subA);
+        // Enforce the size/depth caps by reverting to the parent.
+        if (violatesLimits(childA)) childA = a;
+        if (violatesLimits(childB)) childB = b;
 
-        if (childA.size() > maxTreeSize()) childA = builder_.grow(maxTreeDepth_);
-        if (childB.size() > maxTreeSize()) childB = builder_.grow(maxTreeDepth_);
-
-        childA = childA.simplify();
-        childB = childB.simplify();
-
+        // No simplify() here: in the breeding loop mutate() always runs right
+        // after crossover and finishes with a single simplify pass, so
+        // simplifying twice per offspring was pure duplicated work.
         return {childA, childB};
     }
 
@@ -80,13 +81,19 @@ public:
     // Recursively walk and return a mutated copy.  This avoids UAF from raw
     // pointer lists becoming stale after a child vector reallocation.
     //
-    // Constants are disabled: TERMINAL nodes always mutate to another terminal,
-    // and the CONST branch is intentionally omitted.
+    // When mutation fires on a node:
+    //   TERMINAL  → re-draw the terminal index.
+    //   CONST     → demote to a terminal (constants are disabled).
+    //   operator  → 10%: replace the whole subtree with a fresh grow(3) tree;
+    //               90%: swap the operator for a *different* operator of the
+    //                    same arity (children preserved), then keep walking.
+    //               (Previously the 90% branch did nothing at all, so an ADD
+    //               could never become a SUB and the effective mutation rate
+    //               on internal nodes was mutationRate × 0.10.)
     ExprNode mutateNode(ExprNode node, double mutationRate) {
         if (randomReal() < mutationRate) {
             switch (node.nodeType) {
                 case NodeType::TERMINAL:
-                    // Always stay a terminal; pick a different registry index.
                     node.terminalIndex = randomInt(0, terminalCount_ - 1);
                     return node;
                 case NodeType::CONST:
@@ -100,6 +107,7 @@ public:
                 default:
                     if (randomReal() < 0.10)
                         return builder_.grow(3);
+                    node.nodeType = randomOperatorSameArity(node.nodeType);
                     break;
             }
         }
@@ -109,31 +117,31 @@ public:
     }
 
     void mutate(ExprNode& tree, double mutationRate) {
+        ExprNode original = tree;   // revert target if the caps are violated
         tree = mutateNode(move(tree), mutationRate);
-        if (tree.size() > maxTreeSize()) tree = builder_.grow(maxTreeDepth_);
-        tree = tree.simplify();
+        tree.simplifyInPlace();     // may shrink an oversized tree back under the caps
+        if (violatesLimits(tree)) tree = move(original);
     }
 
     // ── Hoist mutation ───────────────────────────────────────────────────────
-    // Replace the whole tree with a copy of one of its non-root subtrees.
-    void collectSubtrees(const ExprNode& node, vector<ExprNode>& out, bool isRoot) {
-        if (!isRoot) out.push_back(node);
-        for (const auto& c : node.children) collectSubtrees(c, out, false);
-    }
-
+    // Replace the whole tree with one of its own non-root subtrees, chosen
+    // uniformly.  Locates the subtree by preorder index and moves it out —
+    // the previous version materialised a copy of *every* subtree into a
+    // vector (O(n·depth) node copies) just to pick one.
     void hoist(ExprNode& tree) {
-        vector<ExprNode> subtrees;
-        collectSubtrees(tree, subtrees, true);
-        if (subtrees.empty()) return;
-        tree = move(subtrees[randomInt(0, static_cast<int>(subtrees.size()) - 1)]);
+        const int n = tree.size();
+        if (n <= 1) return;
+        ExprNode* sub = locate(tree, randomInt(1, n - 1));
+        ExprNode promoted = move(*sub);
+        tree = move(promoted);
     }
 
     void setTerminalCount(int n) { terminalCount_ = n; }
     void setMaxDepth(int d)      { maxTreeDepth_  = std::max(1, d); }
     #pragma endregion ----------------------------------------------------------
 
-    
-    
+
+
 private:
     #pragma region FIELDS ------------------------------------------------------
     mt19937&     rng_;
@@ -145,7 +153,33 @@ private:
 
 
     #pragma region UTILITIES ---------------------------------------------------
+    static ExprNode* locateAt(ExprNode& node, int target, int& cur) {
+        if (cur == target) return &node;
+        for (auto& c : node.children) {
+            ++cur;
+            if (ExprNode* r = locateAt(c, target, cur)) return r;
+        }
+        return nullptr;
+    }
+
     int maxTreeSize() const { return 1 << (maxTreeDepth_ + 1); }
+
+    bool violatesLimits(const ExprNode& t) const {
+        return t.size() > maxTreeSize() || t.depth() > maxTreeDepth_;
+    }
+
+    /// @brief Uniformly picks an operator of the same arity as `t`, excluding
+    /// `t` itself (single RNG draw, so the stream stays deterministic).
+    NodeType randomOperatorSameArity(NodeType t) {
+        const bool      binary = ARITY[static_cast<int>(t)] == 2;
+        const NodeType* ops    = binary ? TreeBuilder::kBinaryOps.data()
+                                        : TreeBuilder::kUnaryOps.data();
+        const int       n      = binary ? static_cast<int>(TreeBuilder::kBinaryOps.size())
+                                        : static_cast<int>(TreeBuilder::kUnaryOps.size());
+        int idx = randomInt(0, n - 2);
+        if (ops[idx] == t) idx = n - 1;
+        return ops[idx];
+    }
 
     double randomReal() {
         uniform_real_distribution<double> d{0.0, 1.0};

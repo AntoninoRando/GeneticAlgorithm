@@ -142,104 +142,77 @@ struct ExprNode {
         return true;
     }
 
-    /// @brief Returns a semantically equivalent, simplified copy of this
-    /// subtree, collapsing provably redundant operation patterns bottom-up.
+    /// @brief Simplifies this subtree **in place**, collapsing provably
+    /// redundant operation patterns bottom-up.
     ///
-    /// Rules applied (in order, after children are already simplified):
+    /// Every rule is *exact* under eval()'s guarded semantics — simplifying a
+    /// tree can never change the score it produces for any (job, satellite)
+    /// pair.  Two former rules were removed for exactly that reason:
+    ///   DIV(x, x)    → CONST(1)  is wrong when x ≈ 0 (guarded div yields 0),
+    ///   INV(INV(x))  → x         is wrong when |x| ≥ ~1e9 or |x| ≤ ~1e-9
+    ///                              (the inner guarded INV collapses to 0).
     ///
-    /// Unary identity chains
+    /// Rules applied (after children are already simplified):
     ///   NEG(NEG(x))  → x
     ///   ABS(ABS(x))  → ABS(x)
-    ///   ABS(NEG(x))  → ABS(x)
-    ///   INV(INV(x))  → x
-    ///
-    /// Same-child binary idempotency
+    ///   ABS(NEG(x))  → ABS(x)     (both ABS rules iterated to a fixpoint)
     ///   MAX(x, x)    → x
     ///   MIN(x, x)    → x
     ///   SUB(x, x)    → CONST(0)
-    ///   DIV(x, x)    → CONST(1)   (inherits guarded-div: if x≈0 eval→0, not 1;
-    ///                               but that pre-existing corner case is unchanged)
     ///
-    /// @return The simplified node (may be a different node type / shape).
-    ExprNode simplify() const {
-        // --- 1. Recurse: build a copy with simplified children first.
-        ExprNode node = *this;
-        for (auto& child : node.children)
-            child = child.simplify();
+    /// In-place on purpose: the previous copy-based simplify() deep-copied the
+    /// whole subtree at every recursion level (O(n·depth) node copies per
+    /// call), and it ran for every offspring every generation.
+    void simplifyInPlace() {
+        // --- 1. Recurse: simplify children first.
+        for (auto& child : children)
+            child.simplifyInPlace();
 
         // --- 2. Apply local rules on the (now-simplified) node.
-        switch (node.nodeType) {
+        switch (nodeType) {
 
             // ── NEG ──────────────────────────────────────────────────────────
             case NodeType::NEG: {
-                const ExprNode& inner = node.children[0];
                 // NEG(NEG(x)) → x
-                if (inner.nodeType == NodeType::NEG)
-                    return inner.children[0];
+                if (children[0].nodeType == NodeType::NEG) {
+                    ExprNode hoisted = move(children[0].children[0]);
+                    *this = move(hoisted);
+                }
                 break;
             }
 
             // ── ABS ──────────────────────────────────────────────────────────
             case NodeType::ABS: {
-                const ExprNode& inner = node.children[0];
-                // ABS(ABS(x)) → ABS(x)
-                if (inner.nodeType == NodeType::ABS)
-                    return inner;
-                // ABS(NEG(x)) → ABS(x)
-                if (inner.nodeType == NodeType::NEG) {
-                    ExprNode simplified;
-                    simplified.nodeType = NodeType::ABS;
-                    simplified.children.push_back(inner.children[0]);
-                    return simplified;
+                // ABS(ABS(x)) → ABS(x),  ABS(NEG(x)) → ABS(x).
+                // Stripping a NEG can expose a new ABS/NEG directly underneath,
+                // so iterate until neither rule matches.
+                while (children[0].nodeType == NodeType::ABS ||
+                       children[0].nodeType == NodeType::NEG) {
+                    ExprNode hoisted = move(children[0].children[0]);
+                    children[0] = move(hoisted);
                 }
                 break;
             }
 
-            // ── INV ──────────────────────────────────────────────────────────
-            case NodeType::INV: {
-                const ExprNode& inner = node.children[0];
-                // INV(INV(x)) → x
-                if (inner.nodeType == NodeType::INV)
-                    return inner.children[0];
-                break;
-            }
-
-            // ── MAX ──────────────────────────────────────────────────────────
-            case NodeType::MAX_OP: {
-                // MAX(x, x) → x
-                if (structurallyEqual(node.children[0], node.children[1]))
-                    return node.children[0];
-                break;
-            }
-
-            // ── MIN ──────────────────────────────────────────────────────────
+            // ── MAX / MIN ────────────────────────────────────────────────────
+            case NodeType::MAX_OP:
             case NodeType::MIN_OP: {
-                // MIN(x, x) → x
-                if (structurallyEqual(node.children[0], node.children[1]))
-                    return node.children[0];
+                // MAX(x, x) → x,  MIN(x, x) → x
+                if (structurallyEqual(children[0], children[1])) {
+                    ExprNode hoisted = move(children[0]);
+                    *this = move(hoisted);
+                }
                 break;
             }
 
             // ── SUB ──────────────────────────────────────────────────────────
             case NodeType::SUB: {
                 // SUB(x, x) → CONST(0)
-                if (structurallyEqual(node.children[0], node.children[1])) {
-                    ExprNode zero;
-                    zero.nodeType   = NodeType::CONST;
-                    zero.constValue = 0.0;
-                    return zero;
-                }
-                break;
-            }
-
-            // ── DIV ──────────────────────────────────────────────────────────
-            case NodeType::DIV: {
-                // DIV(x, x) → CONST(1)
-                if (structurallyEqual(node.children[0], node.children[1])) {
-                    ExprNode one;
-                    one.nodeType   = NodeType::CONST;
-                    one.constValue = 1.0;
-                    return one;
+                if (structurallyEqual(children[0], children[1])) {
+                    nodeType      = NodeType::CONST;
+                    constValue    = 0.0;
+                    terminalIndex = -1;
+                    children.clear();
                 }
                 break;
             }
@@ -247,7 +220,12 @@ struct ExprNode {
             default:
                 break;
         }
+    }
 
+    /// @brief Returns a simplified copy of this subtree (see simplifyInPlace).
+    ExprNode simplify() const {
+        ExprNode node = *this;
+        node.simplifyInPlace();
         return node;
     }
 
@@ -257,6 +235,15 @@ struct ExprNode {
         int s = 1;
         for (const auto& c : children) s += c.size();
         return s;
+    }
+
+    /// @brief Depth of the subtree in edges: a lone terminal has depth 0.
+    /// Matches TreeBuilder's convention (grow/full(maxDepth) produce trees
+    /// whose depth() is at most maxDepth).
+    int depth() const {
+        int d = 0;
+        for (const auto& c : children) d = max(d, 1 + c.depth());
+        return d;
     }
 
     /// @brief Returns the expression represented by this node as a string.

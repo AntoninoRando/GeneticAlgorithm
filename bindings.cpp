@@ -15,11 +15,8 @@
 #include "scheduler/tree_builder.h"
 #include "scheduler/tree_operators.h"
 #include "scheduler/types.h"
-#include "scheduler/fitness_evaluator.h"
-
-#define const
 #include "scheduler/scheduler_gp.h"
-#undef const
+#include "scheduler/fitness_evaluator.h"
 
 namespace py = pybind11;
 
@@ -98,7 +95,21 @@ is available for the entire simulation horizon.
            .def_readwrite("fitness", &GPIndividual::fitness, "Evaluated fitness score");
 
     py::class_<SchedulerGP>(m, "SchedulerGP", "Genetic Programming Scheduler Manager")
-        .def(py::init<std::vector<Satellite>, std::vector<Job>>(), py::arg("satellites"), py::arg("jobs"), "Initialize GP solver with targets")
+        .def(py::init<const std::vector<Satellite>&, const std::vector<Job>&, long long>(),
+             py::arg("satellites"), py::arg("jobs"), py::arg("seed") = -1,
+             R"doc(
+Initialize the GP solver.
+
+Parameters
+----------
+satellites, jobs : list
+    Accepted for API compatibility; the world state actually used for
+    fitness evaluation is the one passed via :py:class:`SimulationSnapshot`.
+seed : int, optional
+    ``-1`` (default) seeds from the OS entropy source, so every run differs.
+    Any value ``>= 0`` makes the evolution fully deterministic and
+    reproducible, independent of the number of OpenMP threads.
+             )doc")
            .def("initialize", &SchedulerGP::initialize,
                py::arg("populationSize") = 200,
                py::arg("crossoverRate") = 0.80,
@@ -112,12 +123,31 @@ is available for the entire simulation horizon.
                 // Python objects are touched, so the GIL can be released to let
                 // the offspring loop run fully parallel.
                 py::call_guard<py::gil_scoped_release>(),
-                "Evaluate the current population and evolve to the next generation")
+                R"doc(
+Evolve the population to the next generation (selection, crossover,
+mutation, hoist).
+
+.. warning::
+   This replaces the population's storage.  Any ``Individual`` or
+   ``Population`` element reference obtained earlier (e.g. via
+   ``getPopulation()[i]`` or ``max(...)``) becomes DANGLING after this call —
+   re-fetch individuals from ``getPopulation()`` afterwards instead of
+   holding them across generations.
+                )doc")
            .def("getPopulation",
                 static_cast<vector<GPIndividual>& (SchedulerGP::*)()>(
                     &SchedulerGP::getPopulation),
                 py::return_value_policy::reference_internal,
-                "Get the current population of individuals (mutable reference).")
+                R"doc(
+Get the current population of individuals (mutable reference).
+
+Element references into it are only valid until the next
+``solveNextGeneration()`` call (see the warning there).
+                )doc")
+           .def("topIndividuals", &SchedulerGP::topIndividuals,
+                py::arg("k") = 1,
+                "Copies of the best k individuals, best first (safe to hold "
+                "across generations).")
            .def("printSchedule", &SchedulerGP::printSchedule, "Print the best schedule found so far");
     
            // ── SimulationSnapshot ────────────────────────────────────────────────────

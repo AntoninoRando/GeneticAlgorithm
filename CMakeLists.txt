@@ -19,6 +19,15 @@ target_compile_features(scheduler PRIVATE cxx_std_17)
 # always built optimized.
 target_compile_options(scheduler PRIVATE -O3 -funroll-loops -DNDEBUG)
 
+# Optional: tune codegen for the build machine's CPU. Worth a few percent in
+# the tree-eval hot loop, but the resulting .so only runs on CPUs with the
+# same feature set — leave OFF for portable/distributed builds, switch ON
+# (-DSCHEDULER_MARCH_NATIVE=ON) when building inside the target container.
+option(SCHEDULER_MARCH_NATIVE "Compile with -march=native" OFF)
+if(SCHEDULER_MARCH_NATIVE)
+	target_compile_options(scheduler PRIVATE -march=native)
+endif()
+
 target_include_directories(scheduler PRIVATE ${CMAKE_SOURCE_DIR}/include)
 
 if(OpenMP_CXX_FOUND)
