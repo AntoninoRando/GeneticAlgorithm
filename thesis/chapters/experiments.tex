@@ -139,6 +139,10 @@ with satellite load and bandwidth.
         take the first feasible satellite. The earliest-free rule of Section~\ref{sec:ties} has not been
         evaluated (configurations \texttt{tiebreak*} of \texttt{run\_ablation.py}); it changes the
         decoder, so the baselines must be re-scored with it as well.
+  \item All results use the default operators, which replace an offspring above the depth limit by a
+        copy of its parent. With the limit of 4 used here this happens often
+        (Section~\ref{sec:depthaware}) and contributes to the loss of diversity. The depth-aware
+        operators have not been evaluated (configurations \texttt{depth*} of \texttt{run\_ablation.py}).
   \item All results use the population-relative fitness. The fixed-bound fitness of
         Section~\ref{sec:fixed}, designed to remove the misalignment discussed above, has not
         been evaluated yet (configurations \texttt{fixed} and \texttt{fixed+clones+worlds3} of

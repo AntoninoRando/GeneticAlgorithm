@@ -320,3 +320,88 @@ lower response times and may lower the completion ratio. The configurations
 option changes the decoder, the hand-written baselines must be re-scored with
 it too before any comparison. Until then the option stays off by default and
 the thesis and guide claim only what is proved.
+
+## 10. References for the depth-aware operators (2026-11-14)
+
+Two entries were added for the opt-in depth-aware subtree mutation and
+crossover (`depthAwareMutation`, `depthAwareCrossover` in
+`SchedulerGP::initialize`; `--depth-aware-mutation`, `--depth-aware-crossover`;
+maths in `thesis/chapters/method.tex`, section "Offspring that exceed the depth
+limit").
+
+| Bib key | Work | How it was checked | Coverage |
+|---|---|---|---|
+| `poli2008fieldguide` | Poli, Langdon, McPhee (2008), *A Field Guide to Genetic Programming*, published via lulu.com, freely available at gp-field-guide.org.uk, ISBN 978-1-4092-0073-4, with contributions by J. R. Koza | Bibliographic data read from the book itself: the ISBN on its imprint page and the book's own citation entry in its bibliography. No DOI exists | **Section 11.3.2 "Bloat Control in Practice" read in full** (the parts "Size and Depth Limits" and "Anti-bloat Genetic Operators", pp. 104–106), from a PDF copy hosted by a university course page. The text was extracted with a crude script, so words were read without spaces; the content is unambiguous. Nothing else in the book was read |
+| `langdon2000sizefair` | Langdon (2000), *Size fair and homologous tree crossovers for tree genetic programming*, Genetic Programming and Evolvable Machines 1(1–2), 95–119 | Crossref record for DOI 10.1023/A:1010024515191: author, title, journal, volume, issue, pages, year match | **Metadata only.** Known here only through the Field Guide's description of it |
+
+**What the Field Guide section says** (paraphrased from the reading):
+
+- Many implementations, Koza's included, apply a genetic operator and then
+  check the offspring against the size or depth limit; if it exceeds the limit,
+  one of the parents is returned.
+- The authors call this a serious problem. Parents that are more likely to
+  violate the constraint get copied unaltered more often, so the population
+  fills up with programs that nearly infringe it. For depth limits the known
+  result is a population of very bushy programs in which most branches reach
+  the limit (effectively full trees); size limits give stringy programs near
+  the size limit. They point to Crane and McPhee (2005) and McPhee, Jarvis and
+  Crane (2004) for the evidence. **Neither of those was read**; they are not in
+  the bibliography.
+- The fix is not to return parents when the offspring violates the constraint.
+  Two strategies: (1) return the oversized offspring with fitness 0, so that
+  selection removes it; (2) declare the operation failed and try again, either
+  (a) with the same parent or parents and new mutation or crossover points,
+  possibly up to a maximum number of attempts, or (b) with newly selected
+  parents.
+- Under "Anti-bloat genetic operators": size-fair crossover and mutation
+  (Crawford-Marks and Spector 2002; Langdon 2000) constrain the choices made
+  during the operation. In size-fair crossover the point in the first parent is
+  chosen at random as usual, the size of the subtree to be removed is computed,
+  and that size constrains the choice of the second point so that the subtree
+  taken from the second parent is not too big. Older mutation operators are
+  listed: Kinnear (1993) prevents the offspring's depth from exceeding the
+  parent's by more than 15%; Langdon (1998) makes the new random subtree on
+  average the same size as the code it replaces; hoist (Kinnear 1994) and
+  shrink (Angeline 1996) mutation. **None of these cited works was read.**
+
+**Why this supports the choice.** The default behaviour of this project,
+reverting an oversized child to its parent, is exactly the implementation the
+section criticises, and the thesis experiments run at a depth limit of 4, where
+the limit binds often. Depth-aware crossover is strategy (2a) carried out
+without a loop: drawing the second point among the nodes that fit is the
+distribution that "redraw the second point until the children fit" produces.
+It is also the size-fair idea (constrain the second point by what the first one
+removed) with depth in place of size. Depth-aware mutation follows the same
+principle of constraining the choice during the operation.
+
+**What is NOT from the literature.**
+
+- The criterion δ_a(u) + η_b(v) ≤ D and δ_b(v) + η_a(u) ≤ D, and Proposition 3
+  (a fitting second point always exists for parents within the limit), are
+  derived and proved in this project.
+- Redrawing only the *second* point (the first is kept) is a project choice;
+  the Field Guide speaks of new points in general. Keeping the first point
+  preserves the existing internal-node bias for it.
+- The mutation bound grow(min(3, D − δ)) is a project choice. It is not
+  "redraw the subtree until it fits": that would give a different distribution
+  over subtrees.
+- The figures in the thesis (0.32 of children lost for two full trees of depth
+  4; 62% and 42% of subtree mutations discarded at depths 3 and 2 with a limit
+  of 4) are computed in this project from the code's own probabilities.
+
+**A caveat the Field Guide implies.** The section presents depth limits
+themselves as a blunt tool that shapes the population. These options keep the
+limit and only remove the parent-copy side effect; they do not address bloat
+or the shape bias of a depth limit as such.
+
+**Not yet backed by an experiment.** A unit test
+(`tests/test_paper_features.py`, `DepthAwareOperators`) shows the mechanical
+effect on synthetic populations: with crossover only at limit 4, the share of
+offspring already present in the previous generation fell from about 0.39 to
+0.24; with mutation only at per-node rate 1.0 and limit 3, among multi-node
+trees, from about 0.12 to 0.03. These are counts of copies, not performance.
+No run on the held-out worlds exists (`data/` was not available). The
+configurations `depthmut`, `depthx`, `depthops` and `depthops+clones+worlds3`
+in `thesis/experiments/run_ablation.py` are there to measure it; `clones` is
+the natural comparison, because clone retries remove parent copies after the
+fact and the two effects should overlap.

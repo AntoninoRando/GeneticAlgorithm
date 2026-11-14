@@ -66,6 +66,40 @@ using namespace std;
       dtgpam §V-C, 7 in zhang2025mtgper Table 3; Koza uses 17 for crossover
       offspring, koza1994gp §4) and do nothing else against bloat.  The extra
       node-count cap and the hoist mutation below are this project's additions.
+
+    * What happens to an offspring that exceeds the cap.  By default it is
+      discarded and a copy of its parent is returned, which is Koza's
+      implementation of the limit.  Poli, Langdon & McPhee (poli2008fieldguide,
+      §11.3.2 "Size and Depth Limits", pp. 104-105) call this "a serious
+      problem": parents that are likely to violate the limit get copied
+      unaltered more often, so the population fills with programs that nearly
+      infringe it (bushy, almost full trees for a depth limit).  Their remedy
+      is not to return the parent: either keep the offspring with fitness 0,
+      or declare the operation failed and try again, (a) with the same parents
+      and new crossover or mutation points, or (b) with new parents.
+      Two opt-in options implement remedy (a) in closed form, i.e. without a
+      retry loop and without ever producing an invalid tree:
+
+        - depth-aware crossover (setDepthAwareCrossover): the first point is
+          drawn as usual, the second among the nodes for which both children
+          respect the cap.  That is the distribution "redraw the second point
+          until the children fit" would give.  Constraining the second point
+          by what the first one removed is also how size-fair crossover works
+          (Langdon 2000, langdon2000sizefair; poli2008fieldguide §11.3.2,
+          "Anti-bloat genetic operators"), with a size criterion there and a
+          depth criterion here.  A fitting node always exists (Proposition 3,
+          thesis/chapters/method.tex).
+        - depth-aware mutation (setDepthAwareMutation): the replacement
+          subtree is grown within the depth left below the cap.  The same
+          section cites mutation operators that bound the offspring's depth
+          (Kinnear 1993) or match the size of the removed code (Langdon 1998);
+          the exact form used here, grow(min(3, D - depth)), is this project's.
+          Without it one oversized replacement throws away every point
+          mutation made in the same tree (mutate() reverts the whole tree).
+
+      NOT YET MEASURED on the held-out worlds (run_ablation.py, configs
+      "depthmut", "depthx", "depthops"); both default to off, so seeded runs
+      and the thesis results are unchanged.
 */
 
 
@@ -106,8 +140,15 @@ public:
         // Crossover points: uniform by default, or biased towards internal
         // nodes (Koza 1994 §4: 90% internal / 10% terminal).  Parent A's
         // point is drawn before parent B's, as before.
-        ExprNode* nodeA = locate(childA, pickCrossoverPoint(childA));
-        ExprNode* nodeB = locate(childB, pickCrossoverPoint(childB));
+        const int indexA = pickCrossoverPoint(childA);
+        // Depth-aware crossover (opt-in): parent B's point is drawn only
+        // among the nodes for which BOTH children respect the depth cap, so
+        // the revert below never fires.  -1 = no such node (cannot happen for
+        // parents within the cap, see pickFittingPoint) or option off.
+        int indexB = depthAwareCrossover_ ? pickFittingPoint(childA, indexA, childB) : -1;
+        if (indexB < 0) indexB = pickCrossoverPoint(childB);
+        ExprNode* nodeA = locate(childA, indexA);
+        ExprNode* nodeB = locate(childB, indexB);
         swap(*nodeA, *nodeB);
 
         // Enforce the size/depth caps by reverting to the parent.  This is the
@@ -138,7 +179,15 @@ public:
     //               (Previously the 90% branch did nothing at all, so an ADD
     //               could never become a SUB and the effective mutation rate
     //               on internal nodes was mutationRate × 0.10.)
-    ExprNode mutateNode(ExprNode node, double mutationRate) {
+    //
+    // `depth` is the depth of `node` in the whole tree (root = 0).  It is used
+    // only by depth-aware mutation (opt-in): the replacement subtree is then
+    // grown within the room that is left below the cap,
+    //     grow( min(3, maxTreeDepth - depth) ),
+    // so the mutated tree can never exceed the cap and mutate() never has to
+    // throw the whole mutation away.  Off (default) the subtree is grow(3)
+    // wherever the node is, exactly as before.
+    ExprNode mutateNode(ExprNode node, double mutationRate, int depth = 0) {
         if (randomReal() < mutationRate) {
             switch (node.nodeType) {
                 case NodeType::TERMINAL:
@@ -156,14 +205,18 @@ public:
                     node.children.clear();
                     return node;
                 default:
-                    if (randomReal() < 0.10)
-                        return builder_.grow(3);
+                    if (randomReal() < 0.10) {
+                        const int room = depthAwareMutation_
+                            ? std::max(0, std::min(3, maxTreeDepth_ - depth))
+                            : 3;
+                        return builder_.grow(room);
+                    }
                     node.nodeType = randomOperatorSameArity(node.nodeType);
                     break;
             }
         }
         for (auto& child : node.children)
-            child = mutateNode(move(child), mutationRate);
+            child = mutateNode(move(child), mutationRate, depth + 1);
         return node;
     }
 
@@ -194,6 +247,16 @@ public:
         internalCrossoverBias_ = std::max(0.0, std::min(1.0, p));
     }
 
+    /// @brief Depth-aware subtree mutation (default off).  The replacement
+    /// subtree is grown within the depth left below the cap instead of always
+    /// at depth 3.  See mutateNode() and the LITERATURE NOTES at the top.
+    void setDepthAwareMutation(bool on)  { depthAwareMutation_  = on; }
+
+    /// @brief Depth-aware crossover (default off).  The second crossover
+    /// point is drawn among the nodes for which both children respect the
+    /// depth cap.  See pickFittingPoint() and the LITERATURE NOTES at the top.
+    void setDepthAwareCrossover(bool on) { depthAwareCrossover_ = on; }
+
     void setTerminalCount(int n) { terminalCount_ = n; }
     void setMaxDepth(int d)      { maxTreeDepth_  = std::max(1, d); }
     #pragma endregion ----------------------------------------------------------
@@ -207,6 +270,8 @@ private:
     int          maxTreeDepth_;
     int          terminalCount_ = 1;
     double       internalCrossoverBias_ = 0.0;
+    bool         depthAwareMutation_  = false;
+    bool         depthAwareCrossover_ = false;
     #pragma endregion ----------------------------------------------------------
 
 
@@ -243,6 +308,89 @@ private:
         if (internal.empty()) return 0;            // a lone terminal: only the root
         const bool pickInternal = randomReal() < internalCrossoverBias_ || leaves.empty();
         const vector<int>& pool = pickInternal ? internal : leaves;
+        return pool[randomInt(0, static_cast<int>(pool.size()) - 1)];
+    }
+
+    /// @brief Depth (distance from the root) and height (depth of its own
+    /// subtree) of every node, in preorder.
+    struct NodeInfo {
+        int  depth;
+        int  height;
+        bool internal;
+    };
+
+    /// @brief Fills `out` in preorder; returns the height of `n`.
+    static int annotate(const ExprNode& n, int depth, vector<NodeInfo>& out) {
+        const size_t self = out.size();
+        out.push_back({depth, 0, !n.children.empty()});
+        int height = 0;
+        for (const auto& c : n.children)
+            height = std::max(height, 1 + annotate(c, depth + 1, out));
+        out[self].height = height;
+        return height;
+    }
+
+    /// @brief Depth-aware choice of parent B's crossover point, given parent
+    /// A's point `indexA`.  Returns a preorder index in `b`, or -1 if no node
+    /// fits (then the caller falls back to the ordinary draw).
+    ///
+    /// Swapping the subtree at u (in a) with the subtree at v (in b) gives
+    ///     depth(child A) = max( depth of a without u's subtree, d_a(u) + h_b(v) )
+    ///     depth(child B) = max( depth of b without v's subtree, d_b(v) + h_a(u) )
+    /// (d = depth of the node, h = height of its subtree).  The parents are
+    /// within the cap D, so the children are within it exactly when
+    ///     d_a(u) + h_b(v) <= D     and     d_b(v) + h_a(u) <= D.
+    /// v is drawn among the nodes of b that satisfy both.  Such a node always
+    /// exists when both parents respect the cap (Proposition 3,
+    /// thesis/chapters/method.tex): on the path from b's root to one of its
+    /// deepest leaves, take the node at depth max(0, depth(b) - D + d_a(u)).
+    ///
+    /// Distribution.  This is the ordinary draw of v conditioned on "both
+    /// children fit", i.e. what "draw v again until the children fit" would
+    /// return, without the loop: uniform over the fitting nodes when there is
+    /// no internal-node bias; with a bias p, the internal and the leaf pools
+    /// keep their weights p and 1 - p, each scaled by the fraction of its
+    /// nodes that fit.  [poli2008fieldguide §11.3.2, strategy "same parents,
+    /// new crossover points"; langdon2000sizefair for constraining the second
+    /// point by what the first one removed.]
+    int pickFittingPoint(const ExprNode& a, int indexA, const ExprNode& b) {
+        vector<NodeInfo> infoA, infoB;
+        annotate(a, 0, infoA);
+        annotate(b, 0, infoB);
+        if (indexA < 0 || indexA >= static_cast<int>(infoA.size())) return -1;
+        const int depthA  = infoA[indexA].depth;
+        const int heightA = infoA[indexA].height;
+
+        vector<int> fitInternal, fitLeaves;
+        int nInternal = 0, nLeaves = 0;
+        for (int v = 0; v < static_cast<int>(infoB.size()); ++v) {
+            const NodeInfo& nb = infoB[v];
+            (nb.internal ? nInternal : nLeaves) += 1;
+            if (depthA + nb.height <= maxTreeDepth_ && nb.depth + heightA <= maxTreeDepth_)
+                (nb.internal ? fitInternal : fitLeaves).push_back(v);
+        }
+        if (fitInternal.empty() && fitLeaves.empty()) return -1;
+
+        // Weight of each pool under the ordinary draw, restricted to fitting nodes.
+        double wInternal, wLeaves;
+        if (internalCrossoverBias_ <= 0.0) {            // uniform over all nodes
+            wInternal = static_cast<double>(fitInternal.size());
+            wLeaves   = static_cast<double>(fitLeaves.size());
+        } else {
+            // pickCrossoverPoint takes the internal pool with probability p,
+            // the leaf pool otherwise; a lone terminal has no internal pool.
+            const double p = (nInternal == 0) ? 0.0 : internalCrossoverBias_;
+            wInternal = (nInternal > 0) ? p * fitInternal.size() / nInternal : 0.0;
+            wLeaves   = (nLeaves   > 0) ? (1.0 - p) * fitLeaves.size() / nLeaves : 0.0;
+            if (wInternal + wLeaves <= 0.0) {           // e.g. p = 1 and only leaves fit
+                wInternal = static_cast<double>(fitInternal.size());
+                wLeaves   = static_cast<double>(fitLeaves.size());
+            }
+        }
+        const bool takeInternal =
+            !fitInternal.empty() &&
+            (fitLeaves.empty() || randomReal() * (wInternal + wLeaves) < wInternal);
+        const vector<int>& pool = takeInternal ? fitInternal : fitLeaves;
         return pool[randomInt(0, static_cast<int>(pool.size()) - 1)];
     }
 

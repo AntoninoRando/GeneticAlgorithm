@@ -644,6 +644,143 @@ class EarliestFreeTieBreak(unittest.TestCase):
             self.assertGreaterEqual(ind.fitness, -(ev.weightTime + ev.weightEnergy) - 1e-12)
 
 
+# ── depth-aware operators (Poli, Langdon & McPhee 2008, Sec. 11.3.2) ─────────
+def signature(n):
+    """Hashable structural identity of a tree."""
+    return (int(n.nodeType), n.terminalIndex, tuple(signature(c) for c in n.children))
+
+
+def signature_size(sig):
+    return 1 + sum(signature_size(c) for c in sig[2])
+
+
+class DepthAwareOperators(unittest.TestCase):
+    """By default an offspring that exceeds the depth cap is replaced by a copy
+    of its parent (Koza's implementation of the limit).  The Field Guide calls
+    that a serious problem and recommends choosing new points instead.  The two
+    options do so by construction.
+
+    These tests need no world: fitness is set by hand, as in the tournament and
+    terminal-weighting tests.
+    """
+
+    @staticmethod
+    def breed(seed, cap, crossover, mutation, generations=3, **options):
+        """Returns, per generation after the first, the previous-generation
+        trees and the offspring (as signatures)."""
+        gp = SchedulerGP([], [], seed=seed)
+        gp.initialize(populationSize=200, crossoverRate=crossover, mutationRate=mutation,
+                      elitismCount=0, maxDepth=cap, hoistRate=0.0, **options)
+        rounds = []
+        for g in range(generations):
+            pop = gp.getPopulation()
+            for i in range(len(pop)):
+                pop[i].fitness = float((i * 7919) % 13)      # arbitrary but fixed
+            parents = [signature(pop[i].tree) for i in range(len(pop))]
+            gp.solveNextGeneration()
+            pop = gp.getPopulation()
+            children = [signature(pop[i].tree) for i in range(len(pop))]
+            # Generation 0 is skipped: the initial trees are not simplified, so
+            # a returned parent copy would not compare equal to its parent.
+            if g >= 1:
+                rounds.append((parents, children))
+        return rounds
+
+    @classmethod
+    def copy_fraction(cls, cap, crossover, mutation, multi_node_only=False, **options):
+        """Mean fraction of offspring that already existed in the previous
+        generation, over 6 seeds."""
+        fractions = []
+        for seed in range(6):
+            for parents, children in cls.breed(seed, cap, crossover, mutation, **options):
+                known = set(parents)
+                if multi_node_only:
+                    children = [c for c in children if signature_size(c) > 1]
+                fractions.append(sum(c in known for c in children) / max(1, len(children)))
+        return sum(fractions) / len(fractions)
+
+    @staticmethod
+    def depths_and_heights(sig):
+        """List of (depth, height) for every node, in preorder."""
+        out = []
+
+        def walk(node, node_depth):
+            slot = len(out)
+            out.append(None)
+            height = 0
+            for child in node[2]:
+                height = max(height, 1 + walk(child, node_depth + 1))
+            out[slot] = (node_depth, height)
+            return height
+
+        walk(sig, 0)
+        return out
+
+    def test_off_by_default_and_same_as_explicit_false(self):
+        default = self.breed(3, 4, 0.8, 0.08)
+        explicit = self.breed(3, 4, 0.8, 0.08, depthAwareMutation=False, depthAwareCrossover=False)
+        self.assertEqual(default, explicit)
+
+    def test_options_change_the_offspring(self):
+        default = self.breed(3, 4, 0.8, 0.08)
+        self.assertNotEqual(default, self.breed(3, 4, 0.8, 0.08, depthAwareCrossover=True))
+        self.assertNotEqual(default, self.breed(3, 4, 0.8, 0.3, depthAwareMutation=True))
+
+    def test_same_seed_same_evolution(self):
+        options = dict(depthAwareMutation=True, depthAwareCrossover=True)
+        self.assertEqual(self.breed(5, 4, 0.8, 0.08, **options),
+                         self.breed(5, 4, 0.8, 0.08, **options))
+
+    def test_depth_cap_always_holds(self):
+        for cap in (1, 2, 3, 4, 6):
+            for extra in ({}, {"internalCrossoverBias": 0.9}, {"cloneRetries": 3},
+                          {"initialMaxDepth": 1}):
+                rounds = self.breed(2, cap, 0.8, 0.3, generations=4,
+                                    depthAwareMutation=True, depthAwareCrossover=True, **extra)
+                for _, children in rounds:
+                    for child in children:
+                        self.assertLessEqual(max(d for d, _ in self.depths_and_heights(child)), cap)
+
+    def test_a_fitting_second_point_always_exists(self):
+        # Proposition 3 (thesis, method chapter).  Swapping the subtree at u in
+        # a with the subtree at v in b keeps both children within the cap D iff
+        #     depth_a(u) + height_b(v) <= D   and   depth_b(v) + height_a(u) <= D.
+        # For ANY two trees within the cap and ANY u, at least one v qualifies.
+        # Checked exhaustively on the trees of a population at the cap.
+        cap = 4
+        gp = SchedulerGP([], [], seed=9)
+        gp.initialize(populationSize=40, crossoverRate=0.8, mutationRate=0.08, maxDepth=cap)
+        pop = gp.getPopulation()
+        trees = [self.depths_and_heights(signature(pop[i].tree)) for i in range(len(pop))]
+        self.assertTrue(any(max(d for d, _ in t) == cap for t in trees))   # some trees at the cap
+        for a in trees:
+            for depth_u, height_u in a:
+                for b in trees:
+                    self.assertTrue(any(depth_u + height_v <= cap and depth_v + height_u <= cap
+                                        for depth_v, height_v in b))
+
+    def test_depth_aware_crossover_returns_fewer_parent_copies(self):
+        # Crossover only.  By default a child over the cap becomes a copy of its
+        # parent; with the option that cannot happen.  The remaining copies are
+        # swaps of identical subtrees and swaps of two roots.
+        # Measured when written (cap 4): 0.39 by default, 0.24 with the option.
+        for cap in (4, 5):
+            default = self.copy_fraction(cap, 1.0, 0.0)
+            aware = self.copy_fraction(cap, 1.0, 0.0, depthAwareCrossover=True)
+            self.assertLess(aware, 0.8 * default)
+
+    def test_depth_aware_mutation_discards_fewer_mutations(self):
+        # Mutation only, per-node rate 1.0: every operator is swapped for a
+        # DIFFERENT one or replaced by a new subtree, so a multi-node offspring
+        # that already existed is (almost always) a mutation that was thrown
+        # away because its new subtree overflowed the cap.
+        # Measured when written (cap 3): 0.12 by default, 0.03 with the option.
+        for cap in (3, 5):
+            default = self.copy_fraction(cap, 0.0, 1.0, multi_node_only=True)
+            aware = self.copy_fraction(cap, 0.0, 1.0, multi_node_only=True, depthAwareMutation=True)
+            self.assertLess(aware, 0.6 * default)
+
+
 # ── GP options ───────────────────────────────────────────────────────────────
 @unittest.skipUnless(os.path.exists(WORLD0), "needs data/worlds")
 class GPOptions(unittest.TestCase):

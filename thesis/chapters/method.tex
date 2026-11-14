@@ -235,6 +235,88 @@ Every offspring satisfies $\text{depth}\le D_{\max}$ and
 $\text{size}\le 2^{D_{\max}+1}$; a child that violates a cap is replaced by a copy
 of its parent. Trees are algebraically simplified after mutation to remove redundancy.
 
+\subsection{Offspring that exceed the depth limit}
+\label{sec:depthaware}
+Replacing an oversized child by its parent is Koza's implementation of the depth
+limit. \citet[Section~11.3.2]{poli2008fieldguide} point out its drawback: parents
+that are likely to violate the limit are copied unaltered more often than the
+others, so the population fills with programs that nearly infringe the limit,
+which for a depth limit means bushy, almost full trees. Their remedy is not to
+return the parent: either keep the child with fitness $0$, or declare the
+operation failed and try again with new crossover or mutation points. Two
+optional operators apply the second remedy in closed form. They never build an
+invalid tree, so nothing has to be retried or discarded.
+
+\paragraph{Notation.} For a node $u$ of a tree $a$ let $\delta_a(u)$ be its depth
+(root: $0$) and $\eta_a(u)$ the height of the subtree rooted at $u$, so that
+$\operatorname{depth}(a)=\max_u\delta_a(u)$ and
+$\delta_a(u)+\eta_a(u)\le\operatorname{depth}(a)$. Let $D=D_{\max}$.
+
+\paragraph{Crossover.} Swapping the subtree at $u$ in $a$ with the subtree at $v$
+in $b$ gives children of depth
+$\max\bigl(\operatorname{depth}(a\setminus u),\,\delta_a(u)+\eta_b(v)\bigr)$ and
+$\max\bigl(\operatorname{depth}(b\setminus v),\,\delta_b(v)+\eta_a(u)\bigr)$. For
+parents within the limit the children are within it if and only if
+\begin{equation}
+  \delta_a(u)+\eta_b(v)\le D\qquad\text{and}\qquad\delta_b(v)+\eta_a(u)\le D .
+  \label{eq:fit}
+\end{equation}
+In the default operator $u$ and $v$ are drawn independently and a child that
+violates its inequality is replaced by its parent. For two full binary trees of
+depth $D$ and uniform draws, $\eta_b(v)=D-\delta_b(v)$, so the first child is
+lost exactly when $\delta_a(u)>\delta_b(v)$. With $p_d=2^d/(2^{D+1}-1)$ the
+probability that a node has depth $d$, this happens with probability
+$\tfrac12\bigl(1-\sum_dp_d^2\bigr)$, which is $0.32$ for $D=4$ and tends to $1/3$:
+about one child in three is a copy of its parent.
+
+\emph{Depth-aware crossover} draws $u$ as before and then draws $v$ from the same
+distribution restricted to the nodes of $b$ that satisfy \eqref{eq:fit}. This is
+the distribution of ``draw $v$ again until both children fit''. Constraining the
+second point by what the first one removes is also the principle of size-fair
+crossover \citep{langdon2000sizefair}, which uses a size criterion where we use
+depth.
+
+\paragraph{Proposition 3 (a fitting point exists).} If
+$\operatorname{depth}(a)\le D$ and $\operatorname{depth}(b)\le D$, then for every
+node $u$ of $a$ some node $v$ of $b$ satisfies \eqref{eq:fit}.
+
+\emph{Proof.} Let $L=\operatorname{depth}(b)$ and take a path from the root of $b$
+to a leaf of depth $L$. The node of depth $d$ on this path has height $L-d$.
+Choose $d^\star=\max\bigl(0,\,L-D+\delta_a(u)\bigr)$. Then $0\le d^\star\le L$,
+because $\delta_a(u)\le D$, so the node $v$ exists. First inequality:
+$\delta_a(u)+L-d^\star\le D$ by the choice of $d^\star$ (if $d^\star=0$ then
+$L-D+\delta_a(u)\le0$). Second inequality: $d^\star\le\delta_a(u)$ because
+$L\le D$, hence
+$d^\star+\eta_a(u)\le\delta_a(u)+\eta_a(u)\le\operatorname{depth}(a)\le D$.
+\hfill$\square$
+
+Depth-aware crossover therefore always succeeds, and the replacement by the
+parent can no longer occur. (A child can still equal a parent, for instance when
+both roots are selected; this is unrelated to the limit.)
+
+\paragraph{Mutation.} Subtree mutation at a node of depth $\delta$ inserts a
+\emph{grow} tree of nominal depth $3$, whose actual depth $h$ is $1$, $2$ or $3$.
+The tree exceeds the limit when $\delta+h>D$, and the default operator then
+discards the \emph{whole} mutated tree, including every point mutation made in
+the same pass. From the probabilities of the \emph{grow} procedure ($70\%$
+binary operators, a terminal with probability $0.55$ at nominal depths $1$ and
+$2$), $\Pr[h\ge2]=0.62$ and $\Pr[h=3]=0.42$. With $D=4$, the setting of
+Chapter~\ref{ch:exp}, a subtree mutation at depth $3$ is thus discarded $62\%$ of
+the time, and one at depth $2$, $42\%$ of the time.
+
+\emph{Depth-aware mutation} inserts a \emph{grow} tree of nominal depth
+$\min(3,D-\delta)$ instead. Its depth is at most $D-\delta$, so the limit holds by
+construction and no mutation is discarded. Bounding the depth or the size of the
+inserted material is an established way to control growth in mutation
+\citep[Section~11.3.2]{poli2008fieldguide}; the bound $\min(3,D-\delta)$ is a
+choice of this work.
+
+\paragraph{Status.} Both operators are off by default and all experiments of
+Chapter~\ref{ch:exp} use the default ones. Their effect on the test metrics has
+not been measured. They remove one source of parent copies. The implementation
+also has a clone-retry option, which re-mutates an offspring that is identical to
+a parent; it removes copies after the fact, so the two are expected to overlap.
+
 \section{Changing Worlds and Convergence}
 \label{sec:worlds}
 The population is evaluated on a snapshot of one world. In \texttt{main.py}, if the best fitness

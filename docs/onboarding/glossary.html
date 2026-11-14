@@ -32,6 +32,7 @@
 <dt id="decoder">Decoder (greedy)</dt><dd>The fixed procedure that turns a tree into a schedule by repeatedly committing the feasible (job, satellite) pair with the highest score. <span class="see"><a href="decoder.html">Decoder &amp; fitness</a></span></dd>
 <dt id="depth">Depth</dt><dd>Longest root-to-leaf path in a tree, counted in edges. A single terminal has depth 0.</dd>
 <dt id="diversity">Diversity (structural)</dt><dd>Share of distinct trees in the population: 1.0 means all different, \(1/N\) means all clones.</dd>
+<dt id="depth-aware">Depth-aware operators</dt><dd>Opt-in crossover and mutation that choose where to cut and how much to grow so that the result always fits under the depth cap. The default operators build the tree first and, if it is too deep, return a copy of the parent. See <a href="evolution.html#depth-aware-crossover">one generation</a>.</dd>
 <dt id="elitism">Elitism</dt><dd>Copying the best individuals (2 here) unchanged into the next generation.</dd>
 <dt id="fitness">Fitness</dt><dd>One number per individual, higher is better: \(0.6\,C - 0.25\,\hat R - 0.15\,\hat{\mathcal E}\). Only comparable within one population. <span class="see"><a href="decoder.html#fitness">Details</a></span></dd>
 <dt id="full">Full method</dt><dd>Random tree construction where every leaf is at the target depth.</dd>
@@ -40,6 +41,7 @@
 <dt id="gp">Genetic programming (GP)</dt><dd>Evolutionary search over programs, here formulas stored as trees (Koza).</dd>
 <dt id="gphh">GPHH</dt><dd>Genetic programming hyper-heuristic: GP used to evolve heuristics (here, scheduling rules).</dd>
 <dt id="grow">Grow method</dt><dd>Random tree construction where branches may stop early. Biased here toward operators near the root.</dd>
+<dt id="height">Height (of a node)</dt><dd>The depth of the subtree below a node: 0 for a leaf. A node's depth plus its height is at most the depth of the whole tree.</dd>
 <dt id="hoist">Hoist mutation</dt><dd>Replacing a tree with one of its own subtrees. Shrinks trees.</dd>
 <dt id="hyper-heuristic">Hyper-heuristic</dt><dd>A method that searches over heuristics instead of over solutions.</dd>
 <dt id="individual">Individual</dt><dd>One candidate solution: here a <code>GPIndividual</code> with a tree, a fitness and an id.</dd>

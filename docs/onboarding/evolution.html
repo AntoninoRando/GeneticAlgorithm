@@ -71,6 +71,13 @@
 <div class="callout why"><span class="callout-title">Literature</span>
 <p>Subtree crossover is the standard GP operator (<a href="references.html#koza1994gp">koza1994gp</a> §3; <a href="references.html#mtgp_multicloud">mtgp_multicloud</a> Fig. 3a). Reverting an oversized child to its parent plays the role of Koza's depth limit on crossover offspring. Koza chooses an internal (operator) node as crossover point 90% of the time, because in a binary tree about half the nodes are leaves, and a leaf-for-leaf swap is just a point mutation. That bias is the opt-in <code>--internal-crossover-bias 0.9</code>.</p></div>
 
+<h3 id="depth-aware-crossover">What is wrong with step 3, and the opt-in fix</h3>
+<p>Step 3 has a cost. Every child that is too deep becomes an <strong>exact copy of a parent</strong>, so the crossover did nothing for it. And it happens most to deep parents, so deep trees get copied more often than shallow ones. The standard GP textbook calls this a serious problem: the population fills up with trees that almost touch the limit (<a href="references.html#poli2008fieldguide">poli2008fieldguide</a> §11.3.2). Its advice is to pick new points instead of returning the parent.</p>
+<p>How often does it happen? Give every node two numbers: its <strong>depth</strong> \(\delta\) (steps from the root) and its <strong>height</strong> \(\eta\) (depth of the subtree below it). Moving the subtree at \(v\) into the place of \(u\) creates a branch of length \(\delta(u) + \eta(v)\). With cap \(D\), both children fit exactly when</p>
+$$\delta_a(u) + \eta_b(v) \le D \qquad\text{and}\qquad \delta_b(v) + \eta_a(u) \le D .$$
+<p>For two full binary trees at cap 4 and uniform points, a child fails this test 32% of the time: about one child in three is a parent copy.</p>
+<p><code>--depth-aware-crossover</code> changes one thing: after choosing \(u\), it chooses \(v\) <em>only among the nodes that pass the test</em>. Such a node always exists (<a href="theory.html#depth-aware">proof</a>), so step 3 never fires. It is the same as "redraw \(v\) until the children fit", without the loop. Choosing the second point according to what the first one removed is also how size-fair crossover works (<a href="references.html#langdon2000sizefair">langdon2000sizefair</a>).</p>
+
 <h2 id="mutation">5. Mutation and simplification</h2>
 <p><code>TreeOperators::mutate(tree, mutationRate)</code> walks the tree. At each node, with probability <code>mutationRate</code> (0.08):</p>
 <div class="table-wrap"><table>
@@ -83,6 +90,9 @@
 $$\text{NEG}(\text{NEG}(x)) \to x \quad \text{ABS}(\text{ABS}(x)) \to \text{ABS}(x) \quad \text{ABS}(\text{NEG}(x)) \to \text{ABS}(x)$$
 $$\text{MAX}(x,x) \to x \quad \text{MIN}(x,x) \to x \quad \text{SUB}(x,x) \to 0$$
 <p>Two tempting rules were deliberately <strong>removed</strong>: \(\text{DIV}(x,x) \to 1\) is wrong when \(x \approx 0\), because protected division returns 0. \(\text{INV}(\text{INV}(x)) \to x\) is wrong when \(|x| \le 10^{-9}\) or \(|x| \ge 10^{9}\). If the result still breaks a cap, the mutation is undone.</p>
+<h3 id="depth-aware-mutation">When a mutation is undone, and the opt-in fix</h3>
+<p>Only the 10% "replace the subtree" case can break the cap: <code>grow(3)</code> produces a subtree 1, 2 or 3 levels deep wherever the node is. When that overflows, <strong>the whole tree is restored</strong>, and every other change made in the same walk is lost with it. With cap 4 this is frequent: a replacement at depth 3 overflows 62% of the time, and one at depth 2, 42% of the time (<a href="theory.html#depth-aware">where the numbers come from</a>).</p>
+<p><code>--depth-aware-mutation</code> grows the new subtree inside the room that is left: <code>grow(min(3, D − depth of the node))</code>. The result always fits, so nothing is ever undone. Near the cap the new subtree is small, down to a single terminal at depth \(D\).</p>
 <div class="callout"><span class="callout-title">Rates are per node, not per individual</span>
 <p>In the papers, crossover, mutation and reproduction are <em>alternatives</em> chosen once per offspring (for example 0.80 / 0.15 / 0.05). Here crossover is followed by mutation, so an offspring can get both. A tree with \(n\) nodes receives on average about \(0.08\,n\) point mutations (a bit fewer, because subtree replacement stops the walk). For a 15-node tree that is about 1.2.</p></div>
 
@@ -107,6 +117,8 @@ $$\text{MAX}(x,x) \to x \quad \text{MIN}(x,x) \to x \quad \text{SUB}(x,x) \to 0$
 <tr><td><code>excludedTerminals</code></td><td>Never draw the listed terminals (fed by <code>--prune-constant-terminals</code>).</td><td>Hand-picked terminal sets in all papers</td></tr>
 <tr><td><code>trackBusyUntil</code> (on the evaluator)</td><td>Make <code>sat.cpuBusyUntil</code> report when the satellite is next free.</td><td>NT/CL in zhang2025mtgper; AAT/IAT in mtgp_multicloud</td></tr>
 <tr><td><code>worlds_per_eval</code> (in <code>main.py</code>)</td><td>Score on K worlds per generation, pooled.</td><td>dtgpam §V-A; zhang2025mtgper §4.1</td></tr>
+<tr><td><code>depthAwareCrossover</code></td><td>Draw the second crossover point among the nodes that keep both children within the depth cap, so a child is never replaced by a copy of its parent. Not yet measured.</td><td>poli2008fieldguide §11.3.2; langdon2000sizefair</td></tr>
+<tr><td><code>depthAwareMutation</code></td><td>Grow the replacement subtree within the depth left below the cap, so a mutation is never undone. Not yet measured.</td><td>poli2008fieldguide §11.3.2</td></tr>
 <tr><td><code>earliestFreeTieBreak</code> (on the evaluator)</td><td>Decoder tie-break: equally scored pairs go to the satellite that is free earliest instead of the lowest index. Lowers response time for job-only rules; can lower completion under tight batteries. Not yet measured.</td><td>graham1966bounds; topcuoglu2002heft; braun2001comparison</td></tr>
 <tr><td><code>fixedBounds</code> (on the evaluator)</td><td>Normalise response time and energy by per-world bounds instead of the population's min and max, and charge unscheduled jobs the worst response. Not yet measured.</td><td>marler2004survey; icdcs_sc; shabtay2013rejection</td></tr>
 </table></div>

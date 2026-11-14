@@ -156,6 +156,8 @@ seed : int, optional
                py::arg("cloneRetries") = 0,
                py::arg("terminalWeighting") = false,
                py::arg("excludedTerminals") = std::vector<int>{},
+               py::arg("depthAwareMutation") = false,
+               py::arg("depthAwareCrossover") = false,
                R"doc(
 Initialize the GP population with parameters.
 
@@ -180,6 +182,15 @@ cloneRetries : int
 terminalWeighting : bool
     Adaptive terminal weighting for mutation (Yang et al. 2025): terminal
     probabilities are the maximum-likelihood fit to the best individuals.
+depthAwareMutation : bool
+    Subtree mutation grows the replacement within the depth left below the cap
+    (``min(3, maxDepth - depth of the node)``) instead of always at depth 3,
+    so a mutation is never thrown away for exceeding the cap.
+depthAwareCrossover : bool
+    The second crossover point is drawn among the nodes for which both children
+    respect the depth cap, so crossover never returns a copy of a parent.
+    (Poli, Langdon & McPhee 2008, Sec. 11.3.2: do not return the parent when an
+    offspring violates the limit; choose new points instead.)
 excludedTerminals : list[int]
     Terminal registry indices that are never drawn, e.g. the constant
     terminals returned by :py:meth:`FitnessEvaluator.constant_terminals`.

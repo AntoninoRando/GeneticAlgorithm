@@ -220,6 +220,14 @@ public:
     /// @param terminalWeighting  Adaptive terminal weighting for mutation
     ///        (Yang et al. 2025, dtgpam §IV-D / yang2025thesis §3.2.4).
     ///        Default false.
+    /// @param depthAwareMutation  Grow the replacement subtree of subtree
+    ///        mutation within the depth left below the cap, so that a
+    ///        mutation is never discarded for exceeding it.  Default false.
+    /// @param depthAwareCrossover  Draw the second crossover point among the
+    ///        nodes for which both children respect the depth cap, so that
+    ///        crossover never falls back to a copy of a parent.  Default
+    ///        false.  Both follow the remedy of poli2008fieldguide §11.3.2
+    ///        for depth limits; see the LITERATURE NOTES of tree_operators.h.
     /// @param excludedTerminals  Registry indices that are never drawn (for
     ///        example the constant terminals reported by
     ///        FitnessEvaluator::constantTerminals).  Empty = use them all.
@@ -234,7 +242,9 @@ public:
                     double internalCrossoverBias = 0.0,
                     int cloneRetries = 0,
                     bool terminalWeighting = false,
-                    vector<int> excludedTerminals = {})
+                    vector<int> excludedTerminals = {},
+                    bool depthAwareMutation = false,
+                    bool depthAwareCrossover = false)
     {
         this->populationSize = populationSize;
         this->crossoverRate  = crossoverRate;
@@ -248,6 +258,10 @@ public:
         this->internalCrossoverBias_ = std::max(0.0, std::min(1.0, internalCrossoverBias));
         ops_.setMaxDepth(this->maxDepth_);
         ops_.setInternalCrossoverBias(this->internalCrossoverBias_);
+        this->depthAwareMutation_  = depthAwareMutation;
+        this->depthAwareCrossover_ = depthAwareCrossover;
+        ops_.setDepthAwareMutation(depthAwareMutation);
+        ops_.setDepthAwareCrossover(depthAwareCrossover);
 
         // Active terminal set = registry minus the excluded indices.
         const int nTerm = static_cast<int>(registry_.size());
@@ -351,6 +365,8 @@ public:
             TreeOperators pairOps(pairRng, pairBuilder, maxDepth_);
             pairOps.setTerminalCount(static_cast<int>(registry_.size()));
             pairOps.setInternalCrossoverBias(internalCrossoverBias_);
+            pairOps.setDepthAwareMutation(depthAwareMutation_);
+            pairOps.setDepthAwareCrossover(depthAwareCrossover_);
             // Terminal restrictions apply to everything this pair builds or
             // mutates; both pointers are read-only here (written once, before
             // the parallel region), so sharing them is race-free.
@@ -570,6 +586,9 @@ private:
     double internalCrossoverBias_ = 0.0;
     /// @brief Adaptive terminal weighting on/off.
     bool   terminalWeighting_ = false;
+    /// @brief Depth-aware subtree mutation / crossover (see tree_operators.h).
+    bool   depthAwareMutation_  = false;
+    bool   depthAwareCrossover_ = false;
     /// @brief Terminals that may be drawn; empty = the whole registry.
     vector<int>    activeTerminals_;
     /// @brief Cumulative distribution over the active terminals, rebuilt once

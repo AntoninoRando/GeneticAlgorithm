@@ -37,6 +37,9 @@
 <h3 id="ramped">Ramped half-and-half couples method and depth</h3>
 <p>In <code>TreeBuilder::rampedHalfAndHalf</code> the depth is <code>minDepth + i mod m</code> (with \(m\) depths in the ramp) and the method is chosen by the parity of \(i\). When \(m\) is even (cap 7 gives depths 2–7, \(m = 6\)), the two are locked together: <code>grow</code> only ever gets depths 2, 4, 6 and <code>full</code> only 3, 5, 7. Koza's method uses both at every depth (<a href="references.html#koza1994gp">koza1994gp</a> §4). It does not happen with cap 4 (\(m = 3\)), the setting of the thesis experiments, but it does with the CLI default of 7. A fix (for example choosing the method from \(\lfloor i/m \rfloor\)) would change seeded runs at cap 7.</p>
 
+<h3 id="parent-copies">At the depth cap, crossover and mutation often do nothing</h3>
+<p>A child that exceeds the cap is replaced by a copy of its parent, and a mutated tree that exceeds it is restored whole, losing every other change of that mutation. With the thesis cap of 4 this is common: about one crossover child in three for two full trees, and 62% of subtree replacements at depth 3 (<a href="theory.html#depth-aware">derivation</a>). The GP textbook names this as a known flaw of rejection-based depth limits (<a href="references.html#poli2008fieldguide">poli2008fieldguide</a> §11.3.2). It is one source of the parent copies that <code>--clone-retries</code> was added to fight. <strong>Opt-in fix:</strong> <code>--depth-aware-crossover</code> and <code>--depth-aware-mutation</code> never build an oversized tree (<a href="evolution.html#depth-aware-crossover">how</a>). Both are off by default and not yet measured on the test worlds.</p>
+
 <h3 id="hoist-strength">Hoist is stronger than it looks</h3>
 <p>More than half of all hoists yield a one-node tree (<a href="theory.html#bloat">theory §6</a>). Keep the hoist rate at or below 0.05, or restrict hoist to internal nodes.</p>
 

@@ -28,6 +28,10 @@ Where each option comes from (see include/scheduler/*.h for section numbers):
   fixed          fixed-bound fitness: cost terms divided by per-world bounds and
                  unscheduled jobs charged the worst response (Marler & Arora
                  2004; Shabtay et al. 2013; same normalisation as icdcs_sc)
+  depthmut       subtree mutation grows the replacement within the depth left
+                 below the cap (Poli, Langdon & McPhee 2008, Sec. 11.3.2)
+  depthx         second crossover point drawn among the nodes that keep both
+                 children within the cap (same source; Langdon 2000)
   tiebreak       decoder tie-break: equally scored pairs go to the satellite
                  that is free earliest (list scheduling, Graham 1966; earliest
                  finish time, Topcuoglu et al. 2002, Braun et al. 2001).  The
@@ -80,6 +84,15 @@ CONFIGS = {
     # the decoder, so the evolved rule is trained AND scored with it; the
     # hand-written baselines of run_experiments.py are scored with the default
     # tie-break unless they are re-run the same way.
+    # Depth-aware operators (added 2026-11-14): an offspring that would exceed
+    # the depth cap is avoided by construction instead of being replaced by a
+    # copy of its parent.  "clones" is the natural comparison: both attack the
+    # parent copies, from different sides.
+    "depthmut":    dict(depthAwareMutation=True),
+    "depthx":      dict(depthAwareCrossover=True),
+    "depthops":    dict(depthAwareMutation=True, depthAwareCrossover=True),
+    "depthops+clones+worlds3": dict(depthAwareMutation=True, depthAwareCrossover=True,
+                                    cloneRetries=3, worldsPerEval=3),
     "tiebreak":    dict(earliestFreeTieBreak=True),
     "tiebreak+fixed+clones+worlds3": dict(earliestFreeTieBreak=True, fixedBounds=True,
                                           cloneRetries=3, worldsPerEval=3),

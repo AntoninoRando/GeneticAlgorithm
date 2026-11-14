@@ -255,7 +255,7 @@ Contestualizzare confi.json5 con evaluator.py del configuratore
 
 Every choice in `include/scheduler/*.h` carries a *LITERATURE NOTES* comment that
 names the paper and section it comes from (bib keys of `thesis/references.bib`;
-per-paper summaries in `thesis/literature_notes.md`). Ten refinements are
+per-paper summaries in `thesis/literature_notes.md`). Twelve refinements are
 available as opt-in flags; **with none of them the algorithm is bit-for-bit the
 previous one** (same seed, same output).
 
@@ -265,6 +265,8 @@ previous one** (same seed, same output).
 | `--initial-max-depth D` | initial trees shallower than the cap, so crossover can grow them | Sun, Yang, Zhang & Yang, Koza |
 | `--internal-crossover-bias P` | prefer operator nodes as crossover points | Koza 1994, Sec. 4 (0.9) |
 | `--clone-retries N` | re-mutate offspring identical to a parent or an elite | Zhang & Yang 2025, Sec. 3.2.1 (structural proxy of the repetition test) |
+| `--depth-aware-crossover` | draw the second crossover point among the nodes that keep both children within the depth cap, so a child is never replaced by a copy of its parent (not yet measured on the test worlds) | Poli, Langdon & McPhee 2008, Sec. 11.3.2; Langdon 2000 |
+| `--depth-aware-mutation` | grow the replacement subtree of subtree mutation within the depth left below the cap, so a mutation is never undone (not yet measured on the test worlds) | Poli, Langdon & McPhee 2008, Sec. 11.3.2 |
 | `--terminal-weighting` | learn terminal probabilities for mutation by maximum likelihood (water filling) | Yang et al. 2025, Sec. IV-D |
 | `--track-busy-until` | make `sat.cpuBusyUntil` a live "free at" terminal | Zhang & Yang 2025 (NT, CL), Sun 2024 (AAT, IAT) |
 | `--prune-constant-terminals` | never draw terminals that are constant in the data | registry notes (4 of 18 terminals are always 0) |

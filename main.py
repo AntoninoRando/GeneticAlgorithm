@@ -25,6 +25,8 @@ class GAConfig(TypedDict):
     initial_max_depth: int
     internal_crossover_bias: float
     clone_retries: int
+    depth_aware_mutation: bool
+    depth_aware_crossover: bool
     terminal_weighting: bool
     track_busy_until: bool
     fixed_bounds: bool
@@ -60,6 +62,8 @@ def default_config() -> GAConfig:
         initial_max_depth=-1,
         internal_crossover_bias=0.0,
         clone_retries=0,
+        depth_aware_mutation=False,
+        depth_aware_crossover=False,
         terminal_weighting=False,
         track_busy_until=False,
         fixed_bounds=False,
@@ -123,6 +127,14 @@ parser.add_argument("--internal-crossover-bias", type=float,
 parser.add_argument("--clone-retries", type=int,
                     help="Re-mutation attempts for an offspring identical to a parent or an elite "
                          "(structural proxy of the repetition test in Zhang & Yang 2025). 0 = off.")
+parser.add_argument("--depth-aware-mutation", action=argparse.BooleanOptionalAction,
+                    help="Subtree mutation grows the replacement within the depth left below the cap "
+                         "instead of always at depth 3, so a mutation is never discarded for exceeding "
+                         "--max-depth (Poli, Langdon & McPhee 2008, Sec. 11.3.2).")
+parser.add_argument("--depth-aware-crossover", action=argparse.BooleanOptionalAction,
+                    help="Draw the second crossover point among the nodes for which both children "
+                         "respect --max-depth, so crossover never falls back to a copy of a parent "
+                         "(Poli, Langdon & McPhee 2008, Sec. 11.3.2; Langdon 2000).")
 parser.add_argument("--terminal-weighting", action=argparse.BooleanOptionalAction,
                     help="Adaptive terminal weighting for mutation: terminal probabilities follow the "
                          "maximum-likelihood fit to the best individuals (Yang et al. 2025, Sec. IV-D).")
@@ -258,6 +270,8 @@ def run_genetic_algorithm(config: GAConfig):
     initial_max_depth  = config["initial_max_depth"]
     internal_crossover_bias = config["internal_crossover_bias"]
     clone_retries      = config["clone_retries"]
+    depth_aware_mutation  = config["depth_aware_mutation"]
+    depth_aware_crossover = config["depth_aware_crossover"]
     terminal_weighting = config["terminal_weighting"]
     track_busy_until   = config["track_busy_until"]
     fixed_bounds       = config["fixed_bounds"]
@@ -416,6 +430,8 @@ def run_genetic_algorithm(config: GAConfig):
     if initial_max_depth >= 0:         gp_options["initialMaxDepth"] = initial_max_depth
     if internal_crossover_bias > 0:    gp_options["internalCrossoverBias"] = internal_crossover_bias
     if clone_retries > 0:              gp_options["cloneRetries"] = clone_retries
+    if depth_aware_mutation:           gp_options["depthAwareMutation"] = True
+    if depth_aware_crossover:          gp_options["depthAwareCrossover"] = True
     if terminal_weighting:             gp_options["terminalWeighting"] = True
     if excluded_terminals:             gp_options["excludedTerminals"] = excluded_terminals
 
