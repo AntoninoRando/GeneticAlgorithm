@@ -20,9 +20,42 @@
 
 namespace py = pybind11;
 
+// ── Build information ─────────────────────────────────────────────────────────
+// CMakeLists.txt passes the configuration name (RelWithDebInfo, Debug, ...).
+// A build made without CMake reports "unknown".
+#ifndef SCHEDULER_BUILD_TYPE
+#define SCHEDULER_BUILD_TYPE "unknown"
+#endif
+
+// Was this translation unit compiled with optimisation?  GCC and Clang define
+// __OPTIMIZE__ at -O1 and above; MSVC defines _DEBUG for its debug runtime.
+#if defined(__OPTIMIZE__) || (defined(_MSC_VER) && !defined(_DEBUG))
+static constexpr bool kSchedulerOptimized = true;
+#else
+static constexpr bool kSchedulerOptimized = false;
+#endif
+
 PYBIND11_MAKE_OPAQUE(std::vector<GPIndividual>);
 PYBIND11_MODULE(scheduler, m) {
     m.doc() = "Python library to create satellites and tasks and solve the scheduling problem with a genetic programming algorithm.";
+
+    // `scheduler.build_type` / `scheduler.optimized` let a script (and the
+    // tests) check which build they are running.  An unoptimised module is
+    // many times slower, and nothing else would tell: results are still
+    // produced, just far later.  So importing one raises a RuntimeWarning,
+    // once, in every script, not only in main.py.
+    m.attr("build_type") = SCHEDULER_BUILD_TYPE;
+    m.attr("optimized")  = kSchedulerOptimized;
+    if (!kSchedulerOptimized) {
+        if (PyErr_WarnEx(PyExc_RuntimeWarning,
+                "the 'scheduler' module was built WITHOUT optimisation (build type: "
+                SCHEDULER_BUILD_TYPE "). It is meant for debugging and runs many times "
+                "slower. For experiments rebuild with: cmake -S . -B build "
+                "-DCMAKE_BUILD_TYPE=RelWithDebInfo && cmake --build build",
+                1) != 0) {
+            throw py::error_already_set();   // warnings are configured as errors
+        }
+    }
 
     // Inside PYBIND11_MODULE, before the SchedulerGP binding:
     py::bind_vector<std::vector<GPIndividual>>(m, "Population");

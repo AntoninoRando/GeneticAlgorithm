@@ -22,13 +22,13 @@ How to work on this repo (recommended workflow for an AI)
 Build & run commands
 - Build the Python extension (from repo root). CMake writes `scheduler*.so` straight into the repo root, so there is nothing to copy:
 ```
-cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug -DPYTHON_EXECUTABLE=$(which python3)
+cmake -S . -B build -DCMAKE_BUILD_TYPE=RelWithDebInfo -DPYTHON_EXECUTABLE=$(which python3)
 cmake --build build --target scheduler
 ```
-  `CMakeLists.txt` adds `-O3` whatever the build type; `Debug` only adds symbols.
+  `RelWithDebInfo` (optimised, with symbols) is the build for every experiment and the default when no type is given. `Debug` is a real unoptimised build for gdb, many times slower: never benchmark or run experiments with it. `import scheduler` raises a `RuntimeWarning` for an unoptimised module, and `scheduler.build_type` / `scheduler.optimized` report which one is loaded. Always pass the build type explicitly: `build/` remembers the last one.
 - The compiled module is **not** in the repository (`.gitignore`): it must be built on each machine and rebuilt after every change to `bindings.cpp` or `include/scheduler`.
 - There is no CLI target; the only CMake target is `scheduler`.
-- Short helper: the VS Code tasks `Build scheduler module (Debug)` and `Run tests`, or `scripts/build.sh`.
+- Short helper: the VS Code tasks `Build scheduler module` and `Run tests`, or `scripts/build.sh`. For a debugger build: the task `Build scheduler module (Debug, unoptimised)` or `scripts/build-debug.sh`, then rebuild the optimised module afterwards.
 - Run a Python simulation example:
 ```
 python3 main.py --no-start-prompt --generations 5

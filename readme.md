@@ -77,11 +77,11 @@ sudo apt install python3-pybind11
 From the project root:
 
 ```shell
-cmake -S . -B build -DPYTHON_EXECUTABLE=$(which python3)
+cmake -S . -B build -DCMAKE_BUILD_TYPE=RelWithDebInfo -DPYTHON_EXECUTABLE=$(which python3)
 cmake --build build --target scheduler
 ```
 
-or simply `scripts/build.sh`.
+or simply `scripts/build.sh`. `RelWithDebInfo` means optimised (`-O3`) with debug symbols; it is also what you get if you give no build type. Use it for every experiment.
 
 CMake writes the module (`scheduler.cpython-<version>-<arch>-linux-gnu.so`) directly into the project root, where Python finds it: there is nothing to copy. The module is **not stored in the repository**. It is specific to one Python version and CPU, and it goes stale whenever `bindings.cpp` or a header changes, so build it on each machine and rebuild after every C++ change.
 
@@ -91,7 +91,23 @@ CMake writes the module (`scheduler.cpython-<version>-<arch>-linux-gnu.so`) dire
 scripts/build-debug.sh        # same as: cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug ... && cmake --build build
 ```
 
-`CMakeLists.txt` adds `-O3` whatever the build type, so this gives optimised code with debug symbols. `scripts/debug_cpp.sh` builds this way and starts `main.py` under gdb.
+This is a real debug build: no optimisation (`-O0 -g`), assertions on. Every variable is visible in gdb, but evolution runs many times slower, so **never use it for experiments or timings**. `scripts/debug_cpp.sh` builds this way and starts `main.py` under gdb. The debug module replaces the optimised one in the project root; run `scripts/build.sh` when you are done.
+
+Three safeguards against running a debug build by accident:
+
+- CMake prints a warning when it configures `Debug`;
+- `import scheduler` raises a `RuntimeWarning` if the module is unoptimised;
+- `scheduler.build_type` and `scheduler.optimized` tell a script which build it has loaded.
+
+`build/` remembers the build type of its last configuration, so pass `-DCMAKE_BUILD_TYPE=...` explicitly (the scripts do).
+
+| Build type | Flags (GCC/Clang) | Use |
+|---|---|---|
+| `RelWithDebInfo` (default) | `-O3 -funroll-loops -g`, `NDEBUG` | experiments, everyday work |
+| `Release`, `MinSizeRel` | `-O3 -funroll-loops`, `NDEBUG`; pybind11 strips symbols and enables LTO | distribution |
+| `Debug` | `-O0 -g`, assertions on | debugger only |
+
+On MSVC the GCC flags are skipped and CMake's defaults apply (`/O2`); a Windows build has not been tested.
 
 ### Tests
 

@@ -103,6 +103,21 @@ def best_tree_terminals(gp):
     return sorted(terminals_in(best.tree))
 
 
+# ── build information ───────────────────────────────────────────────────────
+class BuildInfo(unittest.TestCase):
+    def test_module_reports_how_it_was_built(self):
+        # CMakeLists.txt passes the configuration name; bindings.cpp derives
+        # `optimized` from the compiler.  The two must agree, because an
+        # unoptimised module is many times slower and nothing else shows it.
+        import scheduler
+        self.assertIsInstance(scheduler.build_type, str)
+        self.assertIsInstance(scheduler.optimized, bool)
+        if scheduler.build_type == "Debug":
+            self.assertFalse(scheduler.optimized)
+        elif scheduler.build_type in ("Release", "RelWithDebInfo", "MinSizeRel"):
+            self.assertTrue(scheduler.optimized)
+
+
 # ── terminal weighting (Yang et al. 2025, Sec. IV-D; thesis Sec. 3.2.4) ──────
 class TerminalWeightSolver(unittest.TestCase):
     def test_thesis_worked_example(self):

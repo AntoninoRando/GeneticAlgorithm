@@ -2,17 +2,30 @@
   "version": "2.0.0",
   "tasks": [
     {
-      "label": "Build scheduler module (Debug)",
+      "label": "Build scheduler module",
+      "detail": "Optimised, with debug symbols (RelWithDebInfo). Use this for experiments.",
+      "type": "shell",
+      "command": "bash",
+      "args": [
+        "-lc",
+        "cmake -S . -B build -DCMAKE_BUILD_TYPE=RelWithDebInfo -DPYTHON_EXECUTABLE=$(which python3) && cmake --build build --target scheduler"
+      ],
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Build scheduler module (Debug, unoptimised)",
+      "detail": "For stepping through the C++ in gdb. Many times slower: rebuild with the task above afterwards.",
       "type": "shell",
       "command": "bash",
       "args": [
         "-lc",
         "cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug -DPYTHON_EXECUTABLE=$(which python3) && cmake --build build --target scheduler"
       ],
-      "group": {
-        "kind": "build",
-        "isDefault": true
-      },
+      "group": "build",
       "problemMatcher": []
     },
     {
@@ -24,7 +37,7 @@
         "python3 -m unittest discover -s tests -v"
       ],
       "group": "test",
-      "dependsOn": "Build scheduler module (Debug)",
+      "dependsOn": "Build scheduler module",
       "problemMatcher": []
     }
   ]

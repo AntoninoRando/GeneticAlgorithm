@@ -53,17 +53,25 @@
 
 <h2 id="build">3. Build the <code>scheduler</code> module</h2>
 <p>From the repository root:</p>
-<pre>cmake -S . -B build -DPYTHON_EXECUTABLE=$(which python3)
+<pre>cmake -S . -B build -DCMAKE_BUILD_TYPE=RelWithDebInfo -DPYTHON_EXECUTABLE=$(which python3)
 cmake --build build --target scheduler</pre>
 <p>The helper <a href="../../scripts/build.sh"><code>scripts/build.sh</code></a> runs exactly these two commands, from any directory. What happens:</p>
 <ul>
   <li><a href="../../CMakeLists.txt"><code>CMakeLists.txt</code></a> compiles <a href="../../bindings.cpp"><code>bindings.cpp</code></a> (which includes every header in <code>include/scheduler/</code>) into a pybind11 module called <code>scheduler</code>.</li>
   <li>The <code>.so</code> file is written <strong>directly into the repository root</strong> (<code>LIBRARY_OUTPUT_DIRECTORY</code>), so <code>import scheduler</code> works from there. You do not need to copy it.</li>
-  <li>It is always compiled with <code>-O3</code>, even for a Debug build type, because the unoptimised build was the main reason runs were slow (see <a href="../../PERFORMANCE.md"><code>PERFORMANCE.md</code></a>).</li>
+  <li>The <strong>build type</strong> (<code>CMAKE_BUILD_TYPE</code>) decides how the compiler optimises. <code>RelWithDebInfo</code> means "release with debug information": fully optimised (<code>-O3</code>) but still carrying the symbols a debugger needs. It is the default, and the one to use for every experiment. An unoptimised module was once the main reason runs were slow (see <a href="../../PERFORMANCE.md"><code>PERFORMANCE.md</code></a>).</li>
   <li>If CMake finds OpenMP it prints <em>"OpenMP found: fitness evaluation will run in parallel."</em></li>
 </ul>
-<p>Check it worked:</p>
-<pre>python3 -c "import scheduler; print(scheduler.SchedulerGP)"</pre>
+<p>Check it worked, and which build you got:</p>
+<pre>python3 -c "import scheduler; print(scheduler.build_type, scheduler.optimized)"   <span class="c"># RelWithDebInfo True</span></pre>
+<div class="table-wrap"><table>
+<tr><th>Build type</th><th>What you get</th><th>Use it for</th></tr>
+<tr class="hl"><td><code>RelWithDebInfo</code> (default)</td><td><code>-O3 -funroll-loops -g</code>, assertions off</td><td>experiments and everyday work</td></tr>
+<tr><td><code>Release</code>, <code>MinSizeRel</code></td><td>the same optimisation; pybind11 also strips the symbols and enables link-time optimisation</td><td>a module to hand to someone else</td></tr>
+<tr><td><code>Debug</code></td><td><code>-O0 -g</code>: no optimisation, assertions on</td><td>a debugger, nothing else</td></tr>
+</table></div>
+<div class="callout warn"><span class="callout-title">Never run experiments on a Debug build</span>
+<p>A Debug module gives results, just many times later, and its timings mean nothing. Three things protect you. CMake prints a warning when it configures <code>Debug</code>. <code>import scheduler</code> raises a <code>RuntimeWarning</code> when the module is unoptimised. And <code>scheduler.optimized</code> is <code>False</code>. One trap remains: the <code>build/</code> folder <strong>remembers</strong> the build type of its last configuration. After a debug session, a bare <code>cmake --build build</code> builds Debug again. Always pass <code>-DCMAKE_BUILD_TYPE=…</code>, or use the scripts below, which do.</p></div>
 <div class="callout warn"><span class="callout-title">Rebuild after every C++ change</span>
 <p>Python runs the <code>.so</code>, not the headers. If you edit <code>bindings.cpp</code> or anything in <code>include/scheduler/</code> and forget to rebuild, Python silently keeps running the old code. A new option then fails with <code>AttributeError</code> or <code>TypeError</code>; a changed formula just gives the old numbers. The <code>.so</code> is ignored by git (<code>*.so</code> in <a href="../../.gitignore"><code>.gitignore</code></a>), so it never arrives with a <code>git pull</code> either.</p></div>
 <p>The helper scripts in <a href="../../scripts"><code>scripts/</code></a> all work from any directory:</p>
@@ -72,7 +80,7 @@ cmake --build build --target scheduler</pre>
 <tr><td><code>scripts/build.sh</code></td><td>Configure if needed, then build.</td></tr>
 <tr><td><code>scripts/build-py.sh</code></td><td>Rebuild only (fast; needs an existing <code>build/</code>).</td></tr>
 <tr><td><code>scripts/build-py-new.sh</code></td><td>Delete <code>build/</code>, reconfigure and build. Use after changing compiler, Python version or CMake options.</td></tr>
-<tr><td><code>scripts/build-debug.sh</code></td><td>Build with debug symbols (still <code>-O3</code>). This is what the dev container uses.</td></tr>
+<tr><td><code>scripts/build-debug.sh</code></td><td>Build <strong>unoptimised</strong> (<code>Debug</code>) for a debugger. It replaces the module in the root; run <code>scripts/build.sh</code> afterwards.</td></tr>
 <tr><td><code>scripts/run.sh</code></td><td>Build, then <code>python3 main.py</code> with your arguments.</td></tr>
 <tr><td><code>scripts/debug_cpp.sh</code></td><td>Build with symbols and start <code>main.py</code> under <code>gdb</code>.</td></tr>
 <tr><td><code>scripts/make-doc.sh</code></td><td>Build the Sphinx API documentation into <code>docs/build</code>.</td></tr>
@@ -151,7 +159,11 @@ python3 thesis/experiments/run_ablation.py --seeds 20</pre>
   <li><strong>VS Code:</strong> use the <em>(debug) Launch main.py</em> configuration, or start <code>python3 main.py</code> and use <em>(debug) Attach to main.py</em> with the printed PID. The prompt "Press Enter to start" gives you time to attach.</li>
   <li><strong>Terminal:</strong> <code>scripts/debug_cpp.sh --generations 5</code> builds with symbols and starts <code>main.py</code> under <code>gdb</code>. By hand: <code>gdb -p &lt;PID&gt;</code>, or <code>gdb python3</code> then <code>set breakpoint pending on</code> and <code>run main.py</code>.</li>
 </ul>
-<p class="small muted">Because the module is always built with <code>-O3 -DNDEBUG</code>, some variables are optimised away. For step-by-step debugging, temporarily remove those flags in <code>CMakeLists.txt</code>.</p>
+<p>Which build to debug with:</p>
+<ul>
+  <li>The normal <code>RelWithDebInfo</code> module has symbols, so breakpoints and backtraces work, but the optimiser removes some variables and reorders lines. It is enough to find <em>where</em> something happens, at full speed.</li>
+  <li>To inspect every variable and step line by line, build <code>Debug</code>: <code>scripts/build-debug.sh</code>, or <code>scripts/debug_cpp.sh</code>, which also starts gdb. Use a small run (<code>--generations 5 --population 20</code>), because it is slow. Rebuild with <code>scripts/build.sh</code> when you are done.</li>
+</ul>
 
 <p class="updated">Last checked against the code on 2026-11-14.</p>
 </main>

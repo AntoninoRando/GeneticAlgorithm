@@ -283,9 +283,8 @@ The performance gains require an **OpenMP-enabled rebuild** — the previously
 shipped `.so` is serial and uncached. From the repo root (inside the container):
 
 ```bash
-cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug -DPYTHON_EXECUTABLE=$(which python3)
+cmake -S . -B build -DCMAKE_BUILD_TYPE=RelWithDebInfo -DPYTHON_EXECUTABLE=$(which python3)
 cmake --build build
-cp build/scheduler*.so .
 
 # confirm OpenMP is actually linked:
 ldd scheduler*.so | grep gomp        # should list libgomp

@@ -455,8 +455,8 @@ Decision: **keep `int`.** Implications:
 in `data_factory`, and rebuild:
 
 ```bash
-cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug -DPYTHON_EXECUTABLE=$(which python3)
-cmake --build build && cp build/scheduler*.so .
+cmake -S . -B build -DCMAKE_BUILD_TYPE=RelWithDebInfo -DPYTHON_EXECUTABLE=$(which python3)
+cmake --build build   # writes scheduler*.so into the repository root
 ```
 
 ---

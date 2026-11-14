@@ -19,6 +19,13 @@
 <h1>Changelog</h1>
 <p class="lede">One dated entry per change to this guide, newest first. Say which pages changed and which code change made them necessary.</p>
 
+<h2>2026-11-14: build flags follow the build type</h2>
+<ul>
+  <li><strong>Code change:</strong> <code>CMakeLists.txt</code> used to add <code>-O3</code> to every build, so <code>Debug</code> was not a debug build, and its flags were GCC-only. Now <code>RelWithDebInfo</code> (optimised, with symbols) is the default and the build for experiments, <code>Debug</code> is really unoptimised, and the GCC flags are skipped on other compilers. Every script, the dev container, the VS Code tasks and CI pass the build type explicitly. The module reports <code>scheduler.build_type</code> and <code>scheduler.optimized</code>, and importing an unoptimised module raises a <code>RuntimeWarning</code>. No algorithm change; the optimised build uses the same flags as before.</li>
+  <li><strong>Day one:</strong> step 3 explains build types with a table, how to check which build is loaded, and a warning about experiments on a Debug build and about <code>build/</code> remembering its type; the script table and the debugging section are updated.</li>
+  <li><strong>Known quirks:</strong> the CMake entry now only says that an MSVC build is untested.</li>
+</ul>
+
 <h2>2026-11-14: typed flags always override the configuration file</h2>
 <ul>
   <li><strong>Code change:</strong> <code>main.py</code> used to detect a command-line override by comparing the value with its default, so a typed flag equal to the default (<code>-c default --generations 200</code>) lost to the file. The parser now records only the flags that were typed, and the layering lives in <code>resolve_config()</code>. On/off options gained a <code>--no-…</code> form and there is a new <code>--enable-metrics</code>. New <code>tests/test_config.py</code>. No algorithm change.</li>

@@ -26,9 +26,10 @@ echo "==> [3/3] Building the C++ 'scheduler' module…"
 # (LIBRARY_OUTPUT_DIRECTORY in CMakeLists.txt): there is nothing to copy.  The
 # old `cp build/scheduler*.so .` matched no file and, under `set -e`, made this
 # script exit with an error after a successful build.
-# The build type stays Debug, as before: CMakeLists.txt adds -O3 regardless, so
-# this gives an optimised module that still carries debug symbols for gdb.
-cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug -DPYTHON_EXECUTABLE="$(which python3)"
+# RelWithDebInfo = optimised, with debug symbols for gdb.  It is the same code
+# the container built before, when it passed Debug and CMakeLists.txt forced
+# -O3 on top; Debug now really means unoptimised (scripts/build-debug.sh).
+cmake -S . -B build -DCMAKE_BUILD_TYPE=RelWithDebInfo -DPYTHON_EXECUTABLE="$(which python3)"
 cmake --build build
 
 echo ""

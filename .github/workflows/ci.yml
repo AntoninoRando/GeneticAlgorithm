@@ -2,6 +2,12 @@
 # pull request.  The simulation data (data/) is not in the repository, so the
 # tests that need data/worlds are skipped here; the others build their worlds
 # in code.
+#
+# Two builds are checked:
+#   RelWithDebInfo  the optimised build used for experiments (and by the dev
+#                   container, .devcontainer/postCreate.sh)
+#   Debug           the unoptimised debugger build; it must still pass the
+#                   tests, and importing it must raise a RuntimeWarning
 name: CI
 
 on:
@@ -19,6 +25,11 @@ jobs:
   build-and-test:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        build_type: [RelWithDebInfo, Debug]
+    name: build-and-test (${{ matrix.build_type }})
     steps:
       - uses: actions/checkout@v4
 
@@ -37,18 +48,38 @@ jobs:
           done
 
       - name: Configure
-        # Same configuration as the dev container (.devcontainer/postCreate.sh).
         run: >
           cmake -S . -B build
-          -DCMAKE_BUILD_TYPE=Debug
+          -DCMAKE_BUILD_TYPE=${{ matrix.build_type }}
           -DPYTHON_EXECUTABLE="$(which python)"
           -Dpybind11_DIR="$(python -m pybind11 --cmakedir)"
 
       - name: Build
-        run: cmake --build build --target scheduler --parallel
+        run: cmake --build build --target scheduler --parallel --verbose
 
-      - name: Import check
-        run: python -c "import scheduler; print(scheduler.__file__)"
+      - name: Check the build type reported by the module
+        env:
+          EXPECTED_BUILD_TYPE: ${{ matrix.build_type }}
+        run: |
+          python -W ignore - <<'PY'
+          import os, scheduler
+          expected = os.environ["EXPECTED_BUILD_TYPE"]
+          print(scheduler.__file__, scheduler.build_type, "optimized =", scheduler.optimized)
+          assert scheduler.build_type == expected, scheduler.build_type
+          assert scheduler.optimized == (expected != "Debug"), scheduler.optimized
+          PY
+
+      - name: An unoptimised module warns on import
+        if: matrix.build_type == 'Debug'
+        run: |
+          if python -W error::RuntimeWarning -c "import scheduler" 2>warning.txt; then
+            echo "::error::importing a Debug build raised no RuntimeWarning"; exit 1
+          fi
+          grep -q "WITHOUT optimisation" warning.txt
+
+      - name: An optimised module imports without warnings
+        if: matrix.build_type != 'Debug'
+        run: python -W error -c "import scheduler"
 
       - name: Unit tests
-        run: python -m unittest discover -s tests -v
+        run: python -W ignore::RuntimeWarning -m unittest discover -s tests -v
