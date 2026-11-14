@@ -49,7 +49,6 @@
 <tr><td><code>tree_operators.h</code></td><td>The size cap \(2^{D+1}\) can never fail once the depth cap holds (<a href="theory.html#bloat">proof</a>). Harmless.</td></tr>
 <tr><td><code>main.py</code></td><td>The crossover rate (0.80) and mutation rate (0.08) are not passed to <code>initialize()</code>, so the binding defaults always apply. The fitness weights are not exposed either.</td></tr>
 <tr><td><code>CMakeLists.txt</code></td><td>Adds <code>-O3 -funroll-loops</code> whatever the build type, and those flags are GCC/Clang only. A real debug build (<code>-O0</code>) needs editing the file, and the module does not build with MSVC.</td></tr>
-<tr><td><code>main.py</code></td><td>A command-line flag set to its own default value cannot override a JSON configuration: <code>-c default --generations 200</code> keeps the file's 5000, because overrides are detected by comparing with the default.</td></tr>
 <tr><td><code>runConfigurations/default.json</code></td><td>Has a <code>jobsCSV</code> block that nothing reads; the ignored columns are hard-coded in <code>data_factory.py</code>.</td></tr>
 <tr><td><code>config.json5</code></td><td>Upstream simulator configuration; nothing here reads it.</td></tr>
 <tr><td><code>data_factory.py</code></td><td>CSV satellites get <code>cpuCapacity</code>, <code>networkCapacity</code>, <code>latency</code> and <code>bandwidth</code> scaled twice (× 0.2, then × 0.22 inside the perturbation). This only changes the magnitude of those terminals.</td></tr>

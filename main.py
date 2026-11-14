@@ -79,57 +79,68 @@ def default_config() -> GAConfig:
 
 
 #region ARGS
-parser = argparse.ArgumentParser(description="Run GP Scheduler")
+# No option carries an argparse default (argument_default=SUPPRESS): the parsed
+# namespace then contains ONLY the options that were typed on the command line.
+# That is what lets resolve_config() tell "--generations 200 was typed" from
+# "--generations was left out", so a typed flag always beats the JSON file,
+# even when its value equals the built-in default.  The built-in defaults live
+# in one place, default_config().  Every option's dest is its GAConfig key.
+parser = argparse.ArgumentParser(
+    description="Run GP Scheduler",
+    argument_default=argparse.SUPPRESS,
+    epilog="Built-in defaults (overridden by -c FILE, then by the flags you type): "
+           + ", ".join(f"{key}={value!r}" for key, value in default_config().items()),
+)
 
 
 #region GA parameters
-parser.add_argument("--population", type=int, default=100, help="Population size")
-parser.add_argument("--generations", type=int, default=200, help="Number of generations")
-parser.add_argument("--max-depth", type=int, default=7,
+parser.add_argument("--population", type=int, dest="population_size", help="Population size")
+parser.add_argument("--generations", type=int, help="Number of generations")
+parser.add_argument("--max-depth", type=int,
                     help="Maximum expression tree depth. Shallower trees are faster and simpler "
                          "(e.g. --max-depth 4). Max nodes ≈ 2^(depth+1), so depth 7 → ≤256 nodes.")
-parser.add_argument("--hoist-rate", type=float, default=0.05,
+parser.add_argument("--hoist-rate", type=float,
                     help="Probability [0..1] that each new offspring undergoes a hoist mutation, "
                          "which replaces the whole tree with one of its own subtrees to fight bloat "
                          "(e.g. --hoist-rate 0.20 for aggressive pruning).")
-parser.add_argument("--convergence-threshold", type=int, default=10, 
+parser.add_argument("--convergence-threshold", type=int, 
                     help="Number of generations without fitness improvement before regenerating satellites and jobs (G).")
-parser.add_argument("--csv-row-limit", type=int, default=100,
+parser.add_argument("--csv-row-limit", type=int,
                     help="Maximum number of rows to load from the CSV file for satellites and jobs. "
                          "Set to 0 or a negative number to load all rows (e.g. --csv-row-limit 50).")
-parser.add_argument("--tournament-size", type=int, default=5,
+parser.add_argument("--tournament-size", type=int,
                     help="Candidates per selection tournament (selection pressure). The papers use "
                          "7 (Sun 2024, Yang 2025) or 2 (Zhang & Yang 2025).")
-parser.add_argument("--initial-max-depth", type=int, default=-1,
+parser.add_argument("--initial-max-depth", type=int,
                     help="Maximum depth of the initial random trees; -1 = same as --max-depth. "
                          "The papers start below the cap (e.g. 2-6 with a cap of 8 in Yang 2025) so "
                          "that crossover has room to grow trees.")
-parser.add_argument("--internal-crossover-bias", type=float, default=0.0,
+parser.add_argument("--internal-crossover-bias", type=float,
                     help="Probability [0..1] that a crossover point is an operator node rather than "
                          "a leaf. 0 = uniform over all nodes; Koza (1994) uses 0.9.")
-parser.add_argument("--clone-retries", type=int, default=0,
+parser.add_argument("--clone-retries", type=int,
                     help="Re-mutation attempts for an offspring identical to a parent or an elite "
                          "(structural proxy of the repetition test in Zhang & Yang 2025). 0 = off.")
-parser.add_argument("--terminal-weighting", action="store_true",
+parser.add_argument("--terminal-weighting", action=argparse.BooleanOptionalAction,
                     help="Adaptive terminal weighting for mutation: terminal probabilities follow the "
                          "maximum-likelihood fit to the best individuals (Yang et al. 2025, Sec. IV-D).")
-parser.add_argument("--track-busy-until", action="store_true",
+parser.add_argument("--track-busy-until", action=argparse.BooleanOptionalAction,
                     help="Make the sat.cpuBusyUntil terminal live: the decoder writes each satellite's "
                          "next free minute into it (availability/queue-load feature of Zhang & Yang "
                          "2025 and Sun et al. 2024).")
-parser.add_argument("--fixed-bounds", action="store_true",
+parser.add_argument("--fixed-bounds", action=argparse.BooleanOptionalAction,
                     help="Fixed-bound fitness: divide response time and energy by per-world bounds "
                          "instead of the population's min and max, and charge every unscheduled job "
                          "the worst response (Marler & Arora 2004; Shabtay et al. 2013). The fitness "
                          "becomes absolute, so it is comparable across generations.")
-parser.add_argument("--prune-constant-terminals", action="store_true",
+parser.add_argument("--prune-constant-terminals", action=argparse.BooleanOptionalAction,
                     help="Never draw terminals that are constant over every loaded world and not "
                          "updated by the decoder (e.g. sat.energyReserved, sat.loadRatio).")
-parser.add_argument("--worlds-per-eval", type=int, default=1,
+parser.add_argument("--worlds-per-eval", type=int,
                     help="Number of worlds each individual is scored on per generation (pooled). "
                          "The papers score every individual on several instances (5 in Yang 2025, "
                          "100 simulations in Zhang & Yang 2025). 1 = a single world, as before.")
-parser.add_argument("--seed", type=int, default=-1,
+parser.add_argument("--seed", type=int,
                     help="Random seed for reproducible runs (seeds both the C++ evolution and the "
                          "Python world sampling). -1 (default) uses fresh randomness every run.")
 #endregion
@@ -137,26 +148,29 @@ parser.add_argument("--seed", type=int, default=-1,
 
 
 #region Metrics
-parser.add_argument("--metrics-dir", type=str, default="metrics",
+parser.add_argument("--metrics-dir", type=str,
                     help="Directory where metrics artifacts are written.")
-parser.add_argument("--metrics-prefix", type=str, default="",
+parser.add_argument("--metrics-prefix", type=str,
                     help="Output prefix for metrics files. Defaults to a timestamp.")
-parser.add_argument("--metrics-flush-every", type=int, default=1,
+parser.add_argument("--metrics-flush-every", type=int,
                     help="How often (in generations) to refresh the NumPy metrics dump.")
-parser.add_argument("--disable-metrics", action="store_true",
+parser.add_argument("--disable-metrics", action="store_false", dest="collect_metrics",
                     help="Disable metrics collection and graph generation.")
+parser.add_argument("--enable-metrics", action="store_true", dest="collect_metrics",
+                    help="Enable metrics collection even if the run configuration turns it off "
+                         "(runConfigurations/default.json does).")
 #endregion
 
 
 
 #region Snapshots
-parser.add_argument("--inspect-snapshots", action="store_true",
+parser.add_argument("--inspect-snapshots", action=argparse.BooleanOptionalAction,
                     help="Print readable summaries for initial/reset/final simulation snapshots.")
-parser.add_argument("--save-snapshots", action="store_true",
+parser.add_argument("--save-snapshots", action=argparse.BooleanOptionalAction,
                     help="Persist inspected snapshots as JSON files.")
-parser.add_argument("--snapshots-dir", type=str, default="snapshots",
+parser.add_argument("--snapshots-dir", type=str,
                     help="Directory where snapshot JSON files are written.")
-parser.add_argument("--snapshots-prefix", type=str, default="",
+parser.add_argument("--snapshots-prefix", type=str,
                     help="Output prefix for snapshot JSON files. Defaults to a timestamp.")
 #endregion
 
@@ -164,17 +178,63 @@ parser.add_argument("--snapshots-prefix", type=str, default="",
 #region Miscellaneous
 parser.add_argument("--no-start-prompt", action="store_true",
                     help="Start immediately without waiting for Enter.")
-parser.add_argument("--print-every", type=int, default=50, help="Print progress every N generations")
+parser.add_argument("--print-every", type=int, help="Print progress every N generations")
 #endregion
 
 
 #region Config file
-parser.add_argument("-c", "--config", type=str, default=None,
+parser.add_argument("-c", "--config", type=str,
                     help="Name of a run configuration (without extension) in the runConfigurations/ "
                          "directory, e.g. '--config default' loads runConfigurations/default.json. "
                          "Known keys override the built-in defaults; unrecognized keys are ignored. "
                          "Explicit CLI flags always take precedence over the JSON values.")
 #endregion
+#endregion
+
+
+
+#region Configuration layering
+def resolve_config(argv=None, config_dir: str = "runConfigurations"):
+    """Builds the run configuration: built-in defaults, then the JSON file
+    named by -c/--config, then the flags typed on the command line.
+
+    Returns ``(config, start_prompt)``; ``start_prompt`` is False when
+    --no-start-prompt was given.
+
+    A flag overrides the file whenever it was TYPED, whatever its value.
+    (The previous version compared each value with its argparse default and so
+    ignored a typed flag that happened to equal the default: with
+    ``-c default --generations 200`` the file's 5000 won.)  Boolean options
+    come in pairs (``--fixed-bounds`` / ``--no-fixed-bounds``,
+    ``--enable-metrics`` / ``--disable-metrics``) so that a value the file sets
+    to true can also be switched off from the command line.
+
+    ``argv`` and ``config_dir`` exist for the tests; main() uses sys.argv and
+    the runConfigurations/ directory.
+    """
+    import json
+    import os
+
+    typed = vars(parser.parse_args(argv))      # only what was typed, see the parser
+    known_keys = set(GAConfig.__annotations__)
+
+    config = default_config()
+
+    config_name = typed.get("config")
+    if config_name is not None:
+        config_path = os.path.join(config_dir, f"{config_name}.json")
+        with open(config_path) as f:
+            json_data = json.load(f)
+        for key, value in json_data.items():
+            if key in known_keys:
+                config[key] = value   # type: ignore[literal-required]
+        print(f"Loaded run configuration: {config_path}")
+
+    for key, value in typed.items():
+        if key in known_keys:
+            config[key] = value       # type: ignore[literal-required]
+
+    return config, not typed.get("no_start_prompt", False)
 #endregion
 
 
@@ -500,69 +560,13 @@ def run_genetic_algorithm(config: GAConfig):
 
 #region Entry point
 if __name__ == "__main__":
-    import os, json
+    import os
     print(f"PID: {os.getpid()} — attach GDB now if you want to debug the C++ code.")
 
-    args = parser.parse_args()
+    # defaults → JSON file (if -c given) → flags typed on the command line
+    config, start_prompt = resolve_config()
 
-    # --- Build config: defaults → JSON file (if -c given) → explicit CLI flags ---
-    _known_keys = set(GAConfig.__annotations__)
-
-    config = default_config()
-
-    if args.config is not None:
-        config_path = os.path.join("runConfigurations", f"{args.config}.json")
-        with open(config_path) as f:
-            json_data = json.load(f)
-        for key, value in json_data.items():
-            if key in _known_keys:
-                config[key] = value   # type: ignore[literal-required]
-        print(f"Loaded run configuration: {config_path}")
-
-    # CLI flags that differ from their argparse defaults override the JSON.
-    # We detect explicit overrides by comparing against argparse defaults.
-    _cli_overrides: dict = {}
-    _defaults = {a.dest: a.default for a in parser._actions if a.dest != "help"}
-    for dest, default in _defaults.items():
-        cli_value = getattr(args, dest, None)
-        if cli_value != default:
-            _cli_overrides[dest] = cli_value
-
-    _dest_to_key = {
-        "generations":          "generations",
-        "population":           "population_size",
-        "max_depth":            "max_depth",
-        "hoist_rate":           "hoist_rate",
-        "convergence_threshold": "convergence_threshold",
-        "csv_row_limit":        "csv_row_limit",
-        "tournament_size":      "tournament_size",
-        "initial_max_depth":    "initial_max_depth",
-        "internal_crossover_bias": "internal_crossover_bias",
-        "clone_retries":        "clone_retries",
-        "terminal_weighting":   "terminal_weighting",
-        "track_busy_until":     "track_busy_until",
-        "fixed_bounds":         "fixed_bounds",
-        "prune_constant_terminals": "prune_constant_terminals",
-        "worlds_per_eval":      "worlds_per_eval",
-        "seed":                 "seed",
-        "metrics_dir":          "metrics_dir",
-        "metrics_prefix":       "metrics_prefix",
-        "metrics_flush_every":  "metrics_flush_every",
-        "disable_metrics":      None,   # handled separately below
-        "inspect_snapshots":    "inspect_snapshots",
-        "save_snapshots":       "save_snapshots",
-        "snapshots_dir":        "snapshots_dir",
-        "snapshots_prefix":     "snapshots_prefix",
-        "print_every":          "print_every",
-    }
-    for dest, key in _dest_to_key.items():
-        if dest in _cli_overrides and key is not None:
-            config[key] = _cli_overrides[dest]  # type: ignore[literal-required]
-    if "disable_metrics" in _cli_overrides:
-        config["collect_metrics"] = not _cli_overrides["disable_metrics"]
-    # -------------------------------------------------------------------------
-
-    if not args.no_start_prompt:
+    if start_prompt:
         print("Press Enter to start the genetic algorithm...")
         input()
 

@@ -80,13 +80,14 @@
 <h3>Python layer</h3>
 <div class="table-wrap"><table>
 <tr><th>File</th><th>Role</th></tr>
-<tr><td><a href="../../main.py"><code>main.py</code></a></td><td>CLI and configuration layering, world loading, the generation loop, convergence-triggered world switching, metrics and logs.</td></tr>
+<tr><td><a href="../../main.py"><code>main.py</code></a></td><td>CLI and configuration layering (<code>resolve_config</code>), world loading, the generation loop, convergence-triggered world switching, metrics and logs.</td></tr>
 <tr><td><a href="../../data_processing/data_factory.py"><code>data_processing/data_factory.py</code></a></td><td>Builds <code>Job</code> and <code>Satellite</code> objects from a world CSV (<code>create_jobs_from_csv</code>, <code>create_satellites_from_csv</code>), plus dummy random generators.</td></tr>
 <tr><td><a href="../../data_processing/csv_preprocessing/world_splitter.py"><code>…/csv_preprocessing/world_splitter.py</code></a></td><td>One-off preprocessing: splits the raw log into 10-minute worlds with normalised arrival times.</td></tr>
 <tr><td><a href="../../utils.py"><code>utils.py</code></a></td><td>CSV loading, locale-aware number parsing (<code>"2,17E+10"</code>), and linear <code>_rescale</code>.</td></tr>
 <tr><td><a href="../../metrics_tracker.py"><code>metrics_tracker.py</code></a></td><td><code>GenerationMetrics</code> dataclass and <code>MetricsCollector</code> (CSV, NPZ, PNG).</td></tr>
 <tr><td><a href="../../snapshot_inspector.py"><code>snapshot_inspector.py</code></a>, <a href="../../snapshot_timeline_plot.py"><code>snapshot_timeline_plot.py</code></a></td><td>Print and save snapshots as JSON; plot a snapshot's timeline.</td></tr>
 <tr><td><a href="../../tests/test_paper_features.py"><code>tests/test_paper_features.py</code></a></td><td>Deterministic unittest checks of the literature features.</td></tr>
+<tr><td><a href="../../tests/test_config.py"><code>tests/test_config.py</code></a></td><td>Checks the configuration layering of <code>main.py</code> (defaults, JSON file, typed flags).</td></tr>
 <tr><td><code>thesis/experiments/</code></td><td><code>run_experiments.py</code> (main study and baselines), <code>run_ablation.py</code> (options vs baseline), <code>make_report.py</code> (LaTeX tables and plots).</td></tr>
 </table></div>
 

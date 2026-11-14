@@ -19,6 +19,14 @@
 <h1>Changelog</h1>
 <p class="lede">One dated entry per change to this guide, newest first. Say which pages changed and which code change made them necessary.</p>
 
+<h2>2026-11-14: typed flags always override the configuration file</h2>
+<ul>
+  <li><strong>Code change:</strong> <code>main.py</code> used to detect a command-line override by comparing the value with its default, so a typed flag equal to the default (<code>-c default --generations 200</code>) lost to the file. The parser now records only the flags that were typed, and the layering lives in <code>resolve_config()</code>. On/off options gained a <code>--no-…</code> form and there is a new <code>--enable-metrics</code>. New <code>tests/test_config.py</code>. No algorithm change.</li>
+  <li><strong>Day one:</strong> step 5 states the rule with the example; the flag table lists <code>--enable-metrics</code> and the <code>--no-…</code> forms; the tests section mentions the new test file.</li>
+  <li><strong>Architecture:</strong> <code>resolve_config</code> and the new test file.</li>
+  <li><strong>Known quirks:</strong> removed the entry for this bug.</li>
+</ul>
+
 <h2>2026-11-14: repository hygiene</h2>
 <ul>
   <li><strong>Repository change:</strong> the compiled modules (<code>scheduler*.so</code>), the stray binaries <code>main</code> and <code>build/scheduler_cli</code>, <code>docs/get-pip.py</code> and the generated Sphinx output are no longer tracked (the PDF linked from the readme stays). New <code>.gitattributes</code> keeps shell scripts in LF. The scripts in <code>scripts/</code> work from any directory and no longer call missing files or targets. <code>.devcontainer/postCreate.sh</code> no longer ends with an error. <code>./run NAME</code> now really applies <code>runConfigurations/NAME.json</code>. <code>main.py</code> explains what to do when the data is missing. The unused header <code>data_factories.h</code> is deleted. A CI workflow builds the module and runs the tests. No algorithm change.</li>
