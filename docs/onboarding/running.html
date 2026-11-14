@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Day One Setup</title>
+<link rel="stylesheet" href="assets/style.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css">
+<script defer src="assets/site.js"></script>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.js"></script>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/contrib/auto-render.min.js" onload="onboardingRenderMath()"></script>
+</head>
+<body>
+<div class="layout">
+<aside class="sidebar" id="sidebar"></aside>
+<main class="content">
+
+<div class="eyebrow">Start here</div>
+<h1>Day one: build &amp; run</h1>
+<p class="lede">By the end of this page you will have compiled the C++ module, generated the training data, run a short evolution and run the tests.</p>
+
+<div class="toc"><strong>On this page</strong>
+<ol>
+  <li><a href="#env">Get an environment</a></li>
+  <li><a href="#data">Get the data</a></li>
+  <li><a href="#build">Build the <code>scheduler</code> module</a></li>
+  <li><a href="#run">Run an evolution</a></li>
+  <li><a href="#config">Configure a run</a></li>
+  <li><a href="#outputs">Read the outputs</a></li>
+  <li><a href="#tests">Run the tests</a></li>
+  <li><a href="#experiments">Re-run the thesis experiments</a></li>
+  <li><a href="#debug">Debug the C++ from Python</a></li>
+</ol></div>
+
+<h2 id="env">1. Get an environment</h2>
+<p>The project is developed on <strong>Linux inside a VS Code dev container</strong>. The compiled modules in the repository root (<code>scheduler.cpython-313-x86_64-linux-gnu.so</code>, <code>…-aarch64-…</code>) are Linux binaries, so they will not load in Python on Windows or macOS directly.</p>
+<ol>
+  <li>Install Docker and VS Code with the <em>Dev Containers</em> extension.</li>
+  <li>Open the repository folder and choose <strong>Reopen in Container</strong>.</li>
+  <li>The first start runs <a href="../../.devcontainer/postCreate.sh"><code>.devcontainer/postCreate.sh</code></a>. It installs numpy, matplotlib, pybind11 and the debug tools, then builds the module.</li>
+</ol>
+<p class="small muted">Without the container you need Python 3, CMake ≥ 3.15, a C++17 compiler, pybind11, numpy and matplotlib (see <a href="../../requirements.txt"><code>requirements.txt</code></a>). OpenMP is optional: without it everything still works, just on one core.</p>
+
+<h2 id="data">2. Get the data</h2>
+<p>The <code>data/</code> folder is <strong>not in git</strong> (it is listed in <code>.gitignore</code>). Ask your supervisor for <code>data/example.csv</code>, the task log of one 300-minute simulation (2960 rows). Then split it into 30 "worlds" of 10 minutes each:</p>
+<pre>python3 -m data_processing.csv_preprocessing.world_splitter \
+    --csv data/example.csv --output-dir data/worlds --window-minutes 10</pre>
+<p>You now have <code>data/worlds/world_000.csv</code> … <code>world_029.csv</code> and a <code>manifest.json</code>. The <a href="data.html">data pipeline page</a> explains what the splitter does and why.</p>
+<div class="callout"><span class="callout-title">No worlds?</span>
+<p><code>main.py</code> falls back to <code>data/example.csv</code> if <code>data/worlds/</code> is empty, and prints a reminder to run the splitter.</p></div>
+
+<h2 id="build">3. Build the <code>scheduler</code> module</h2>
+<p>From the repository root:</p>
+<pre>cmake -S . -B build -DPYTHON_EXECUTABLE=$(which python3)
+cmake --build build</pre>
+<p>What happens:</p>
+<ul>
+  <li><a href="../../CMakeLists.txt"><code>CMakeLists.txt</code></a> compiles <a href="../../bindings.cpp"><code>bindings.cpp</code></a> (which includes every header in <code>include/scheduler/</code>) into a pybind11 module called <code>scheduler</code>.</li>
+  <li>The <code>.so</code> file is written <strong>directly into the repository root</strong> (<code>LIBRARY_OUTPUT_DIRECTORY</code>), so <code>import scheduler</code> works from there. You do not need to copy it.</li>
+  <li>It is always compiled with <code>-O3</code>, even for a Debug build type, because the unoptimised build was the main reason runs were slow (see <a href="../../PERFORMANCE.md"><code>PERFORMANCE.md</code></a>).</li>
+  <li>If CMake finds OpenMP it prints <em>"OpenMP found: fitness evaluation will run in parallel."</em></li>
+</ul>
+<p>Check it worked:</p>
+<pre>python3 -c "import scheduler; print(scheduler.SchedulerGP)"</pre>
+<div class="callout warn"><span class="callout-title">Outdated instructions elsewhere</span>
+<p><code>AGENT.md</code> and the readme still mention a <code>scheduler_cli</code> target and copying <code>build/scheduler*.so</code>. The current <code>CMakeLists.txt</code> has no CLI target and writes the module to the root. Trust <code>CMakeLists.txt</code>. See <a href="quirks.html">Known quirks</a>.</p></div>
+
+<h2 id="run">4. Run an evolution</h2>
+<p>A short, reproducible run that finishes in seconds:</p>
+<pre>python3 main.py --no-start-prompt --generations 50 --population 50 \
+    --max-depth 4 --seed 1 --print-every 10</pre>
+<p>What you will see:</p>
+<ul>
+  <li><code>PID: …</code>: printed so you can attach a debugger (see <a href="#debug">below</a>).</li>
+  <li><code>Loaded 30 pre-processed world(s)</code>.</li>
+  <li><code>New best fitness in world: …</code> each time the best individual improves.</li>
+  <li><code>Convergence detected after 10 generations…</code> when the best fitness stops improving for 10 generations: the program then switches to the next world.</li>
+  <li>Every 10 generations, a <code>SCHEDULE SNAPSHOT</code> with the best tree and the population's <em>structural diversity</em> (share of distinct trees).</li>
+  <li>At the end: <code>Jobs scheduled: …% | Mean response: … min | Energy: … Wmin</code> for the best tree on the last world.</li>
+</ul>
+<p>Without <code>--no-start-prompt</code> the program waits for <kbd>Enter</kbd> before starting. Without <code>--seed</code> every run is different.</p>
+
+<h2 id="config">5. Configure a run</h2>
+<p>Settings come from three layers. Each one overrides the previous:</p>
+<ol>
+  <li>built-in defaults in <code>default_config()</code> in <a href="../../main.py"><code>main.py</code></a>;</li>
+  <li>a JSON file in <code>runConfigurations/</code> (for example <a href="../../runConfigurations/default.json"><code>default.json</code></a>, <a href="../../runConfigurations/robust.json"><code>robust.json</code></a>), selected with <code>-c NAME</code>;</li>
+  <li>command-line flags that differ from their default.</li>
+</ol>
+<pre>python3 main.py -c robust --no-start-prompt          <span class="c"># 5000 gens, depth 4, clone retries + 3 worlds</span>
+./run default --generations 10                       <span class="c"># same thing through the launcher script</span></pre>
+<h3>The flags you will use most</h3>
+<div class="table-wrap"><table>
+<tr><th>Flag</th><th>Default</th><th>Meaning</th></tr>
+<tr><td><code>--population</code></td><td class="num">100</td><td>Number of formulas per generation.</td></tr>
+<tr><td><code>--generations</code></td><td class="num">200</td><td>Number of generations.</td></tr>
+<tr><td><code>--max-depth</code></td><td class="num">7</td><td>Maximum tree depth. The run configurations and the thesis use 4.</td></tr>
+<tr><td><code>--hoist-rate</code></td><td class="num">0.05</td><td>Chance that an offspring is replaced by one of its own subtrees (anti-bloat).</td></tr>
+<tr><td><code>--convergence-threshold</code></td><td class="num">10</td><td>Generations without improvement before switching to the next world.</td></tr>
+<tr><td><code>--csv-row-limit</code></td><td class="num">100</td><td>Jobs loaded per world (≤ 0 = all).</td></tr>
+<tr><td><code>--seed</code></td><td class="num">-1</td><td>≥ 0 makes the run fully reproducible, whatever the thread count.</td></tr>
+<tr><td><code>--clone-retries</code></td><td class="num">0</td><td>Re-mutate offspring that are copies of a parent or an elite. 3 helps (see <a href="results.html">results</a>).</td></tr>
+<tr><td><code>--worlds-per-eval</code></td><td class="num">1</td><td>Score every formula on K worlds at once. 3 helps.</td></tr>
+<tr><td><code>--tournament-size</code></td><td class="num">5</td><td>Selection pressure.</td></tr>
+<tr><td><code>--disable-metrics</code></td><td></td><td>Skip the CSV/NPZ/PNG metrics.</td></tr>
+</table></div>
+<p>Other literature options (<code>--initial-max-depth</code>, <code>--internal-crossover-bias</code>, <code>--terminal-weighting</code>, <code>--track-busy-until</code>, <code>--prune-constant-terminals</code>) are explained on the <a href="evolution.html">generation page</a>. Run <code>python3 main.py --help</code> for the full list.</p>
+<div class="callout warn"><span class="callout-title">Two things you cannot set from the command line</span>
+<p>The crossover rate (0.80) and the per-node mutation rate (0.08) are the defaults of <code>SchedulerGP.initialize()</code> in <code>bindings.cpp</code>. <code>main.py</code> does not pass them. The fitness weights (0.60 / 0.25 / 0.15) are attributes of <code>FitnessEvaluator</code> and are also not exposed. To change them, edit <code>main.py</code>.</p></div>
+<div class="callout"><span class="callout-title">What is <code>config.json5</code>?</span>
+<p>It is the configuration of the upstream satellite simulator that produced the data (orbit altitude, sunset elevation, energy budget, …). <strong>No code in this repository reads it.</strong> It is kept as a record of how the data was generated.</p></div>
+
+<h2 id="outputs">6. Read the outputs</h2>
+<ul>
+  <li><strong>Metrics</strong> (on by default) go to <code>metrics/</code>: <code>&lt;prefix&gt;_metrics.csv</code> (one row per generation), <code>.npz</code> (the same as NumPy arrays) and <code>.png</code> (plots). Written by <a href="../../metrics_tracker.py"><code>metrics_tracker.py</code></a>. Columns: best and mean fitness, fitness standard deviation, the best individual's completion ratio, mean response and energy, the snapshot size, the stagnation counter, and whether the world was reset.</li>
+  <li><strong>Snapshots</strong> (<code>--inspect-snapshots</code>, <code>--save-snapshots</code>) print or save the world the population was scored on, at the start, at each reset and at the end. Draw one with <code>python3 snapshot_timeline_plot.py snapshots/&lt;file&gt;.json</code>.</li>
+</ul>
+<div class="callout warn"><span class="callout-title">Do not compare fitness across worlds</span>
+<p>Fitness is normalised <em>within the current population</em> (see <a href="decoder.html#fitness">Decoder &amp; fitness</a>). A best fitness of 0.40 in world 3 and 0.35 in world 4 does not mean the formula got worse. Compare the raw metrics instead (completion ratio, mean response, energy).</p></div>
+
+<h2 id="tests">7. Run the tests</h2>
+<pre>python3 -m unittest discover -s tests -v</pre>
+<p><a href="../../tests/test_paper_features.py"><code>tests/test_paper_features.py</code></a> checks the literature features against independent computations: the terminal-weight solver against the worked example in Yang's thesis, multi-world pooling, the busy-until terminal, seeded reproducibility, depth caps, excluded terminals, clone retries and tournament pressure. Run it after every C++ change, together with a short seeded run.</p>
+
+<h2 id="experiments">8. Re-run the thesis experiments</h2>
+<pre>python3 thesis/experiments/run_experiments.py --out thesis/experiments/results
+python3 thesis/experiments/make_report.py
+python3 thesis/experiments/run_ablation.py --seeds 20</pre>
+<p>These take a long time (many seeds × many configurations). Ask before starting them on a shared machine. The <a href="results.html">results page</a> explains the setup.</p>
+
+<h2 id="debug">9. Debug the C++ from Python</h2>
+<p>The C++ runs inside the Python process, so you debug it by attaching <code>gdb</code> to Python:</p>
+<ul>
+  <li><strong>VS Code:</strong> use the <em>(debug) Launch main.py</em> configuration, or start <code>python3 main.py</code> and use <em>(debug) Attach to main.py</em> with the printed PID. The prompt "Press Enter to start" gives you time to attach.</li>
+  <li><strong>Terminal:</strong> <code>gdb -p &lt;PID&gt;</code>, or <code>gdb python3</code> then <code>set breakpoint pending on</code> and <code>run main.py</code>.</li>
+</ul>
+<p class="small muted">Because the module is always built with <code>-O3 -DNDEBUG</code>, some variables are optimised away. For step-by-step debugging, temporarily remove those flags in <code>CMakeLists.txt</code>.</p>
+
+<p class="updated">Last checked against the code on 2026-11-14.</p>
+</main>
+</div>
+</body>
+</html>

@@ -2,6 +2,8 @@
 
 _More information specified in the [documentation](/docs/build/latex/schedulerlib.pdf)._
 
+**New to the project?** Open [`docs/onboarding/index.html`](docs/onboarding/index.html) in a browser: a step-by-step guide to the problem, the code and the maths behind it. Keep it up to date with your changes (see `CLAUDE.md`).
+
 
 
 ## The Problem

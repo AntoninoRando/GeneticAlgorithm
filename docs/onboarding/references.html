@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Guide References</title>
+<link rel="stylesheet" href="assets/style.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css">
+<script defer src="assets/site.js"></script>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.js"></script>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/contrib/auto-render.min.js" onload="onboardingRenderMath()"></script>
+<style>
+  .ref { padding: 10px 0; border-bottom: 1px solid var(--border); }
+  .ref:last-child { border-bottom: 0; }
+  .ref .key { font-family: var(--mono); font-size: 13px; color: var(--muted); }
+  .ref .use { font-size: 14px; color: var(--muted); margin-top: 2px; }
+  .ref:target { background: var(--accent-soft); border-radius: 8px; padding-left: 10px; padding-right: 10px; }
+</style>
+</head>
+<body>
+<div class="layout">
+<aside class="sidebar" id="sidebar"></aside>
+<main class="content">
+
+<div class="eyebrow">Reference</div>
+<h1>References</h1>
+<p class="lede">Every source cited in this guide. Keys match <code>thesis/references.bib</code>; reading notes, including how much of each paper was actually read, are in <code>thesis/literature_notes.md</code>.</p>
+
+<h2>Problem and data: satellite edge computing</h2>
+<div class="ref" id="magliarisi2025orbit"><div class="key">magliarisi2025orbit</div>D. Magliarisi, E. Casalicchio, V. Salvatore. Orbit-aware task scheduling in satellite edge computing. <em>Cluster Computing</em> 28, 1013 (2025). <a href="https://doi.org/10.1007/s10586-025-05663-9">doi:10.1007/s10586-025-05663-9</a><div class="use">The problem, the simulator that produced our data, the sunset constraint and the response-time objective.</div></div>
+<div class="ref" id="icdcs_sc"><div class="key">icdcs_sc</div>D. Magliarisi, E. Casalicchio. Handling of energy- and time-constrained heterogeneous satellite computing services. Venue and year to be confirmed (bib entry incomplete).<div class="use">Energy-budget model, heuristics vs ILP, why satellites need cheap decisions.</div></div>
+<div class="ref" id="magliarisi2026thesis"><div class="key">magliarisi2026thesis</div>D. Magliarisi. Decentralized and orbit-aware scheduling for computational tasks in satellite edge computing. PhD thesis, Sapienza University of Rome (2026). <a href="https://hdl.handle.net/20.500.14242/366216">hdl:20.500.14242/366216</a><div class="use">Hard sunset constraint; warning about weighting non-homogeneous metrics; lexicographic alternative.</div></div>
+<div class="ref" id="leyva2023sec"><div class="key">leyva2023sec</div>I. Leyva-Mayorga et al. Satellite edge computing for real-time and very-high resolution Earth observation. <em>IEEE Trans. Communications</em> 71(10), 6180–6194 (2023). <a href="https://doi.org/10.1109/TCOMM.2023.3296584">doi:10.1109/TCOMM.2023.3296584</a></div>
+<div class="ref" id="wang2023satellite"><div class="key">wang2023satellite</div>S. Wang, Q. Li. Satellite computing: vision and challenges. <em>IEEE Internet of Things Journal</em> 10(24), 22514–22529 (2023). <a href="https://doi.org/10.1109/JIOT.2023.3303346">doi:10.1109/JIOT.2023.3303346</a></div>
+
+<h2>Genetic programming and hyper-heuristics</h2>
+<div class="ref" id="koza1992book"><div class="key">koza1992book</div>J. R. Koza. <em>Genetic Programming: On the Programming of Computers by Means of Natural Selection</em>. MIT Press (1992).</div>
+<div class="ref" id="koza1994gp"><div class="key">koza1994gp</div>J. R. Koza. Genetic programming as a means for programming computers by natural selection. <em>Statistics and Computing</em> 4(2), 87–112 (1994). <a href="https://doi.org/10.1007/BF00175355">doi:10.1007/BF00175355</a><div class="use">The GP loop, closure, ramped half-and-half, subtree crossover, depth limit, 90/10 crossover bias.</div></div>
+<div class="ref" id="burke2013hyperheuristics"><div class="key">burke2013hyperheuristics</div>E. K. Burke et al. Hyper-heuristics: a survey of the state of the art. <em>J. Operational Research Society</em> 64(12), 1695–1724 (2013). <a href="https://doi.org/10.1057/jors.2013.71">doi:10.1057/jors.2013.71</a></div>
+<div class="ref" id="branke2016automated"><div class="key">branke2016automated</div>J. Branke, S. Nguyen, C. W. Pickardt, M. Zhang. Automated design of production scheduling heuristics: a review. <em>IEEE Trans. Evolutionary Computation</em> 20(1), 110–124 (2016). <a href="https://doi.org/10.1109/TEVC.2015.2429314">doi:10.1109/TEVC.2015.2429314</a></div>
+<div class="ref" id="nguyen2017gpsurvey"><div class="key">nguyen2017gpsurvey</div>S. Nguyen, Y. Mei, M. Zhang. Genetic programming for production scheduling: a survey with a unified framework. <em>Complex &amp; Intelligent Systems</em> 3(1), 41–66 (2017). <a href="https://doi.org/10.1007/s40747-017-0036-x">doi:10.1007/s40747-017-0036-x</a></div>
+<div class="ref" id="zhang2021gpbook"><div class="key">zhang2021gpbook</div>F. Zhang, S. Nguyen, Y. Mei, M. Zhang. <em>Genetic Programming for Production Scheduling</em>. Springer (2021). <a href="https://doi.org/10.1007/978-981-16-4859-5">doi:10.1007/978-981-16-4859-5</a></div>
+
+<h2>GP for cloud, fog and satellite scheduling</h2>
+<div class="ref" id="mtgp_multicloud"><div class="key">mtgp_multicloud</div>Z. Sun, Y. Mei, F. Zhang, H. Huang, C. Gu, M. Zhang. Multi-tree genetic programming hyper-heuristic for dynamic flexible workflow scheduling in multi-clouds. <em>IEEE Trans. Services Computing</em> 17(5), 2687–2703 (2024). <a href="https://doi.org/10.1109/TSC.2024.3394691">doi:10.1109/TSC.2024.3394691</a><div class="use">Function set, protected division, operators and rates, parameter table, decision cost, single vs multi-tree ablation.</div></div>
+<div class="ref" id="zhang2025mtgper"><div class="key">zhang2025mtgper</div>C. Zhang, J. Yang. Multi-tree genetic programming with elite recombination for dynamic task scheduling of satellite edge computing. <em>Future Generation Computer Systems</em> 166, 107700 (2025). <a href="https://doi.org/10.1016/j.future.2024.107700">doi:10.1016/j.future.2024.107700</a><div class="use">GP for SEC; terminal set; repetition test behind clone retries; queue/availability terminals.</div></div>
+<div class="ref" id="gp_fog"><div class="key">gp_fog</div>M. Xu et al. Genetic programming for dynamic workflow scheduling in fog computing. <em>IEEE Trans. Services Computing</em> 16(4), 2657–2671 (2023). <a href="https://doi.org/10.1109/TSC.2023.3249160">doi:10.1109/TSC.2023.3249160</a></div>
+<div class="ref" id="dtgpam"><div class="key">dtgpam</div>Y. Yang, G. Chen, H. Ma, S. Hartmann, M. Zhang. Dual-tree genetic programming with adaptive mutation for dynamic workflow scheduling in cloud computing. <em>IEEE Trans. Evolutionary Computation</em> 29(5), 1692–1706 (2025). <a href="https://doi.org/10.1109/TEVC.2024.3392968">doi:10.1109/TEVC.2024.3392968</a><div class="use">Adaptive terminal weighting; several training instances per generation.</div></div>
+<div class="ref" id="yang2025thesis"><div class="key">yang2025thesis</div>Y. Yang. Learning approaches to dynamic workflow scheduling based on genetic programming and deep reinforcement learning. PhD thesis, Victoria University of Wellington (2025). <a href="https://doi.org/10.26686/wgtn.29134007">doi:10.26686/wgtn.29134007</a><div class="use">Maximum-likelihood terminal weights, water filling, the "log rev" sampling schedule, instance rotation.</div></div>
+<div class="ref" id="zhang2018mtgp"><div class="key">zhang2018mtgp</div>F. Zhang, Y. Mei, M. Zhang. Genetic programming with multi-tree representation for dynamic flexible job shop scheduling. <em>AI 2018</em>, LNCS 11320, 472–484 (2018). <a href="https://doi.org/10.1007/978-3-030-03991-2_43">doi:10.1007/978-3-030-03991-2_43</a></div>
+<div class="ref" id="riley2016terminal"><div class="key">riley2016terminal</div>M. Riley, Y. Mei, M. Zhang. Improving job shop dispatching rules via terminal weighting and adaptive mutation in genetic programming. <em>IEEE CEC 2016</em>, 3362–3369. <a href="https://doi.org/10.1109/CEC.2016.7744215">doi:10.1109/CEC.2016.7744215</a></div>
+
+<h2>Theory and statistics</h2>
+<p class="small muted">Added for the theory page on 2026-11-14. Metadata checked against Crossref. They are cited for standard, well-known results; their full text was not re-read for this guide (see <code>literature_notes.md</code>).</p>
+<div class="ref" id="blickle1996selection"><div class="key">blickle1996selection</div>T. Blickle, L. Thiele. A comparison of selection schemes used in evolutionary algorithms. <em>Evolutionary Computation</em> 4(4), 361–394 (1996). <a href="https://doi.org/10.1162/evco.1996.4.4.361">doi:10.1162/evco.1996.4.4.361</a><div class="use">Tournament selection probabilities and takeover time.</div></div>
+<div class="ref" id="luke2006bloat"><div class="key">luke2006bloat</div>S. Luke, L. Panait. A comparison of bloat control methods for genetic programming. <em>Evolutionary Computation</em> 14(3), 309–344 (2006). <a href="https://doi.org/10.1162/evco.2006.14.3.309">doi:10.1162/evco.2006.14.3.309</a></div>
+<div class="ref" id="das1997weighted"><div class="key">das1997weighted</div>I. Das, J. E. Dennis. A closer look at drawbacks of minimizing weighted sums of objectives for Pareto set generation in multicriteria optimization problems. <em>Structural Optimization</em> 14(1), 63–69 (1997). <a href="https://doi.org/10.1007/BF01197559">doi:10.1007/BF01197559</a></div>
+<div class="ref" id="deb2002nsga2"><div class="key">deb2002nsga2</div>K. Deb, A. Pratap, S. Agarwal, T. Meyarivan. A fast and elitist multiobjective genetic algorithm: NSGA-II. <em>IEEE Trans. Evolutionary Computation</em> 6(2), 182–197 (2002). <a href="https://doi.org/10.1109/4235.996017">doi:10.1109/4235.996017</a></div>
+<div class="ref" id="wolpert1997nfl"><div class="key">wolpert1997nfl</div>D. H. Wolpert, W. G. Macready. No free lunch theorems for optimization. <em>IEEE Trans. Evolutionary Computation</em> 1(1), 67–82 (1997). <a href="https://doi.org/10.1109/4235.585893">doi:10.1109/4235.585893</a></div>
+<div class="ref" id="mann1947test"><div class="key">mann1947test</div>H. B. Mann, D. R. Whitney. On a test of whether one of two random variables is stochastically larger than the other. <em>Annals of Mathematical Statistics</em> 18(1), 50–60 (1947). <a href="https://doi.org/10.1214/aoms/1177730491">doi:10.1214/aoms/1177730491</a></div>
+<div class="ref" id="lenstra1977complexity"><div class="key">lenstra1977complexity</div>J. K. Lenstra, A. H. G. Rinnooy Kan, P. Brucker. Complexity of machine scheduling problems. <em>Annals of Discrete Mathematics</em> 1, 343–362 (1977). <a href="https://doi.org/10.1016/S0167-5060(08)70743-X">doi:10.1016/S0167-5060(08)70743-X</a></div>
+
+<p class="updated">Last checked on 2026-11-14.</p>
+</main>
+</div>
+</body>
+</html>

@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Known Quirks</title>
+<link rel="stylesheet" href="assets/style.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css">
+<script defer src="assets/site.js"></script>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.js"></script>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/contrib/auto-render.min.js" onload="onboardingRenderMath()"></script>
+</head>
+<body>
+<div class="layout">
+<aside class="sidebar" id="sidebar"></aside>
+<main class="content">
+
+<div class="eyebrow">Science</div>
+<h1>Known quirks &amp; open questions</h1>
+<p class="lede">Things that surprise newcomers, small inconsistencies, and the research questions still open. None of these is a crash bug. Several would change results if "fixed", so treat each fix as an algorithm change: literature, maths, seeded experiments.</p>
+
+<h2>Behaviour that affects results</h2>
+
+<h3 id="misalignment">The fitness rewards scheduling few, fast jobs</h3>
+<p>Response time is averaged over scheduled jobs only, and the min-max normalised cost terms outweigh any realistic difference in completion ratio. Being the costliest individual costs 0.40 fitness, while a 0.1 lead in \(C\) earns only 0.06. Long runs therefore lower \(R\) <em>and</em> \(C\). Derivation: <a href="theory.html#multiobjective">theory §5</a>. Evidence: <a href="results.html#main">results</a>.</p>
+
+<h3 id="energy">Energy is the binding constraint</h3>
+<p>Satellite budgets are 14–26 units (<code>_rescale(…, 70, 130) * 0.2</code> in <code>data_factory.py</code>), the energy rate is 1 per minute, and job durations are 6–38 minutes. Each satellite can run one or two jobs; the 300–600-minute sunset almost never matters. That caps \(C\) at about 0.2–0.27 for every method and compresses the differences between rules. If you change the energy model, expect every number in the thesis to move.</p>
+
+<h3 id="best-fitness">Best fitness can go down even with elitism</h3>
+<p>Elites survive unchanged, but their fitness is recomputed against each new population's min and max, so the best fitness value can fall from one generation to the next. <code>main.py</code>'s "10 generations without a new best" convergence rule is therefore a heuristic.</p>
+
+<h3 id="ramped">Ramped half-and-half couples method and depth</h3>
+<p>In <code>TreeBuilder::rampedHalfAndHalf</code> the depth is <code>minDepth + i mod m</code> (with \(m\) depths in the ramp) and the method is chosen by the parity of \(i\). When \(m\) is even (cap 7 gives depths 2–7, \(m = 6\)), the two are locked together: <code>grow</code> only ever gets depths 2, 4, 6 and <code>full</code> only 3, 5, 7. Koza's method uses both at every depth (<a href="references.html#koza1994gp">koza1994gp</a> §4). It does not happen with cap 4 (\(m = 3\)), the setting of the thesis experiments, but it does with the CLI default of 7. A fix (for example choosing the method from \(\lfloor i/m \rfloor\)) would change seeded runs at cap 7.</p>
+
+<h3 id="hoist-strength">Hoist is stronger than it looks</h3>
+<p>More than half of all hoists yield a one-node tree (<a href="theory.html#bloat">theory §6</a>). Keep the hoist rate at or below 0.05, or restrict hoist to internal nodes.</p>
+
+<h3 id="lifo">"FCFS-like" rules are actually LIFO</h3>
+<p>The thesis (Evolved Rules section) calls <code>job.arrivalTime</code> FCFS-like. With higher-is-better scoring it is latest-arrival-first. The FCFS baseline is \(-a_j\). This is a wording fix in <code>thesis/chapters/experiments.tex</code>.</p>
+
+<h3 id="dead">Four terminals never vary</h3>
+<p><code>sat.cpuBusyUntil</code>, <code>sat.networkBusyUntil</code>, <code>sat.energyReserved</code> and <code>sat.loadRatio</code> are 0 for every satellite in our data: 4 of 18 terminals, about 22% of uniform draws. The comment in <code>registry.h</code> says "4 of the 17 terminals"; the registry actually has 18 (7 job + 11 satellite).</p>
+
+<h2>Inconsistencies in the code and docs</h2>
+<div class="table-wrap"><table>
+<tr><th>Where</th><th>What</th></tr>
+<tr><td><code>tree_operators.h</code></td><td>The size cap \(2^{D+1}\) can never fail once the depth cap holds (<a href="theory.html#bloat">proof</a>). Harmless.</td></tr>
+<tr><td><code>main.py</code></td><td>The crossover rate (0.80) and mutation rate (0.08) are not passed to <code>initialize()</code>, so the binding defaults always apply. The fitness weights are not exposed either.</td></tr>
+<tr><td><code>AGENT.md</code>, readme</td><td>Mention a <code>scheduler_cli</code> target and copying <code>build/scheduler*.so</code>; <code>CMakeLists.txt</code> has no CLI target and writes the module to the root. A stale <code>build/scheduler_cli</code> binary is tracked in git.</td></tr>
+<tr><td><code>config.json5</code></td><td>Upstream simulator configuration; nothing here reads it.</td></tr>
+<tr><td><code>data_factory.py</code></td><td>CSV satellites get <code>cpuCapacity</code>, <code>networkCapacity</code>, <code>latency</code> and <code>bandwidth</code> scaled twice (× 0.2, then × 0.22 inside the perturbation). This only changes the magnitude of those terminals.</td></tr>
+<tr><td><code>include/scheduler/data_factories.h</code></td><td>Declarations with no implementation; unused.</td></tr>
+<tr><td><code>thesis/references.bib</code></td><td>The <code>icdcs_sc</code> entry still has <code>TODO</code> for venue and year.</td></tr>
+</table></div>
+
+<h2>Open research questions</h2>
+<ol>
+  <li><strong>Fitness design.</strong> Lexicographic (\(C\) first), fixed-bound normalisation, or Pareto (NSGA-II)? See <a href="theory.html#multiobjective">theory §5</a>.</li>
+  <li><strong>Deadlines.</strong> Jobs have no deadline, so there is no counterpart to the papers' deadline terminals and constraints (<a href="references.html#magliarisi2025orbit">magliarisi2025orbit</a> Eq. 7). This is the main gap with the literature.</li>
+  <li><strong>Dynamic decoding.</strong> The decoder is batch (all jobs visible at once). The papers make one decision per event. A dynamic version would match the real access point better.</li>
+  <li><strong>Multi-tree GP.</strong> Separate job-selection and satellite-selection trees (<a href="references.html#zhang2025mtgper">zhang2025mtgper</a>, <a href="references.html#mtgp_multicloud">mtgp_multicloud</a>).</li>
+  <li><strong>More data.</strong> All results come from one 300-minute trace. More traces, and loads where the sunset actually binds, would test generalisation properly.</li>
+  <li><strong>Justify or test the project additions</strong> marked "project" in the <a href="theory.html#map">design map</a>.</li>
+</ol>
+
+<p class="updated">Last checked against the code on 2026-11-14.</p>
+</main>
+</div>
+</body>
+</html>

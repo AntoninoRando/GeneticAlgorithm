@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GP Scheduler Onboarding</title>
+<link rel="stylesheet" href="assets/style.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css">
+<script defer src="assets/site.js"></script>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.js"></script>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/contrib/auto-render.min.js" onload="onboardingRenderMath()"></script>
+</head>
+<body>
+<div class="layout">
+<aside class="sidebar" id="sidebar"></aside>
+<main class="content">
+
+<div class="eyebrow">Onboarding guide</div>
+<h1>Welcome to the GP Scheduler</h1>
+<p class="lede">This guide is for your first days on the project. It assumes you can program in Python and read C++, and nothing else: no genetic programming, no satellites, no knowledge of this codebase.</p>
+
+<h2>The project in one minute</h2>
+<p>Satellites in low Earth orbit can carry small computers. People on the ground send them computing <strong>jobs</strong> (for example "process this image"). Someone has to decide <strong>which satellite runs which job</strong>, and in what order. That decision is called <strong>scheduling</strong>.</p>
+<p>A schedule is good when it completes many jobs, completes them fast and uses little energy. There are also hard rules: a satellite flies out of reach at some point (its <em>sunset</em>), and its battery is limited.</p>
+<p>We do not write the scheduling rule by hand. We let the computer <strong>evolve</strong> it with <strong>genetic programming (GP)</strong>:</p>
+<ol>
+  <li>A rule is a small formula, such as <code>-(job.executionTime + job.transferTime)</code>. It gives a score to every (job, satellite) pair, and a higher score means "do this pair first".</li>
+  <li>We start with 100 random formulas.</li>
+  <li>We test each formula by running it inside a simple scheduler (the <em>decoder</em>) on realistic data, and we measure how good the resulting schedule is (its <em>fitness</em>).</li>
+  <li>The better formulas get to "reproduce": we mix pieces of them (<em>crossover</em>) and change small parts at random (<em>mutation</em>).</li>
+  <li>We repeat for hundreds of generations. The formulas get better over time.</li>
+</ol>
+<p>The output is a <strong>scheduling heuristic</strong>, a formula a satellite could evaluate in microseconds, not a one-off schedule. That is what makes this approach a <em>hyper-heuristic</em>: an algorithm that designs algorithms.</p>
+
+<figure>
+<div class="frame">
+<svg class="diagram" viewBox="0 0 760 200" role="img" aria-label="The evolutionary loop: population of formulas, decoder builds schedules, fitness scores them, selection and breeding make the next population.">
+  <defs><marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="arrowhead"/></marker></defs>
+  <rect x="10" y="60" width="150" height="70" rx="10" class="box-accent"/>
+  <text x="85" y="90" text-anchor="middle" font-weight="600">Population</text>
+  <text x="85" y="110" text-anchor="middle" class="t-muted">100 formulas (trees)</text>
+  <rect x="205" y="60" width="160" height="70" rx="10" class="box"/>
+  <text x="285" y="90" text-anchor="middle" font-weight="600">Greedy decoder</text>
+  <text x="285" y="110" text-anchor="middle" class="t-muted">formula → schedule</text>
+  <rect x="410" y="60" width="150" height="70" rx="10" class="box"/>
+  <text x="485" y="90" text-anchor="middle" font-weight="600">Fitness</text>
+  <text x="485" y="110" text-anchor="middle" class="t-muted">jobs, time, energy</text>
+  <rect x="605" y="60" width="145" height="70" rx="10" class="box-ok"/>
+  <text x="677" y="90" text-anchor="middle" font-weight="600">Breeding</text>
+  <text x="677" y="110" text-anchor="middle" class="t-muted">select, cross, mutate</text>
+  <line x1="160" y1="95" x2="203" y2="95" class="edge" marker-end="url(#ah)"/>
+  <line x1="365" y1="95" x2="408" y2="95" class="edge" marker-end="url(#ah)"/>
+  <line x1="560" y1="95" x2="603" y2="95" class="edge" marker-end="url(#ah)"/>
+  <path d="M677,132 C677,185 85,185 85,132" class="edge" marker-end="url(#ah)"/>
+  <text x="380" y="178" text-anchor="middle" class="t-muted">next generation (repeat hundreds of times)</text>
+  <text x="285" y="40" text-anchor="middle" class="t-muted">world snapshot: jobs + satellites</text>
+  <line x1="285" y1="46" x2="285" y2="58" class="edge" marker-end="url(#ah)"/>
+</svg>
+</div>
+<figcaption>The whole project is this loop. The C++ core does the three boxes on the right; Python drives the loop and loads the data.</figcaption>
+</figure>
+
+<h2>Who built what</h2>
+<ul>
+  <li>The <strong>problem and data</strong> come from research on satellite edge computing by Magliarisi, Casalicchio and colleagues. Their simulator produced the task log we train on (<a href="references.html#magliarisi2025orbit">magliarisi2025orbit</a>).</li>
+  <li>The <strong>method</strong> follows the genetic-programming hyper-heuristic literature: Koza for GP itself, and recent papers that evolve scheduling rules for cloud, fog and satellite computing (<a href="references.html">references</a>).</li>
+  <li>The <strong>code</strong> is a C++17 library compiled into a Python module called <code>scheduler</code>, plus Python scripts that load data, run the evolution and record metrics.</li>
+  <li>The <strong>thesis</strong> in <code>thesis/</code> describes the method and the experiments formally. This guide is the friendly version and links to it.</li>
+</ul>
+
+<h2>Suggested reading order</h2>
+<div class="cards">
+  <a class="card" href="running.html"><div class="step">Step 1</div><h3>Build & run it</h3><p>Get the dev container up, compile the module, run a short evolution.</p></a>
+  <a class="card" href="problem.html"><div class="step">Step 2</div><h3>The problem</h3><p>Jobs, satellites, constraints and the three objectives, with the maths.</p></a>
+  <a class="card" href="gp-basics.html"><div class="step">Step 3</div><h3>GP from zero</h3><p>Trees, populations, selection, crossover and mutation, explained with pictures.</p></a>
+  <a class="card" href="architecture.html"><div class="step">Step 4</div><h3>Architecture map</h3><p>Which file does what, and how Python talks to C++.</p></a>
+  <a class="card" href="decoder.html"><div class="step">Step 5</div><h3>Decoder & fitness</h3><p>How a formula becomes a schedule and a score. Includes a playground.</p></a>
+  <a class="card" href="evolution.html"><div class="step">Step 6</div><h3>One generation</h3><p>The breeding loop line by line, with every parameter.</p></a>
+  <a class="card" href="theory.html"><div class="step">Step 7</div><h3>Theory & maths</h3><p>Why each design choice is sound, with derivations and papers.</p></a>
+  <a class="card" href="results.html"><div class="step">Step 8</div><h3>What we found</h3><p>Experiment results, what they mean and what they do not mean.</p></a>
+</div>
+<p>Keep the <a href="glossary.html">glossary</a> open in another tab. Every technical word in this guide is defined there.</p>
+
+<h2>Two rules of this project</h2>
+<div class="callout why">
+  <span class="callout-title">1. Every algorithm choice must be backed by the literature and the maths</span>
+  <p>If you change how the GP works (an operator, a parameter, the fitness), you must point to a peer-reviewed paper that supports the choice, write down its mathematical definition, and test it with several seeds and a statistical test. If no paper supports it, say so and label it as a project-specific choice. Look for the <em>LITERATURE NOTES</em> comments at the top of each header in <code>include/scheduler/</code>: they show what this looks like.</p>
+</div>
+<div class="callout ok">
+  <span class="callout-title">2. Keep this guide up to date</span>
+  <p>If your change makes a page here wrong, fix the page in the same change and add a line to the <a href="changelog.html">changelog</a>. Both rules are written in <code>CLAUDE.md</code> at the repository root.</p>
+</div>
+
+<p class="updated">Last checked against the code on 2026-11-14 (branch <code>tmp/refactor</code>, commit <code>22e4606</code>).</p>
+</main>
+</div>
+</body>
+</html>

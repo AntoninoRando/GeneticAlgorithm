@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Guide Changelog</title>
+<link rel="stylesheet" href="assets/style.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css">
+<script defer src="assets/site.js"></script>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.js"></script>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/contrib/auto-render.min.js" onload="onboardingRenderMath()"></script>
+</head>
+<body>
+<div class="layout">
+<aside class="sidebar" id="sidebar"></aside>
+<main class="content">
+
+<div class="eyebrow">Reference</div>
+<h1>Changelog</h1>
+<p class="lede">One dated entry per change to this guide, newest first. Say which pages changed and which code change made them necessary.</p>
+
+<h2>2026-11-14: first version</h2>
+<ul>
+  <li>Created the guide with 15 pages: welcome, day one, the problem, GP from zero, glossary, architecture, data pipeline, decoder &amp; fitness (with an interactive decoder playground), one generation, theory &amp; maths (with a selection-pressure calculator), experiments &amp; findings, known quirks, where to start, references and this changelog.</li>
+  <li>Checked against branch <code>tmp/refactor</code>, commit <code>22e4606</code>.</li>
+  <li>Added 7 references for the theory page (Blickle &amp; Thiele 1996, Luke &amp; Panait 2006, Das &amp; Dennis 1997, Deb et al. 2002, Wolpert &amp; Macready 1997, Mann &amp; Whitney 1947, Lenstra et al. 1977), metadata verified via Crossref, also added to <code>thesis/references.bib</code>.</li>
+  <li>Documented findings from reading the code: the ramped half-and-half parity coupling, the redundant size cap, the fitness imbalance between \(C\) and the normalised costs, best fitness not being monotone under elitism, and the LIFO reading of <code>job.arrivalTime</code>.</li>
+</ul>
+
+</main>
+</div>
+</body>
+</html>

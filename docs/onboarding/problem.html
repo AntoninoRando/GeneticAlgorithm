@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The Scheduling Problem</title>
+<link rel="stylesheet" href="assets/style.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css">
+<script defer src="assets/site.js"></script>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.js"></script>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/contrib/auto-render.min.js" onload="onboardingRenderMath()"></script>
+</head>
+<body>
+<div class="layout">
+<aside class="sidebar" id="sidebar"></aside>
+<main class="content">
+
+<div class="eyebrow">Concepts</div>
+<h1>The scheduling problem</h1>
+<p class="lede">What we are trying to optimise, first in plain words, then as maths. The formal version is in <code>thesis/chapters/problem.tex</code>.</p>
+
+<h2>The real-world setting</h2>
+<p><strong>Satellite edge computing (SEC)</strong> puts small computers on satellites in <strong>low Earth orbit (LEO)</strong>, a few hundred kilometres up. Instead of sending raw data down to a data centre, the satellites process it themselves (<a href="references.html#leyva2023sec">leyva2023sec</a>, <a href="references.html#wang2023satellite">wang2023satellite</a>).</p>
+<p>A ground user sends a <strong>task</strong> (we call it a <strong>job</strong> in the code) to an <strong>access point</strong>, a satellite currently overhead. The access point decides which satellite in its neighbourhood runs the job. In the research our data comes from, each of these satellites is called a <strong>satellite edge node (SEN)</strong> (<a href="references.html#magliarisi2025orbit">magliarisi2025orbit</a>).</p>
+<p>Two things make this hard:</p>
+<ul>
+  <li><strong>Satellites move.</strong> A LEO satellite is visible from a point on the ground for only a few minutes. After its <strong>sunset</strong> it can no longer return results to that user. A job must finish before then.</li>
+  <li><strong>Satellites run on batteries.</strong> Each one has a limited energy budget. A job that needs more energy than is left cannot run.</li>
+</ul>
+<p>The scheduler also has to be <strong>cheap</strong>. A satellite cannot afford to solve a big optimisation problem for every request. Magliarisi and Casalicchio chose fast heuristics over integer linear programming (ILP), genetic algorithms or deep learning for exactly this reason (<a href="references.html#icdcs_sc">icdcs_sc</a>). Evolving a <em>formula</em> respects that constraint: the expensive search happens offline, on the ground, and the satellite only evaluates the evolved formula.</p>
+
+<h2>Jobs and satellites in the code</h2>
+<p>Both are plain C++ structs in <a href="../../include/scheduler/types.h"><code>include/scheduler/types.h</code></a>, exposed to Python by <code>bindings.cpp</code>.</p>
+<div class="table-wrap"><table>
+<tr><th><code>Job</code> field</th><th>Meaning</th><th>Typical values</th></tr>
+<tr><td><code>arrivalTime</code></td><td>Minute the job reached the access point (relative to the world's first job)</td><td class="num">0–10</td></tr>
+<tr><td><code>executionTime</code></td><td>Minutes of CPU work</td><td class="num">5–30</td></tr>
+<tr><td><code>transferTime</code></td><td>Minutes to move the data</td><td class="num">1–8</td></tr>
+<tr><td><code>imageSize</code></td><td>Input size (MB, rescaled)</td><td class="num">8–24</td></tr>
+<tr><td><code>ram</code>, <code>disk</code></td><td>Resource demand, derived from the task type</td><td class="num">1–16, 12–72</td></tr>
+<tr><td><code>numberOfHops</code></td><td>Network hops from the access point</td><td class="num">1–5</td></tr>
+<tr><td><code>type</code></td><td><code>Generic_Service</code>, <code>CPU_Intensive</code>, <code>CPU_and_Data_Intensive</code></td><td></td></tr>
+</table></div>
+<div class="table-wrap"><table>
+<tr><th><code>Satellite</code> field</th><th>Meaning</th></tr>
+<tr><td><code>operationalUntil</code></td><td>Sunset minute: no job may finish after it. Drawn uniformly in [300, 600] minutes after the snapshot.</td></tr>
+<tr><td><code>remainingEnergy</code></td><td>Energy budget left. Between 14 and 26 units in the CSV worlds.</td></tr>
+<tr><td><code>cpuCapacity</code>, <code>networkCapacity</code>, <code>latency</code>, <code>bandwidth</code>, <code>elevationAngle</code></td><td>Satellite characteristics derived from the server's statistics in the CSV. The formula can read them, but the decoder does not use them.</td></tr>
+<tr><td><code>completedTasks</code></td><td>Jobs assigned so far in this decode, so it works as a live queue length.</td></tr>
+<tr><td><code>cpuBusyUntil</code></td><td>When the satellite is free again. It is 0 in the data and live only with <code>--track-busy-until</code>.</td></tr>
+<tr><td><code>networkBusyUntil</code>, <code>energyReserved</code>, <code>tasks</code>, …</td><td>Present for completeness. Always 0 or empty in our data.</td></tr>
+</table></div>
+<p>The ranges come from the rescaling in <a href="../../data_processing/data_factory.py"><code>data_processing/data_factory.py</code></a>; see the <a href="data.html">data page</a>.</p>
+
+<h2>A snapshot</h2>
+<p>We do not simulate time passing. We take a <strong>snapshot</strong>: a frozen picture of the world at one instant, containing all satellites and all jobs (about 100) that arrived in a 10-minute window. The snapshot time is set to the last arrival, so every job is waiting. Then we ask: "if you had to place all these waiting jobs now, how would you do it?" In the code this is <code>SimulationSnapshot</code> in <a href="../../include/scheduler/fitness_evaluator.h"><code>fitness_evaluator.h</code></a>.</p>
+<p>This is a <strong>batch, static</strong> version of the problem. The papers we build on mostly study the <em>dynamic</em> version, where decisions are made one at a time as jobs arrive (<a href="references.html#nguyen2017gpsurvey">nguyen2017gpsurvey</a>). See <a href="quirks.html">open questions</a>.</p>
+
+<h2 id="maths">The maths</h2>
+<p>Notation (it matches the thesis):</p>
+<ul>
+  <li>Jobs \(j \in J\), with arrival time \(a_j\), execution time \(e_j\), transfer time \(t_j\), and duration \(d_j = e_j + t_j\).</li>
+  <li>Satellites \(s \in S\), with sunset \(\omega_s\), remaining energy \(E_s\) and energy rate \(\rho_s\) (energy per minute, 1 in all our runs).</li>
+  <li>\(f_s\) is the minute at which satellite \(s\) becomes free. It starts at the snapshot time \(\tau\) and grows as jobs are added.</li>
+</ul>
+
+<h3>Constraints</h3>
+<p>Job \(j\) may be placed on satellite \(s\), starting at \(f_s\), only if both hold:</p>
+$$
+\underbrace{f_s + d_j \le \omega_s}_{\text{finish before sunset}}
+\qquad\text{and}\qquad
+\underbrace{\rho_s\, d_j \le E_s}_{\text{enough energy}}
+$$
+<p>Each satellite runs one job at a time, without interruption (non-preemptive, single machine per satellite). When a job is committed, \(f_s \leftarrow f_s + d_j\) and \(E_s \leftarrow E_s - \rho_s d_j\).</p>
+<div class="callout why"><span class="callout-title">Why these constraints</span>
+<p>The sunset constraint is the "orbit-aware" rule of Magliarisi et al.: the response time must be shorter than the satellite's remaining visibility (<a href="references.html#magliarisi2025orbit">magliarisi2025orbit</a> §5.3, <a href="references.html#magliarisi2026thesis">magliarisi2026thesis</a> §6.3.1). The energy test is the battery-budget check of <a href="references.html#icdcs_sc">icdcs_sc</a> §III-C. Both are <strong>hard</strong>: an infeasible pair is never considered, whatever score the formula gives it. The per-job <em>deadline</em> constraint of those papers is missing here, because our jobs have no deadline field.</p></div>
+
+<h3>Objectives</h3>
+<p>A schedule \(\mathcal{A}\) is the set of committed (job, satellite) pairs, with completion time \(c_j\) for each scheduled job. Over \(N = |J|\) jobs:</p>
+$$
+\begin{aligned}
+C &= \frac{|\mathcal{A}|}{N} && \text{completion ratio (maximise)}\\[4pt]
+R &= \frac{1}{|\mathcal{A}|}\sum_{(j,s)\in\mathcal{A}} (c_j - a_j) && \text{mean response time over scheduled jobs (minimise)}\\[4pt]
+\mathcal{E} &= \sum_{(j,s)\in\mathcal{A}} \rho_s\, d_j && \text{total energy (minimise)}
+\end{aligned}
+$$
+<p>\(C\) plays the role of the <em>task success rate</em>, the main metric in <a href="references.html#zhang2025mtgper">zhang2025mtgper</a> and <a href="references.html#magliarisi2025orbit">magliarisi2025orbit</a>. \(R\) is the objective of magliarisi2025orbit (Eq. 6). \(\mathcal{E}\) follows the energy-budget model of icdcs_sc.</p>
+<p>These three goals conflict. Scheduling more jobs costs more energy, and jobs placed later raise the mean response time. The <a href="decoder.html#fitness">fitness function</a> combines them into one number with weights. The <a href="theory.html#multiobjective">theory page</a> explains why that is a delicate choice.</p>
+
+<div class="callout warn"><span class="callout-title">A trap that matters for the results</span>
+<p>\(R\) is averaged only over the jobs that <em>were</em> scheduled. A schedule that places three short jobs and rejects 97 has an excellent \(R\). The thesis found that long evolutions exploit exactly this. See <a href="results.html">Experiments &amp; findings</a>.</p></div>
+
+<h3>Why not solve it exactly?</h3>
+<p>Take the simplest special case: identical satellites, unlimited energy and one common sunset. Asking "can <em>all</em> jobs be finished before sunset?" is then the decision version of \(P\,\|\,C_{\max}\), the classic problem of minimising the makespan on parallel identical machines, which is NP-hard (<a href="references.html#lenstra1977complexity">lenstra1977complexity</a>). Maximising the completion ratio \(C\) answers that question, so our problem is at least as hard, and we should not expect a fast exact algorithm. (Minimising \(R\) alone with every job scheduled would be easy: on identical machines, shortest-job-first is optimal for total completion time. The constraints are what make the problem hard.) Exact ILP formulations exist, but in Magliarisi and Casalicchio's study the ILP had a lower success rate than the heuristics, because it took too long and missed deadlines (<a href="references.html#icdcs_sc">icdcs_sc</a> §V-C). A hand-written greedy rule is fast but fixed. GP sits in between: it searches offline for a fast rule that works well on the data.</p>
+
+<p class="updated">Last checked against the code on 2026-11-14.</p>
+</main>
+</div>
+</body>
+</html>

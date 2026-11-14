@@ -1,0 +1,346 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Decoder and Fitness</title>
+<link rel="stylesheet" href="assets/style.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css">
+<script defer src="assets/site.js"></script>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.js"></script>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/contrib/auto-render.min.js" onload="onboardingRenderMath()"></script>
+</head>
+<body>
+<div class="layout">
+<aside class="sidebar" id="sidebar"></aside>
+<main class="content">
+
+<div class="eyebrow">The code</div>
+<h1>Decoder &amp; fitness</h1>
+<p class="lede">A tree is only a formula. The <strong>greedy decoder</strong> turns it into a schedule, and the <strong>fitness function</strong> turns the schedule into one number. Both live in <a href="../../include/scheduler/fitness_evaluator.h"><code>fitness_evaluator.h</code></a>.</p>
+
+<div class="toc"><strong>On this page</strong>
+<ol>
+  <li><a href="#decoder">The greedy decoder</a></li>
+  <li><a href="#example">A worked example</a></li>
+  <li><a href="#playground">Playground: try your own formula</a></li>
+  <li><a href="#cache">The score cache and its cost</a></li>
+  <li><a href="#fitness">From schedule to fitness</a></li>
+  <li><a href="#many">Several worlds at once</a></li>
+</ol></div>
+
+<h2 id="decoder">1. The greedy decoder</h2>
+<p><code>detail::greedyDecode(tree, registry, snapshot, …)</code> repeats one simple step: <strong>among all pairs (unscheduled job, satellite) that are still feasible, commit the one with the highest score.</strong></p>
+<pre>every satellite s:  free_at[s] ← τ          <span class="c"># snapshot time</span>
+jobs with arrival &gt; τ are skipped
+score[j][s] ← tree(j, s) for all j, s       <span class="c"># computed once</span>
+loop:
+    best ← argmax over unscheduled j, all s, of score[j][s]
+           among pairs where  free_at[s] + d_j ≤ sunset[s]      <span class="c"># sunset</span>
+                         and  rate[s] · d_j  ≤ energy[s]        <span class="c"># battery</span>
+    if no feasible pair: stop                <span class="c"># remaining jobs are rejected</span>
+    commit best (j*, s*):
+        start = free_at[s*], completion = start + d_j*
+        free_at[s*] = completion
+        energy[s*] -= rate[s*] · d_j*
+        completedTasks[s*] += 1
+    recompute score[·][s*] for unscheduled jobs   <span class="c"># only s* changed</span></pre>
+<p>Details that matter:</p>
+<ul>
+  <li><strong>Ties</strong> are broken by scan order: jobs in file order, then satellites in order, and a pair only wins if its score is <em>strictly</em> higher. A formula that ignores the satellite (for example <code>job.arrivalTime</code>) therefore always picks the first feasible satellite, which amounts to "first-fit".</li>
+  <li><strong>Infeasible pairs are skipped before the score is read.</strong> A formula cannot "choose" to break a constraint (<a href="references.html#magliarisi2026thesis">magliarisi2026thesis</a> §6.3.1, <a href="references.html#icdcs_sc">icdcs_sc</a> §III-C).</li>
+  <li><strong>The decoder chooses the job and the satellite with the same formula.</strong> The papers usually evolve separate rules for "which task next" and "which machine" (<a href="references.html#zhang2025mtgper">zhang2025mtgper</a> §2.2, <a href="references.html#mtgp_multicloud">mtgp_multicloud</a> §4.1). The project starts with one tree deliberately; see <a href="theory.html#single-tree">theory</a>.</li>
+  <li><strong>Batch, not dynamic:</strong> every job is visible at once, and the decoder picks the globally best pair each round. The papers instead react to one event at a time.</li>
+</ul>
+
+<h2 id="example">2. A worked example</h2>
+<p>Snapshot time \(\tau = 10\), energy rate 1 per minute. Five jobs, two satellites:</p>
+<div class="table-wrap"><table>
+<tr><th>Job</th><th class="num">arrival \(a_j\)</th><th class="num">exec \(e_j\)</th><th class="num">transfer \(t_j\)</th><th class="num">duration \(d_j\)</th></tr>
+<tr><td>J0</td><td class="num">0</td><td class="num">10</td><td class="num">2</td><td class="num">12</td></tr>
+<tr><td>J1</td><td class="num">3</td><td class="num">5</td><td class="num">1</td><td class="num">6</td></tr>
+<tr><td>J2</td><td class="num">7</td><td class="num">20</td><td class="num">4</td><td class="num">24</td></tr>
+<tr><td>J3</td><td class="num">9</td><td class="num">8</td><td class="num">2</td><td class="num">10</td></tr>
+<tr><td>J4</td><td class="num">5</td><td class="num">15</td><td class="num">3</td><td class="num">18</td></tr>
+</table></div>
+<div class="table-wrap"><table>
+<tr><th>Satellite</th><th class="num">energy \(E_s\)</th><th class="num">sunset \(\omega_s\)</th></tr>
+<tr><td>S0</td><td class="num">20</td><td class="num">40</td></tr>
+<tr><td>S1</td><td class="num">30</td><td class="num">35</td></tr>
+</table></div>
+<p>Use <strong>shortest job first</strong>, the tree <code>NEG(ADD(job.executionTime, job.transferTime))</code>, so the score is \(-d_j\):</p>
+<ol>
+  <li>Best score is J1 (−6). Both satellites tie, so S0 wins by scan order. S0: free at 16, energy 14.</li>
+  <li>Next is J3 (−10). On S0: \(16+10 = 26 \le 40\) and \(10 \le 14\). Feasible, so S0. S0: free at 26, energy 4.</li>
+  <li>Next is J0 (−12). On S0 the energy check fails (\(12 &gt; 4\)). On S1: \(10+12 = 22 \le 35\) and \(12 \le 30\). So S1. S1: free at 22, energy 18.</li>
+  <li>J4 (−18): S0 lacks energy; on S1, \(22 + 18 = 40 &gt; 35\) breaks the sunset. J2 (−24): breaks the sunset on both. <strong>No feasible pair: stop.</strong></li>
+</ol>
+<p>Result: 3 of 5 jobs scheduled, so \(C = 0.6\). Response times are J1 \(16-3=13\), J3 \(26-9=17\) and J0 \(22-0=22\), so \(R = 17.33\). Energy \(\mathcal{E} = 6+10+12 = 28\).</p>
+
+<h2 id="playground">3. Playground: try your own formula</h2>
+<p>The same world and the same algorithm, in your browser: same tie-breaking, same protected division, same column refresh. Pick a rule or type one, then step through.</p>
+<div class="widget" id="pg">
+  <div class="controls">
+    <label for="pg-preset">Rule</label>
+    <select id="pg-preset">
+      <option value="-(job.executionTime + job.transferTime)">Shortest job first</option>
+      <option value="-job.arrivalTime">FCFS: earliest arrival first</option>
+      <option value="job.arrivalTime">job.arrivalTime (latest arrival first)</option>
+      <option value="-sat.completedTasks">Least-loaded satellite</option>
+      <option value="sat.remainingEnergy">Most energy left</option>
+      <option value="(job.arrivalTime - (job.executionTime /? MAX(sat.completedTasks, sat.bandwidth)))">An evolved-looking tree</option>
+    </select>
+  </div>
+  <label for="pg-expr" class="small muted">Formula. Operators: + - * /? (or /), MAX, MIN, ABS, NEG, INV. Terminals: job.arrivalTime, job.executionTime, job.transferTime, job.imageSize, sat.remainingEnergy, sat.completedTasks, sat.bandwidth, sat.cpuCapacity</label>
+  <input type="text" id="pg-expr" spellcheck="false" autocomplete="off">
+  <div class="controls">
+    <button class="btn btn-primary" id="pg-step" type="button">Step</button>
+    <button class="btn" id="pg-run" type="button">Run to end</button>
+    <button class="btn" id="pg-reset" type="button">Reset</button>
+    <span class="status" id="pg-status" role="status"></span>
+  </div>
+  <div class="table-wrap"><table id="pg-matrix"></table></div>
+  <div class="table-wrap"><table id="pg-sats"></table></div>
+  <div id="pg-log" class="small"></div>
+  <p class="small muted">Outlined cell: the pair the next step will commit. Struck-through cell: infeasible now (sunset or energy). Greyed row: already scheduled.</p>
+</div>
+<div class="callout try"><span class="callout-title">Things to try</span>
+<ul>
+  <li>Compare <em>FCFS</em> and <em>job.arrivalTime</em>. They are opposites: a higher score wins, so <code>job.arrivalTime</code> on its own means "latest arrival first".</li>
+  <li>Run <em>Least-loaded satellite</em> and watch the S0 column change after each commit. That change is the column refresh.</li>
+  <li>Every preset schedules 3 of 5 jobs but with different \(R\) and energy. Which objectives does the choice of rule actually move here?</li>
+  <li>Can <em>any</em> formula schedule 4 jobs? Work it out before you try. <details><summary class="small">Answer</summary>No. S0 can host at most 20 minutes of work (energy 20, and 30 minutes until sunset). S1 can host at most 25 (sunset). The four shortest jobs need \(6+10+12+18 = 46 &gt; 45\). This is the kind of capacity limit that keeps \(C\) low in the real worlds too.</details></li>
+</ul></div>
+
+<h2 id="cache">4. The score cache and its cost</h2>
+<p>A naive decoder would re-evaluate the tree for every pair on every round: up to \(J\) rounds × \(J S\) pairs, so \(O(J^2 S)\) tree evaluations. The trick: a score depends only on the job, which never changes, and the satellite, which changes only when a job is committed to it. So:</p>
+<ul>
+  <li>compute the \(J \times S\) matrix once: \(JS\) evaluations;</li>
+  <li>after each commit, refresh only that satellite's column: at most \(J\) evaluations per round, \(J^2\) in total.</li>
+</ul>
+$$\text{tree evaluations: } O(J^2 S) \;\longrightarrow\; O(JS + J^2)$$
+<p>The argmax scan is still \(O(JS)\) comparisons per round, but those are cheap next to a tree walk. Selection is byte-for-byte the same as without the cache, which <a href="../../PERFORMANCE.md"><code>PERFORMANCE.md</code></a> verified. Working buffers are <code>thread_local</code>, so they are allocated once per thread instead of once per decode.</p>
+
+<h2 id="fitness">5. From schedule to fitness</h2>
+<p>After decoding every individual \(i\) we have raw objectives \((C_i, R_i, \mathcal{E}_i)\). They are combined in <code>FitnessEvaluator::evaluatePointers</code>:</p>
+$$ f_i \;=\; w_C\, C_i \;-\; w_R\, \hat R_i \;-\; w_E\, \hat{\mathcal E}_i, \qquad (w_C, w_R, w_E) = (0.60,\ 0.25,\ 0.15)$$
+<p>where the hats are <strong>min-max normalisation across the current population</strong>:</p>
+$$\hat x_i = \frac{x_i - \min_k x_k}{\max_k x_k - \min_k x_k} \in [0,1], \qquad \hat x_i = 0 \text{ if all } x_k \text{ are equal.}$$
+<ul>
+  <li>\(C_i\) is <strong>not</strong> normalised. It is already in [0, 1], and keeping it absolute preserves selection pressure when the whole population ties on cost.</li>
+  <li>For \(R\), individuals that scheduled <strong>nothing</strong> are left out of the min and max and get \(\hat R_i = 1\), the worst value. Otherwise an empty schedule would report \(R = 0\), the best possible.</li>
+  <li>\(\mathcal{E}\) uses plain min-max: zero energy for zero jobs is a true value.</li>
+</ul>
+
+<h3>Worked example: why the weights are delicate</h3>
+<p>Three individuals in one population:</p>
+<div class="table-wrap"><table>
+<tr><th></th><th class="num">\(C\)</th><th class="num">\(R\)</th><th class="num">\(\mathcal{E}\)</th><th class="num">\(\hat R\)</th><th class="num">\(\hat{\mathcal E}\)</th><th class="num">fitness</th></tr>
+<tr><td>A: schedules many</td><td class="num">0.75</td><td class="num">17.3</td><td class="num">28</td><td class="num">1</td><td class="num">1</td><td class="num">0.60·0.75 − 0.25 − 0.15 = <strong>0.050</strong></td></tr>
+<tr class="hl"><td>B: schedules few, fast</td><td class="num">0.50</td><td class="num">12.0</td><td class="num">16</td><td class="num">0</td><td class="num">0.571</td><td class="num">0.30 − 0 − 0.086 = <strong>0.214</strong></td></tr>
+<tr><td>C: schedules nothing</td><td class="num">0</td><td class="num">n/a</td><td class="num">0</td><td class="num">1</td><td class="num">0</td><td class="num">0 − 0.25 − 0 = <strong>−0.250</strong></td></tr>
+</table></div>
+<p><strong>B beats A</strong> although A completes 50% more jobs. Because \(\hat R\) and \(\hat{\mathcal E}\) are relative, the individual with the worst cost always pays the full 0.40 penalty. The completion bonus of A over B is only \(0.6 \times 0.25 = 0.15\). This is the "misalignment" the thesis observed: long runs drift toward rules that schedule few, short jobs (<a href="results.html">results</a>). The <a href="theory.html#multiobjective">theory page</a> discusses alternatives (lexicographic, Pareto).</p>
+<div class="callout warn"><span class="callout-title">Fitness is only comparable inside one population and one world</span>
+<p>The same tree gets a different fitness in a different population or a different world. To compare trees across runs, re-score them with <code>evaluate_single</code>, which returns the raw \((C, R, \mathcal{E})\). The experiments do exactly that.</p></div>
+
+<h2 id="many">6. Several worlds at once</h2>
+<p><code>evaluate_many(population, snapshots)</code> decodes each individual on every world and <strong>pools</strong> the raw sums before normalising:</p>
+$$C_i = \frac{\sum_w |\mathcal A_{i,w}|}{\sum_w N_w}, \qquad R_i = \frac{\sum_w \sum_{\mathcal A_{i,w}} (c_j - a_j)}{\sum_w |\mathcal A_{i,w}|}, \qquad \mathcal E_i = \sum_w \mathcal E_{i,w}$$
+<p>Pooling, rather than averaging per-world ratios, gives every job the same weight and keeps "no job scheduled" well defined. Empty worlds are skipped. With one world, <code>evaluate_many</code> gives exactly the same result as <code>evaluate</code>, and a unit test checks this.</p>
+
+<p class="updated">Last checked against the code on 2026-11-14.</p>
+</main>
+</div>
+
+<script>
+(function () {
+  "use strict";
+  var TAU = 10;
+  var JOBS = [
+    { name: "J0", arrivalTime: 0, executionTime: 10, transferTime: 2, imageSize: 12.0 },
+    { name: "J1", arrivalTime: 3, executionTime: 5,  transferTime: 1, imageSize: 9.5 },
+    { name: "J2", arrivalTime: 7, executionTime: 20, transferTime: 4, imageSize: 22.0 },
+    { name: "J3", arrivalTime: 9, executionTime: 8,  transferTime: 2, imageSize: 14.0 },
+    { name: "J4", arrivalTime: 5, executionTime: 15, transferTime: 3, imageSize: 18.5 }
+  ];
+  var SATS = [
+    { name: "S0", remainingEnergy: 20, operationalUntil: 40, bandwidth: 12.0, cpuCapacity: 3.1 },
+    { name: "S1", remainingEnergy: 30, operationalUntil: 35, bandwidth: 9.0,  cpuCapacity: 4.2 }
+  ];
+  var TERMS = {
+    "job.arrivalTime":   function (j) { return j.arrivalTime; },
+    "job.executionTime": function (j) { return j.executionTime; },
+    "job.transferTime":  function (j) { return j.transferTime; },
+    "job.imageSize":     function (j) { return j.imageSize; },
+    "sat.remainingEnergy": function (j, s) { return s.remainingEnergy; },
+    "sat.completedTasks":  function (j, s) { return s.completedTasks; },
+    "sat.bandwidth":       function (j, s) { return s.bandwidth; },
+    "sat.cpuCapacity":     function (j, s) { return s.cpuCapacity; }
+  };
+  function pdiv(a, b) { return Math.abs(b) < 1e-9 ? 0 : a / b; }
+  var FUNCS = {
+    MAX: [2, function (a, b) { return Math.max(a, b); }],
+    MIN: [2, function (a, b) { return Math.min(a, b); }],
+    ABS: [1, function (a) { return Math.abs(a); }],
+    NEG: [1, function (a) { return -a; }],
+    INV: [1, function (a) { return Math.abs(a) < 1e-9 ? 0 : 1 / a; }]
+  };
+
+  // ── Tiny recursive-descent parser → closure (j, s) => number ──
+  function parse(src) {
+    var toks = [], re = /\s*(\/\?|[A-Za-z_][\w.]*|\d+(?:\.\d+)?|[-+*\/(),])/y, m, pos = 0;
+    src = src.trim();
+    while (pos < src.length) {
+      re.lastIndex = pos; m = re.exec(src);
+      if (!m) throw new Error("Unexpected character at position " + (pos + 1) + ": '" + src[pos] + "'");
+      toks.push(m[1]); pos = re.lastIndex;
+      while (pos < src.length && /\s/.test(src[pos])) pos++;
+    }
+    var i = 0;
+    function peek() { return toks[i]; }
+    function eat(t) { if (toks[i] !== t) throw new Error("Expected '" + t + "' but found " + (toks[i] ? "'" + toks[i] + "'" : "end of formula")); i++; }
+    function expr() {
+      var f = term();
+      while (peek() === "+" || peek() === "-") {
+        var op = toks[i++], g = term();
+        f = (function (a, b, o) { return o === "+" ? function (j, s) { return a(j, s) + b(j, s); } : function (j, s) { return a(j, s) - b(j, s); }; })(f, g, op);
+      }
+      return f;
+    }
+    function term() {
+      var f = unary();
+      while (peek() === "*" || peek() === "/" || peek() === "/?") {
+        var op = toks[i++], g = unary();
+        f = (function (a, b, o) { return o === "*" ? function (j, s) { return a(j, s) * b(j, s); } : function (j, s) { return pdiv(a(j, s), b(j, s)); }; })(f, g, op);
+      }
+      return f;
+    }
+    function unary() {
+      if (peek() === "-") { i++; var a = unary(); return function (j, s) { return -a(j, s); }; }
+      return primary();
+    }
+    function primary() {
+      var t = toks[i];
+      if (t === undefined) throw new Error("Formula ends too early");
+      if (t === "(") { i++; var e = expr(); eat(")"); return e; }
+      if (/^\d/.test(t)) { i++; var v = parseFloat(t); return function () { return v; }; }
+      var up = t.toUpperCase();
+      if (FUNCS[up] && toks[i + 1] === "(") {
+        i += 2; var args = [expr()];
+        while (peek() === ",") { i++; args.push(expr()); }
+        eat(")");
+        if (args.length !== FUNCS[up][0]) throw new Error(up + " takes " + FUNCS[up][0] + " argument(s)");
+        var fn = FUNCS[up][1];
+        return args.length === 1 ? function (j, s) { return fn(args[0](j, s)); }
+                                 : function (j, s) { return fn(args[0](j, s), args[1](j, s)); };
+      }
+      if (TERMS[t]) { i++; var acc = TERMS[t]; return function (j, s) { return acc(j, s); }; }
+      throw new Error("Unknown name '" + t + "'");
+    }
+    var f = expr();
+    if (i < toks.length) throw new Error("Unexpected '" + toks[i] + "'");
+    return f;
+  }
+
+  // ── Decoder state (mirrors detail::greedyDecode) ──
+  var st;
+  var $ = function (id) { return document.getElementById(id); };
+  function dur(j) { return j.executionTime + j.transferTime; }
+
+  function reset() {
+    var f;
+    try { f = parse($("pg-expr").value); }
+    catch (e) { st = null; $("pg-status").textContent = e.message; $("pg-status").className = "status err"; render(); return; }
+    $("pg-status").className = "status";
+    var sats = SATS.map(function (s) { return { name: s.name, remainingEnergy: s.remainingEnergy, operationalUntil: s.operationalUntil, bandwidth: s.bandwidth, cpuCapacity: s.cpuCapacity, completedTasks: 0, freeAt: TAU, spent: 0 }; });
+    var score = JOBS.map(function (j) { return sats.map(function (s) { return f(j, s); }); });
+    st = { f: f, sats: sats, score: score, done: JOBS.map(function () { return null; }), log: [], finished: false, round: 0 };
+    findBest(); render();
+  }
+
+  function feasible(j, s) {
+    var d = dur(JOBS[j]), sat = st.sats[s];
+    return sat.freeAt + d <= sat.operationalUntil && d * 1.0 <= sat.remainingEnergy;
+  }
+
+  function findBest() {
+    var best = -Infinity, bj = -1, bs = -1;
+    for (var j = 0; j < JOBS.length; j++) {
+      if (st.done[j]) continue;
+      for (var s = 0; s < st.sats.length; s++) {
+        if (!feasible(j, s)) continue;
+        if (st.score[j][s] > best) { best = st.score[j][s]; bj = j; bs = s; }
+      }
+    }
+    st.next = bj < 0 ? null : { j: bj, s: bs };
+    if (!st.next) st.finished = true;
+  }
+
+  function step() {
+    if (!st || st.finished) return;
+    var j = st.next.j, s = st.next.s, sat = st.sats[s], d = dur(JOBS[j]);
+    var start = sat.freeAt, end = start + d;
+    sat.freeAt = end; sat.completedTasks += 1; sat.remainingEnergy -= d; sat.spent += d;
+    st.done[j] = { sat: s, start: start, end: end };
+    st.round++;
+    st.log.push("Round " + st.round + ": " + JOBS[j].name + " → " + sat.name + ", start " + start + ", finish " + end + " (response " + (end - JOBS[j].arrivalTime) + ")");
+    for (var k = 0; k < JOBS.length; k++) if (!st.done[k]) st.score[k][s] = st.f(JOBS[k], sat);
+    findBest(); render();
+  }
+
+  function fmt(x) { return (Math.abs(x) >= 1000 || (Math.abs(x) < 0.01 && x !== 0)) ? x.toExponential(2) : (+x.toFixed(3)).toString(); }
+
+  function render() {
+    var m = $("pg-matrix"), t = $("pg-sats"), lg = $("pg-log");
+    m.innerHTML = ""; t.innerHTML = ""; lg.innerHTML = "";
+    if (!st) return;
+    var h = "<tr><th>Job</th><th class='num'>a</th><th class='num'>d</th>";
+    st.sats.forEach(function (s) { h += "<th class='num'>score on " + s.name + "</th>"; });
+    h += "<th>Status</th></tr>";
+    JOBS.forEach(function (job, j) {
+      h += "<tr><td>" + job.name + "</td><td class='num'>" + job.arrivalTime + "</td><td class='num'>" + dur(job) + "</td>";
+      st.sats.forEach(function (s, k) {
+        var cls = "num";
+        if (st.done[j]) cls += " done";
+        else if (!feasible(j, k)) cls += " infeasible";
+        if (st.next && st.next.j === j && st.next.s === k) cls += " best";
+        h += "<td class='" + cls + "'>" + fmt(st.score[j][k]) + "</td>";
+      });
+      var d = st.done[j];
+      h += "<td>" + (d ? "<span class='pill ok'>on " + st.sats[d.sat].name + ", ends " + d.end + "</span>" : (st.finished ? "<span class='pill bad'>rejected</span>" : "waiting")) + "</td></tr>";
+    });
+    m.innerHTML = h;
+    var hs = "<tr><th>Satellite</th><th class='num'>free at</th><th class='num'>energy left</th><th class='num'>sunset</th><th class='num'>completedTasks</th></tr>";
+    st.sats.forEach(function (s) { hs += "<tr><td>" + s.name + "</td><td class='num'>" + s.freeAt + "</td><td class='num'>" + s.remainingEnergy + "</td><td class='num'>" + s.operationalUntil + "</td><td class='num'>" + s.completedTasks + "</td></tr>"; });
+    t.innerHTML = hs;
+    var lines = st.log.map(function (l) { return "<div>" + l + "</div>"; }).join("");
+    if (st.finished) {
+      var n = 0, resp = 0, energy = 0;
+      st.done.forEach(function (d, j) { if (d) { n++; resp += d.end - JOBS[j].arrivalTime; } });
+      st.sats.forEach(function (s) { energy += s.spent; });
+      lines += "<p><strong>Finished.</strong> No feasible pair left. C = " + n + "/" + JOBS.length + " = " + (n / JOBS.length).toFixed(2) +
+               ", R = " + (n ? (resp / n).toFixed(2) : "n/a") + " min, energy = " + energy + ".</p>";
+      $("pg-status").textContent = "Done in " + st.round + " round(s).";
+    } else {
+      $("pg-status").textContent = "Next: " + JOBS[st.next.j].name + " → " + st.sats[st.next.s].name;
+    }
+    lg.innerHTML = lines;
+  }
+
+  function init() {
+    var sel = $("pg-preset");
+    $("pg-expr").value = sel.value;
+    sel.addEventListener("change", function () { $("pg-expr").value = sel.value; reset(); });
+    $("pg-expr").addEventListener("change", reset);
+    $("pg-expr").addEventListener("keydown", function (e) { if (e.key === "Enter") reset(); });
+    $("pg-step").addEventListener("click", step);
+    $("pg-run").addEventListener("click", function () { var guard = 0; while (st && !st.finished && guard++ < 50) step(); });
+    $("pg-reset").addEventListener("click", reset);
+    reset();
+  }
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init); else init();
+})();
+</script>
+</body>
+</html>

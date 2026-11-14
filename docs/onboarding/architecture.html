@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Architecture Map</title>
+<link rel="stylesheet" href="assets/style.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css">
+<script defer src="assets/site.js"></script>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.js"></script>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/contrib/auto-render.min.js" onload="onboardingRenderMath()"></script>
+</head>
+<body>
+<div class="layout">
+<aside class="sidebar" id="sidebar"></aside>
+<main class="content">
+
+<div class="eyebrow">The code</div>
+<h1>Architecture map</h1>
+<p class="lede">Two languages, one process. Python loads data and drives the loop. A header-only C++17 library does all the heavy work and is compiled into a Python module called <code>scheduler</code>.</p>
+
+<figure>
+<div class="frame">
+<svg class="diagram" viewBox="0 0 760 470" role="img" aria-label="Architecture: Python layer with main.py, data_processing, metrics and snapshot tools calls the scheduler module via pybind11 bindings; the C++ core contains SchedulerGP, TreeOperators, TreeBuilder, ExprNode, registry, FitnessEvaluator and types.">
+  <defs><marker id="ah3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" class="arrowhead"/></marker></defs>
+  <rect x="10" y="10" width="740" height="150" rx="12" class="box-ok" opacity=".55"/>
+  <text x="26" y="32" font-weight="650">Python</text>
+  <rect x="30" y="48" width="160" height="56" rx="8" class="box"/><text x="110" y="72" text-anchor="middle" class="t-mono">main.py</text><text x="110" y="90" text-anchor="middle" class="t-muted">evolution loop, CLI</text>
+  <rect x="210" y="48" width="170" height="56" rx="8" class="box"/><text x="295" y="72" text-anchor="middle" class="t-mono">data_processing/</text><text x="295" y="90" text-anchor="middle" class="t-muted">CSV → Job, Satellite</text>
+  <rect x="400" y="48" width="160" height="56" rx="8" class="box"/><text x="480" y="72" text-anchor="middle" class="t-mono">metrics_tracker.py</text><text x="480" y="90" text-anchor="middle" class="t-muted">CSV / NPZ / PNG</text>
+  <rect x="580" y="48" width="155" height="56" rx="8" class="box"/><text x="657" y="72" text-anchor="middle" class="t-mono">snapshot_*.py</text><text x="657" y="90" text-anchor="middle" class="t-muted">inspect & plot worlds</text>
+  <text x="30" y="140" class="t-muted">also: thesis/experiments/*.py (experiments), tests/ (unittest), utils.py (CSV parsing)</text>
+  <rect x="190" y="178" width="380" height="40" rx="8" class="box-accent"/>
+  <text x="380" y="203" text-anchor="middle" class="t-mono">bindings.cpp  →  import scheduler  (pybind11)</text>
+  <line x1="380" y1="160" x2="380" y2="176" class="edge" marker-end="url(#ah3)"/>
+  <line x1="380" y1="218" x2="380" y2="236" class="edge" marker-end="url(#ah3)"/>
+  <rect x="10" y="238" width="740" height="222" rx="12" class="box-lit" opacity=".45"/>
+  <text x="26" y="260" font-weight="650">C++ core: include/scheduler/</text>
+  <rect x="30" y="276" width="220" height="62" rx="8" class="box"/><text x="140" y="300" text-anchor="middle" class="t-mono">scheduler_gp.h</text><text x="140" y="318" text-anchor="middle" class="t-muted">SchedulerGP: the GA loop</text>
+  <rect x="270" y="276" width="220" height="62" rx="8" class="box"/><text x="380" y="300" text-anchor="middle" class="t-mono">tree_operators.h</text><text x="380" y="318" text-anchor="middle" class="t-muted">crossover, mutate, hoist</text>
+  <rect x="510" y="276" width="220" height="62" rx="8" class="box"/><text x="620" y="300" text-anchor="middle" class="t-mono">fitness_evaluator.h</text><text x="620" y="318" text-anchor="middle" class="t-muted">decoder + fitness</text>
+  <rect x="270" y="360" width="220" height="62" rx="8" class="box"/><text x="380" y="384" text-anchor="middle" class="t-mono">tree_builder.h</text><text x="380" y="402" text-anchor="middle" class="t-muted">random trees (grow/full)</text>
+  <rect x="510" y="360" width="105" height="62" rx="8" class="box"/><text x="562" y="384" text-anchor="middle" class="t-mono">expr_tree.h</text><text x="562" y="402" text-anchor="middle" class="t-muted">ExprNode</text>
+  <rect x="625" y="360" width="105" height="62" rx="8" class="box"/><text x="677" y="384" text-anchor="middle" class="t-mono">registry.h</text><text x="677" y="402" text-anchor="middle" class="t-muted">terminals</text>
+  <rect x="30" y="360" width="220" height="62" rx="8" class="box"/><text x="140" y="384" text-anchor="middle" class="t-mono">types.h</text><text x="140" y="402" text-anchor="middle" class="t-muted">Job, Satellite structs</text>
+  <line x1="250" y1="307" x2="268" y2="307" class="edge" marker-end="url(#ah3)"/>
+  <line x1="380" y1="338" x2="380" y2="358" class="edge" marker-end="url(#ah3)"/>
+  <line x1="490" y1="391" x2="508" y2="391" class="edge" marker-end="url(#ah3)"/>
+  <line x1="620" y1="338" x2="580" y2="358" class="edge" marker-end="url(#ah3)"/>
+  <line x1="640" y1="338" x2="670" y2="358" class="edge" marker-end="url(#ah3)"/>
+  <text x="30" y="446" class="t-muted">arrows = "uses". fitness_evaluator.h also includes scheduler_gp.h for the GPIndividual type.</text>
+</svg>
+</div>
+<figcaption>Everything below the binding line is header-only C++ compiled once into one <code>.so</code> file. Python never runs the GP logic itself; it only passes data and calls methods.</figcaption>
+</figure>
+
+<h2>Why two languages?</h2>
+<p>Fitness evaluation dominates the run time: each generation decodes every tree on every world, and each decode evaluates the tree thousands of times. For \(N\) decisions, \(n\) candidates and rule size \(R\), Sun et al. put the cost of one generation at \(O(N \cdot n \cdot R)\) (<a href="references.html#mtgp_multicloud">mtgp_multicloud</a> §4.4). C++ with <code>-O3</code> and OpenMP makes that fast. Python keeps data handling, configuration and plotting simple. <a href="../../PERFORMANCE.md"><code>PERFORMANCE.md</code></a> records the speed-ups and how they were measured.</p>
+
+<h2>The files, one by one</h2>
+
+<h3>C++ core: <code>include/scheduler/</code></h3>
+<div class="table-wrap"><table>
+<tr><th>File</th><th>What lives there</th><th>Read it when…</th></tr>
+<tr><td><a href="../../include/scheduler/types.h"><code>types.h</code></a></td><td><code>Job</code> and <code>Satellite</code> plain structs.</td><td>you need to know what data exists.</td></tr>
+<tr><td><a href="../../include/scheduler/registry.h"><code>registry.h</code></a></td><td><code>buildTerminalRegistry()</code>: the 18 terminals as (name, accessor function) pairs. Accessors are plain function pointers, for speed in the inner loop.</td><td>you add or change an input feature.</td></tr>
+<tr><td><a href="../../include/scheduler/expr_tree.h"><code>expr_tree.h</code></a></td><td><code>ExprNode</code>: node type, children, <code>eval()</code>, <code>simplifyInPlace()</code>, <code>size()</code>, <code>depth()</code>, <code>toString()</code>.</td><td>you add an operator or debug a score.</td></tr>
+<tr><td><a href="../../include/scheduler/tree_builder.h"><code>tree_builder.h</code></a></td><td><code>TreeBuilder</code>: <code>grow</code>, <code>full</code>, <code>rampedHalfAndHalf</code>, and the one place where a terminal is drawn (<code>randomTerminalIndex</code>).</td><td>you change initialisation or terminal sampling.</td></tr>
+<tr><td><a href="../../include/scheduler/tree_operators.h"><code>tree_operators.h</code></a></td><td><code>TreeOperators</code>: <code>crossover</code>, <code>mutate</code>, <code>hoist</code>, and the size/depth caps.</td><td>you change a genetic operator.</td></tr>
+<tr><td><a href="../../include/scheduler/scheduler_gp.h"><code>scheduler_gp.h</code></a></td><td><code>GPIndividual</code> (tree + fitness + id) and <code>SchedulerGP</code>: <code>initialize()</code>, <code>solveNextGeneration()</code>, tournament selection, elitism, clone retries, terminal weighting, diversity.</td><td>you change the evolutionary loop or its parameters.</td></tr>
+<tr><td><a href="../../include/scheduler/fitness_evaluator.h"><code>fitness_evaluator.h</code></a></td><td><code>SimulationSnapshot</code>, the greedy decoder <code>detail::greedyDecode</code>, and <code>FitnessEvaluator</code> (<code>evaluate</code>, <code>evaluateMany</code>, <code>evaluateSingle</code>, <code>constantTerminals</code>).</td><td>you change constraints, objectives or the fitness formula.</td></tr>
+<tr><td><code>data_factories.h</code></td><td>Two declarations with no implementation. Leftover; nothing uses it.</td><td>never.</td></tr>
+</table></div>
+<div class="callout"><span class="callout-title">Read the top comment of every header first</span>
+<p>Each header starts with a <em>LITERATURE NOTES</em> block that explains which paper each design choice comes from and where the project deviates. It is the fastest way to understand <em>why</em> the code looks the way it does.</p></div>
+
+<h3>The bridge: <a href="../../bindings.cpp"><code>bindings.cpp</code></a></h3>
+<p>Uses <strong>pybind11</strong> to expose the C++ classes to Python with their default arguments. The names stay the same, except <code>evaluateMany</code>, <code>evaluateSingle</code> and <code>constantTerminals</code>, which become <code>evaluate_many</code>, <code>evaluate_single</code> and <code>constant_terminals</code> in Python. <code>evaluate_single</code> returns a tuple <code>(completion_ratio, mean_response, energy)</code>.</p>
+<p>When you add a parameter to a C++ method, add it in <code>bindings.cpp</code> too, with a <code>py::arg</code> and a default that keeps the old behaviour.</p>
+
+<h3>Python layer</h3>
+<div class="table-wrap"><table>
+<tr><th>File</th><th>Role</th></tr>
+<tr><td><a href="../../main.py"><code>main.py</code></a></td><td>CLI and configuration layering, world loading, the generation loop, convergence-triggered world switching, metrics and logs.</td></tr>
+<tr><td><a href="../../data_processing/data_factory.py"><code>data_processing/data_factory.py</code></a></td><td>Builds <code>Job</code> and <code>Satellite</code> objects from a world CSV (<code>create_jobs_from_csv</code>, <code>create_satellites_from_csv</code>), plus dummy random generators.</td></tr>
+<tr><td><a href="../../data_processing/csv_preprocessing/world_splitter.py"><code>…/csv_preprocessing/world_splitter.py</code></a></td><td>One-off preprocessing: splits the raw log into 10-minute worlds with normalised arrival times.</td></tr>
+<tr><td><a href="../../utils.py"><code>utils.py</code></a></td><td>CSV loading, locale-aware number parsing (<code>"2,17E+10"</code>), and linear <code>_rescale</code>.</td></tr>
+<tr><td><a href="../../metrics_tracker.py"><code>metrics_tracker.py</code></a></td><td><code>GenerationMetrics</code> dataclass and <code>MetricsCollector</code> (CSV, NPZ, PNG).</td></tr>
+<tr><td><a href="../../snapshot_inspector.py"><code>snapshot_inspector.py</code></a>, <a href="../../snapshot_timeline_plot.py"><code>snapshot_timeline_plot.py</code></a></td><td>Print and save snapshots as JSON; plot a snapshot's timeline.</td></tr>
+<tr><td><a href="../../tests/test_paper_features.py"><code>tests/test_paper_features.py</code></a></td><td>Deterministic unittest checks of the literature features.</td></tr>
+<tr><td><code>thesis/experiments/</code></td><td><code>run_experiments.py</code> (main study and baselines), <code>run_ablation.py</code> (options vs baseline), <code>make_report.py</code> (LaTeX tables and plots).</td></tr>
+</table></div>
+
+<h3>Other folders</h3>
+<ul>
+  <li><code>thesis/</code>: LaTeX thesis, <code>references.bib</code> and <code>literature_notes.md</code>, which holds reading notes for every cited paper. Read the notes before changing the algorithm.</li>
+  <li><code>docs/source</code>, <code>docs/build</code>: Sphinx API documentation of the <code>scheduler</code> module (<code>scripts/make-doc.sh</code>).</li>
+  <li><code>docs/onboarding</code>: this guide.</li>
+  <li><code>runConfigurations/</code>: named JSON run settings.</li>
+  <li><code>scripts/</code>: small shell helpers for building, running and debugging.</li>
+  <li><code>.devcontainer/</code>: the Docker development environment.</li>
+</ul>
+
+<h2>One call, end to end</h2>
+<p>What happens when <code>main.py</code> runs one generation:</p>
+<ol>
+  <li><code>fitness_evaluator.evaluate(population, snapshot)</code> crosses into C++.</li>
+  <li>In <code>FitnessEvaluator::evaluatePointers</code>, an OpenMP loop gives each thread some individuals. For each one, <code>detail::greedyDecode</code> builds a schedule and <code>sumObjectives</code> measures it.</li>
+  <li>Back on one thread, response time and energy are min-max normalised across the population, and <code>fitness</code> is written into each <code>GPIndividual</code>. The objects are shared with Python, not copied.</li>
+  <li>Python reads the best fitness, decides whether to switch worlds, records metrics.</li>
+  <li><code>genetic_algorithm.solveNextGeneration()</code> crosses into C++ again: sort, elitism, then a second OpenMP loop breeds offspring pairs. Each pair has its own random-number stream, so a seeded run gives the same result on any number of threads.</li>
+</ol>
+
+<h2>Conventions you must keep</h2>
+<ul>
+  <li><strong>Higher score is better</strong>, both for a tree's output and for fitness. Some papers use the opposite convention, so watch the sign when you compare formulas.</li>
+  <li><strong>Defaults reproduce the old behaviour.</strong> Every literature option is off by default, so the same seed gives the same evolution as before. New options should follow the same rule.</li>
+  <li><strong>Do not rename public C++ functions</strong> without updating <code>bindings.cpp</code> and the Python callers (<code>AGENT.md</code>).</li>
+  <li><strong>Randomness goes through the given <code>mt19937</code></strong>, never <code>rand()</code> or a new <code>random_device</code>, or seeded runs stop being reproducible.</li>
+  <li><strong>Python references into the population go stale.</strong> <code>getPopulation()</code> returns a live view of the C++ vector. After <code>solveNextGeneration()</code> that vector is replaced, so an individual you saved from before the call points to freed memory. Call <code>getPopulation()</code> again after each generation, as <code>main.py</code> does.</li>
+</ul>
+
+<p class="updated">Last checked against the code on 2026-11-14.</p>
+</main>
+</div>
+</body>
+</html>

@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Data Pipeline</title>
+<link rel="stylesheet" href="assets/style.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css">
+<script defer src="assets/site.js"></script>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.js"></script>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/contrib/auto-render.min.js" onload="onboardingRenderMath()"></script>
+</head>
+<body>
+<div class="layout">
+<aside class="sidebar" id="sidebar"></aside>
+<main class="content">
+
+<div class="eyebrow">The code</div>
+<h1>Data pipeline</h1>
+<p class="lede">How one simulator log becomes 30 training worlds, and how a CSV row becomes a <code>Job</code> or a <code>Satellite</code>. The full technical write-up is <a href="../../data_processing/DATA_PIPELINE.md"><code>data_processing/DATA_PIPELINE.md</code></a>.</p>
+
+<figure>
+<div class="frame">
+<svg class="diagram" viewBox="0 0 760 250" role="img" aria-label="Data flow: example.csv is split by world_splitter into 30 world CSVs; for each world, data_factory builds jobs and satellites, which form a SimulationSnapshot passed to the C++ evaluator.">
+  <defs><marker id="ah4" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" class="arrowhead"/></marker></defs>
+  <rect x="10" y="30" width="150" height="70" rx="8" class="box"/>
+  <text x="85" y="58" text-anchor="middle" class="t-mono">data/example.csv</text>
+  <text x="85" y="78" text-anchor="middle" class="t-muted">2960 tasks, 300 min</text>
+  <rect x="200" y="30" width="170" height="70" rx="8" class="box-accent"/>
+  <text x="285" y="58" text-anchor="middle" class="t-mono">world_splitter.py</text>
+  <text x="285" y="78" text-anchor="middle" class="t-muted">run once</text>
+  <rect x="410" y="30" width="150" height="70" rx="8" class="box"/>
+  <text x="485" y="58" text-anchor="middle" class="t-mono">data/worlds/</text>
+  <text x="485" y="78" text-anchor="middle" class="t-muted">world_000…029.csv</text>
+  <rect x="600" y="30" width="150" height="70" rx="8" class="box-accent"/>
+  <text x="675" y="58" text-anchor="middle" class="t-mono">data_factory.py</text>
+  <text x="675" y="78" text-anchor="middle" class="t-muted">every world load</text>
+  <line x1="160" y1="65" x2="198" y2="65" class="edge" marker-end="url(#ah4)"/>
+  <line x1="370" y1="65" x2="408" y2="65" class="edge" marker-end="url(#ah4)"/>
+  <line x1="560" y1="65" x2="598" y2="65" class="edge" marker-end="url(#ah4)"/>
+  <rect x="470" y="150" width="130" height="60" rx="8" class="box-ok"/>
+  <text x="535" y="176" text-anchor="middle" class="t-mono">Job ×100</text>
+  <text x="535" y="194" text-anchor="middle" class="t-muted">one per row</text>
+  <rect x="620" y="150" width="130" height="60" rx="8" class="box-ok"/>
+  <text x="685" y="176" text-anchor="middle" class="t-mono">Satellite ×k</text>
+  <text x="685" y="194" text-anchor="middle" class="t-muted">one per server</text>
+  <line x1="660" y1="100" x2="560" y2="148" class="edge" marker-end="url(#ah4)"/>
+  <line x1="690" y1="100" x2="688" y2="148" class="edge" marker-end="url(#ah4)"/>
+  <rect x="170" y="150" width="250" height="60" rx="8" class="box-lit"/>
+  <text x="295" y="176" text-anchor="middle" class="t-mono">SimulationSnapshot</text>
+  <text x="295" y="194" text-anchor="middle" class="t-muted">τ = last arrival → C++ evaluator</text>
+  <line x1="468" y1="180" x2="422" y2="180" class="edge" marker-end="url(#ah4)"/>
+</svg>
+</div>
+<figcaption>Only the splitter writes files. Everything after it happens in memory at run time.</figcaption>
+</figure>
+
+<h2>Where the data comes from</h2>
+<p><code>data/example.csv</code> is the task log of one 300-minute run of the discrete-event simulator of Magliarisi et al. (<a href="references.html#magliarisi2025orbit">magliarisi2025orbit</a>). That simulator uses real Starlink orbits and models each satellite as a queue. The log has one row per task: its type, execution and transfer time, image size, number of routing hops, queue length, the server (satellite) that ran it, and its remaining energy. <code>config.json5</code> holds the simulator settings that produced it.</p>
+<p>The file is <strong>not in git</strong>. Ask your supervisor for it.</p>
+
+<h2>Step 1: split into worlds</h2>
+<p><a href="../../data_processing/csv_preprocessing/world_splitter.py"><code>world_splitter.py</code></a> puts each row into a 10-minute window, \([0,10), [10,20), \dots\), using its <code>Arrival Time (System)</code>. Each non-empty window becomes a <strong>world</strong>: 30 files of about 100 tasks each, plus a <code>manifest.json</code>.</p>
+<p>Inside each world the arrival times are <strong>shifted so the earliest is 0</strong>, keeping the gaps, and written to a new column <code>Arrival Time (Normalized)</code>. The absolute minute does not matter to the scheduler; the order and spacing of arrivals do.</p>
+<div class="callout"><span class="callout-title">Why worlds at all?</span>
+<p>Training on one fixed instance invites <strong>overfitting</strong>: the formula learns the quirks of that instance. The papers always train on several instances (<a href="references.html#dtgpam">dtgpam</a> §V-A samples 5 per generation; <a href="references.html#zhang2025mtgper">zhang2025mtgper</a> averages 100 simulations). Here the population switches to the next world when it stops improving (<code>main.py</code>), or is scored on several worlds at once with <code>--worlds-per-eval</code>. Yang calls cycling through instances "rotation" (<a href="references.html#yang2025thesis">yang2025thesis</a> §3.6).</p></div>
+
+<h2>Step 2: build jobs (<code>create_jobs_from_csv</code>)</h2>
+<p>For each of the first <code>--csv-row-limit</code> rows (default 100) of a world:</p>
+<ul>
+  <li><strong>Rescaling.</strong> Raw values are mapped linearly into fixed ranges using the world's min and max: <code>executionTime</code> → 5–30 min (rounded), <code>transferTime</code> → 1–8 min, <code>imageSize</code> → 8–24. The formula is \(\text{dst}_{\min} + \frac{x - \text{src}_{\min}}{\text{src}_{\max} - \text{src}_{\min}}(\text{dst}_{\max}-\text{dst}_{\min})\), clipped to the range (<code>utils._rescale</code>).</li>
+  <li><strong>RAM and disk</strong> depend on the task type and the rescaled queue length \(q \in [0,1]\): CPU-and-data-intensive jobs get \(8 + 8q\) RAM and \(3\times\) image size of disk, CPU-intensive jobs \(4 + 8q\) and \(2\times\), all others \(1 + 5q\) and \(1.5\times\).</li>
+  <li><strong>Hops</strong> are clipped to 1–5. <strong>Arrival</strong> is the normalised arrival rounded to a whole minute (<code>Job.arrivalTime</code> is an <code>int</code>).</li>
+  <li>Missing values are replaced by the midpoint of the observed range.</li>
+</ul>
+<div class="callout warn"><span class="callout-title">Rescaling is per world</span>
+<p>Because min and max are taken per world, a job with <code>executionTime = 30</code> in world 3 is not necessarily as long, in raw terms, as one with 30 in world 7. The formula only sees values relative to their world.</p></div>
+
+<h2>Step 3: build satellites (<code>create_satellites_from_csv</code>)</h2>
+<p>The CSV has no satellite table, so satellites are <strong>inferred from the servers</strong> that appear in the world's rows. For each distinct <code>Server Name</code> the code averages execution time, transfer time, queue length and remaining energy over that server's rows, then rescales them:</p>
+<div class="table-wrap"><table>
+<tr><th>Field</th><th>Derived from</th><th>Resulting range</th></tr>
+<tr><td><code>remainingEnergy</code></td><td>mean remaining energy, rescaled to 70–130, × 0.2</td><td class="num">14–26</td></tr>
+<tr><td><code>cpuCapacity</code></td><td>mean execution time, inverted (faster server → higher capacity)</td><td>small positive number</td></tr>
+<tr><td><code>latency</code>, <code>bandwidth</code>, <code>networkCapacity</code></td><td>mean transfer time</td><td>small positive numbers</td></tr>
+<tr><td><code>elevationAngle</code></td><td>mean queue length, inverted</td><td class="num">6–13</td></tr>
+<tr><td><code>operationalUntil</code></td><td>random, \(\tau + U(300, 600)\)</td><td>300–600 min after the snapshot</td></tr>
+<tr><td><code>neighbors</code></td><td>every other satellite (fully connected)</td><td></td></tr>
+</table></div>
+<p>A small random perturbation (±2%) keeps satellites distinct even when their statistics coincide. The random draws use a per-world seed taken from the run seed, so <code>--seed</code> makes the worlds reproducible too.</p>
+<div class="callout warn"><span class="callout-title">Energy is the binding constraint</span>
+<p>With an energy rate of 1 per minute and job durations of 6–38 minutes, a budget of 14–26 units fits only one or two jobs per satellite. The sunset (300+ minutes away) almost never binds. This is the main reason completion ratios are only about 0.2–0.27 in every experiment. Keep it in mind before reading anything into a low \(C\). See <a href="quirks.html">Known quirks</a>.</p></div>
+
+<h2>Step 4: the snapshot</h2>
+<p><code>main.py</code>'s <code>build_world()</code> sets the snapshot time \(\tau\) to the <strong>latest arrival</strong> in the world, so every job has arrived. It then creates <code>SimulationSnapshot(τ, satellites, jobs)</code> with the default uniform energy rate 1.0. Every satellite becomes free at \(\tau\). Response time is still measured from each job's own arrival, so jobs that arrived early start with a handicap of up to 10 minutes.</p>
+
+<h2>Gotchas</h2>
+<ul>
+  <li>Header names are matched <strong>after stripping whitespace</strong>: the raw header is <code>" Arrival Time (System)  "</code>.</li>
+  <li>Numbers use European formatting in places (<code>12.345.678</code>, <code>2,17E+10</code>). <code>utils._parse_csv_number</code> handles it, so do not use <code>float()</code> directly.</li>
+  <li>Columns listed in <code>_IGNORED_CSV_COLUMNS</code> (task ID, status, start/end time, server name…) are deliberately <strong>not</strong> used as job features. Most of them are <em>outcomes</em> of the simulator's own scheduler and would leak the answer.</li>
+</ul>
+
+<p class="updated">Last checked against the code on 2026-11-14.</p>
+</main>
+</div>
+</body>
+</html>

@@ -1,0 +1,176 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Genetic Programming Basics</title>
+<link rel="stylesheet" href="assets/style.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css">
+<script defer src="assets/site.js"></script>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.js"></script>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/contrib/auto-render.min.js" onload="onboardingRenderMath()"></script>
+</head>
+<body>
+<div class="layout">
+<aside class="sidebar" id="sidebar"></aside>
+<main class="content">
+
+<div class="eyebrow">Concepts</div>
+<h1>Genetic programming from zero</h1>
+<p class="lede">Genetic programming (GP) evolves small programs the way breeders improve plants: keep the best, cross them, add some random variation, repeat. This page explains every piece using the formulas this project actually evolves.</p>
+
+<h2>From genetic algorithms to genetic programming</h2>
+<p>A <strong>genetic algorithm (GA)</strong> searches for a good solution by keeping a <strong>population</strong> of candidates. Each candidate (an <strong>individual</strong>) gets a <strong>fitness</strong>, a number saying how good it is. Better individuals are more likely to become <strong>parents</strong>. Parents produce <strong>offspring</strong> through <strong>crossover</strong> (combining two parents) and <strong>mutation</strong> (random small changes). One round of this is a <strong>generation</strong>.</p>
+<p>In a classic GA an individual is a fixed-length string, such as a list of numbers. In <strong>genetic programming</strong> an individual is a <strong>program</strong>, usually stored as a tree. GP was introduced by John Koza (<a href="references.html#koza1992book">koza1992book</a>, <a href="references.html#koza1994gp">koza1994gp</a>). Our programs are arithmetic formulas, so "program" and "formula" mean the same thing here.</p>
+
+<h2>Our individuals: priority formulas</h2>
+<p>Each individual is one formula that takes a (job, satellite) pair and returns a number, its <strong>priority score</strong>. Higher means "schedule this job on this satellite first". For example:</p>
+$$\text{score}(j, s) \;=\; a_j \;-\; \frac{e_j}{\max(\text{completed}_s,\ \text{bandwidth}_s)}$$
+<p>As a tree, with operators inside and inputs at the leaves:</p>
+
+<figure>
+<div class="frame">
+<svg class="diagram" viewBox="0 0 640 230" role="img" aria-label="Expression tree: SUB at the root, with job.arrivalTime on the left and DIV on the right; DIV has job.executionTime and MAX; MAX has sat.completedTasks and sat.bandwidth.">
+  <line x1="320" y1="40" x2="170" y2="95" class="edge"/>
+  <line x1="320" y1="40" x2="430" y2="95" class="edge"/>
+  <line x1="430" y1="108" x2="330" y2="160" class="edge"/>
+  <line x1="430" y1="108" x2="530" y2="160" class="edge"/>
+  <line x1="530" y1="172" x2="460" y2="205" class="edge"/>
+  <line x1="530" y1="172" x2="600" y2="205" class="edge"/>
+  <rect x="285" y="22" width="70" height="28" rx="14" class="node-op"/><text x="320" y="41" text-anchor="middle" class="t-mono">SUB  −</text>
+  <rect x="105" y="92" width="130" height="28" rx="6" class="node-leaf"/><text x="170" y="111" text-anchor="middle" class="t-mono">job.arrivalTime</text>
+  <rect x="395" y="92" width="70" height="28" rx="14" class="node-op"/><text x="430" y="111" text-anchor="middle" class="t-mono">DIV  ÷?</text>
+  <rect x="255" y="150" width="150" height="28" rx="6" class="node-leaf"/><text x="330" y="169" text-anchor="middle" class="t-mono">job.executionTime</text>
+  <rect x="495" y="150" width="70" height="28" rx="14" class="node-op"/><text x="530" y="169" text-anchor="middle" class="t-mono">MAX</text>
+  <rect x="390" y="196" width="140" height="28" rx="6" class="node-leaf"/><text x="460" y="215" text-anchor="middle" class="t-mono">sat.completedTasks</text>
+  <rect x="545" y="196" width="95" height="28" rx="6" class="node-leaf"/><text x="592" y="215" text-anchor="middle" class="t-mono">sat.bandwidth</text>
+</svg>
+</div>
+<figcaption>Blue rounded nodes are <strong>operators</strong> (the <em>function set</em>). Green nodes are <strong>terminals</strong>, the inputs the formula can read. Printed by the code as <code>(job.arrivalTime - (job.executionTime /? MAX(sat.completedTasks, sat.bandwidth)))</code>.</figcaption>
+</figure>
+
+<h3>Evaluating a tree, by hand</h3>
+<p>Evaluation is recursive: evaluate the children, then apply the operator. Take a job with \(a_j = 7\), \(e_j = 20\) on a satellite with 1 completed task and bandwidth 10.6:</p>
+<ol>
+  <li><code>MAX(1, 10.6)</code> = 10.6</li>
+  <li><code>20 /? 10.6</code> = 1.887</li>
+  <li><code>7 − 1.887</code> = <strong>5.113</strong>, the priority of this pair.</li>
+</ol>
+<p>In C++ this is <code>ExprNode::eval()</code> in <a href="../../include/scheduler/expr_tree.h"><code>expr_tree.h</code></a>: a <code>switch</code> on the node type that calls itself on the children.</p>
+
+<h3>The function set: 9 operators</h3>
+<div class="table-wrap"><table>
+<tr><th>Operator</th><th>Arity</th><th>Definition</th></tr>
+<tr><td><code>ADD SUB MUL</code></td><td class="num">2</td><td>\(x+y,\ x-y,\ xy\)</td></tr>
+<tr><td><code>DIV</code> (printed <code>/?</code>)</td><td class="num">2</td><td><strong>Protected division</strong>: \(x / y\), but 0 if \(|y| &lt; 10^{-9}\)</td></tr>
+<tr><td><code>MAX MIN</code></td><td class="num">2</td><td>\(\max(x,y),\ \min(x,y)\)</td></tr>
+<tr><td><code>NEG ABS</code></td><td class="num">1</td><td>\(-x,\ |x|\)</td></tr>
+<tr><td><code>INV</code></td><td class="num">1</td><td>Protected inverse: \(1/x\), but 0 if \(|x| &lt; 10^{-9}\)</td></tr>
+</table></div>
+<div class="callout why"><span class="callout-title">Why "protected" division? Closure.</span>
+<p>Crossover can put any subtree under any operator, so every operator must accept every value it might receive. Koza calls this <strong>closure</strong> (<a href="references.html#koza1994gp">koza1994gp</a> §4). A plain division would crash or return infinity when the denominator is 0. The papers we follow return 1 in that case (<a href="references.html#mtgp_multicloud">mtgp_multicloud</a> §4.2, <a href="references.html#zhang2025mtgper">zhang2025mtgper</a> §3.2.2). This project returns 0, a documented deviation kept so that older results stay valid. The six binary operators are exactly the function set of those two papers. <code>NEG</code>, <code>ABS</code> and <code>INV</code> are this project's additions.</p></div>
+
+<h3>The terminal set: 18 inputs</h3>
+<p>Terminals are listed in <code>buildTerminalRegistry()</code> in <a href="../../include/scheduler/registry.h"><code>registry.h</code></a>. Each one is a name plus a small function that reads a field from the job or the satellite:</p>
+<ul>
+  <li><strong>7 job terminals:</strong> <code>job.arrivalTime</code>, <code>job.ram</code>, <code>job.disk</code>, <code>job.imageSize</code>, <code>job.executionTime</code>, <code>job.transferTime</code>, <code>job.numberOfHops</code>.</li>
+  <li><strong>11 satellite terminals:</strong> <code>sat.elevationAngle</code>, <code>sat.latency</code>, <code>sat.bandwidth</code>, <code>sat.completedTasks</code>, <code>sat.cpuBusyUntil</code>, <code>sat.networkBusyUntil</code>, <code>sat.cpuCapacity</code>, <code>sat.networkCapacity</code>, <code>sat.energyReserved</code>, <code>sat.remainingEnergy</code>, <code>sat.loadRatio</code>.</li>
+</ul>
+<p>There are <strong>no numeric constants</strong> (no "ephemeral random constants" such as <code>0.37</code>): every leaf is a terminal, as in the papers we follow (mtgp_multicloud Table 2, zhang2025mtgper Table 2).</p>
+<div class="callout warn"><span class="callout-title">Four terminals are always zero</span>
+<p>In our data <code>sat.cpuBusyUntil</code>, <code>sat.networkBusyUntil</code>, <code>sat.energyReserved</code> and <code>sat.loadRatio</code> are 0 for every satellite. A leaf with one of them contributes nothing. <code>--prune-constant-terminals</code> stops GP from drawing them, and <code>--track-busy-until</code> turns <code>sat.cpuBusyUntil</code> into a live "free at" value.</p></div>
+
+<h2>Why a formula and not a schedule?</h2>
+<p>We could evolve a schedule directly (a list "job 3 → satellite 7, …"). That would only solve one snapshot. A formula is a <strong>rule</strong>: given any new snapshot, the <a href="decoder.html">greedy decoder</a> applies it to build a schedule. An algorithm that searches the space of heuristics, instead of the space of solutions, is called a <strong>hyper-heuristic</strong> (<a href="references.html#burke2013hyperheuristics">burke2013hyperheuristics</a>). GP is the most common way to build one for scheduling (<a href="references.html#branke2016automated">branke2016automated</a>, <a href="references.html#nguyen2017gpsurvey">nguyen2017gpsurvey</a>). This setup is called <strong>GPHH</strong> (GP hyper-heuristic).</p>
+
+<h2>The evolutionary loop</h2>
+<pre>population ← 100 random trees                     <span class="c"># ramped half-and-half</span>
+repeat for G generations:
+    for each tree:  schedule ← decode(tree, world)  <span class="c"># C++, parallel</span>
+                    fitness  ← score(schedule)
+    next ← copy of the 2 best trees                 <span class="c"># elitism</span>
+    while next is not full:
+        p1, p2 ← two tournament winners             <span class="c"># selection</span>
+        c1, c2 ← crossover(p1, p2)  with prob 0.8
+        mutate(c1); mutate(c2)                      <span class="c"># per-node prob 0.08</span>
+        maybe hoist(c1), hoist(c2)                  <span class="c"># prob 0.05 each</span>
+        add c1, c2 to next
+    population ← next
+    if no improvement for 10 generations: switch world</pre>
+<p>Each step in plain words:</p>
+
+<h3>1. Initialisation</h3>
+<p>Random trees are built with <strong>ramped half-and-half</strong> (<a href="references.html#koza1994gp">koza1994gp</a> §4). Half of them use the <em>full</em> method, where every branch reaches the same depth. The other half use <em>grow</em>, where branches may stop early. The target depth is "ramped" across a range, for example 2 to 7. The goal is a first population with many different shapes and sizes.</p>
+
+<h3>2. Evaluation</h3>
+<p>Every tree is run through the decoder on the current world, and the resulting schedule is scored. This is the expensive part, done in C++ with OpenMP. Details: <a href="decoder.html">Decoder &amp; fitness</a>.</p>
+
+<h3>3. Selection: tournaments</h3>
+<p>To pick a parent, draw 5 individuals at random and keep the fittest. This is <strong>tournament selection</strong>. Bigger tournaments favour the best individuals more strongly (more <em>selection pressure</em>). The <a href="theory.html#tournament">theory page</a> works out the exact probabilities.</p>
+
+<h3>4. Elitism</h3>
+<p>The 2 best individuals are copied unchanged into the next generation, so the best fitness found so far is never lost.</p>
+
+<h3>5. Crossover: swap subtrees</h3>
+<p>Pick a random node in each parent and swap the subtrees rooted there:</p>
+<figure>
+<div class="frame">
+<svg class="diagram" viewBox="0 0 760 420" role="img" aria-label="Subtree crossover: parent A's MUL subtree and parent B's sat.completedTasks leaf are swapped, producing child A and child B.">
+  <defs><marker id="ah2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" class="arrowhead"/></marker></defs>
+  <text x="190" y="16" text-anchor="middle" font-weight="600">Parent A</text>
+  <text x="570" y="16" text-anchor="middle" font-weight="600">Parent B</text>
+  <line x1="190" y1="40" x2="120" y2="100" class="edge"/><line x1="190" y1="40" x2="260" y2="100" class="edge"/>
+  <line x1="260" y1="100" x2="210" y2="160" class="edge"/><line x1="260" y1="100" x2="310" y2="160" class="edge"/>
+  <rect x="160" y="27" width="60" height="26" rx="13" class="node-op"/><text x="190" y="45" text-anchor="middle" class="t-mono">ADD</text>
+  <rect x="75" y="87" width="90" height="26" rx="6" class="node-leaf"/><text x="120" y="105" text-anchor="middle" class="t-mono">exec</text>
+  <rect x="230" y="87" width="60" height="26" rx="13" class="node-hl"/><text x="260" y="105" text-anchor="middle" class="t-mono">MUL</text>
+  <rect x="168" y="147" width="84" height="26" rx="6" class="node-hl"/><text x="210" y="165" text-anchor="middle" class="t-mono">latency</text>
+  <rect x="268" y="147" width="84" height="26" rx="6" class="node-hl"/><text x="310" y="165" text-anchor="middle" class="t-mono">ram</text>
+  <line x1="570" y1="40" x2="500" y2="100" class="edge"/><line x1="570" y1="40" x2="640" y2="100" class="edge"/>
+  <rect x="540" y="27" width="60" height="26" rx="13" class="node-op"/><text x="570" y="45" text-anchor="middle" class="t-mono">SUB</text>
+  <rect x="455" y="87" width="90" height="26" rx="6" class="node-leaf"/><text x="500" y="105" text-anchor="middle" class="t-mono">arrival</text>
+  <rect x="590" y="87" width="100" height="26" rx="6" class="node-hl"/><text x="640" y="105" text-anchor="middle" class="t-mono">completed</text>
+  <line x1="380" y1="190" x2="380" y2="222" class="edge" marker-end="url(#ah2)"/>
+  <text x="392" y="212" class="t-muted">swap the highlighted subtrees</text>
+  <text x="190" y="236" text-anchor="middle" font-weight="600">Child A</text>
+  <text x="570" y="236" text-anchor="middle" font-weight="600">Child B</text>
+  <line x1="190" y1="262" x2="120" y2="322" class="edge"/><line x1="190" y1="262" x2="260" y2="322" class="edge"/>
+  <rect x="160" y="249" width="60" height="26" rx="13" class="node-op"/><text x="190" y="267" text-anchor="middle" class="t-mono">ADD</text>
+  <rect x="75" y="309" width="90" height="26" rx="6" class="node-leaf"/><text x="120" y="327" text-anchor="middle" class="t-mono">exec</text>
+  <rect x="210" y="309" width="100" height="26" rx="6" class="node-hl"/><text x="260" y="327" text-anchor="middle" class="t-mono">completed</text>
+  <line x1="570" y1="262" x2="500" y2="322" class="edge"/><line x1="570" y1="262" x2="640" y2="322" class="edge"/>
+  <line x1="640" y1="322" x2="590" y2="382" class="edge"/><line x1="640" y1="322" x2="690" y2="382" class="edge"/>
+  <rect x="540" y="249" width="60" height="26" rx="13" class="node-op"/><text x="570" y="267" text-anchor="middle" class="t-mono">SUB</text>
+  <rect x="455" y="309" width="90" height="26" rx="6" class="node-leaf"/><text x="500" y="327" text-anchor="middle" class="t-mono">arrival</text>
+  <rect x="610" y="309" width="60" height="26" rx="13" class="node-hl"/><text x="640" y="327" text-anchor="middle" class="t-mono">MUL</text>
+  <rect x="548" y="369" width="84" height="26" rx="6" class="node-hl"/><text x="590" y="387" text-anchor="middle" class="t-mono">latency</text>
+  <rect x="648" y="369" width="84" height="26" rx="6" class="node-hl"/><text x="690" y="387" text-anchor="middle" class="t-mono">ram</text>
+</svg>
+</div>
+<figcaption><strong>Subtree crossover</strong> (<a href="references.html#koza1994gp">koza1994gp</a> §3). Short names: <code>exec</code> = <code>job.executionTime</code>, <code>completed</code> = <code>sat.completedTasks</code>, etc. If a child would exceed the depth limit, it is replaced by a copy of its parent.</figcaption>
+</figure>
+
+<h3>6. Mutation: small random edits</h3>
+<p>Each node of a child has an 8% chance of being mutated:</p>
+<ul>
+  <li>a <strong>terminal</strong> is replaced by another random terminal (<code>job.ram</code> → <code>sat.latency</code>);</li>
+  <li>an <strong>operator</strong> is swapped for a different one with the same arity (<code>ADD</code> → <code>MIN</code>), keeping its children;</li>
+  <li>or, in 10% of operator mutations, the whole subtree is thrown away and regrown at random (<strong>subtree mutation</strong>).</li>
+</ul>
+
+<h3>7. Hoist: fight bloat</h3>
+<p>GP trees tend to grow larger over generations without getting better. This is called <strong>bloat</strong> (<a href="references.html#luke2006bloat">luke2006bloat</a>). With probability 5%, an offspring is replaced by one of its own subtrees (<strong>hoist mutation</strong>), which makes it smaller. A hard depth cap (default 7, 4 in most experiments) also bounds every tree.</p>
+
+<h2>What you should take away</h2>
+<ul>
+  <li>An individual is a <strong>tree-shaped formula</strong> that scores (job, satellite) pairs.</li>
+  <li>The formula only becomes a schedule through the <strong>decoder</strong>, and the schedule determines the <strong>fitness</strong>.</li>
+  <li>Evolution is <strong>selection</strong> (tournaments + elitism) plus <strong>variation</strong> (crossover, mutation, hoist).</li>
+  <li>Every one of these choices comes from a paper, except a few project additions that are labelled as such. The <a href="evolution.html">generation page</a> maps each line of code to its source.</li>
+</ul>
+
+<p class="updated">Last checked against the code on 2026-11-14.</p>
+</main>
+</div>
+</body>
+</html>

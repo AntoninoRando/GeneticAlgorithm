@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Where to Start</title>
+<link rel="stylesheet" href="assets/style.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css">
+<script defer src="assets/site.js"></script>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.js"></script>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/contrib/auto-render.min.js" onload="onboardingRenderMath()"></script>
+</head>
+<body>
+<div class="layout">
+<aside class="sidebar" id="sidebar"></aside>
+<main class="content">
+
+<div class="eyebrow">Reference</div>
+<h1>Where do I start if…</h1>
+<p class="lede">Recipes for the changes people make most often. Each one lists the files to touch, in order, and what to check afterwards.</p>
+
+<div class="callout why"><span class="callout-title">Before any change to the algorithm</span>
+<p>Read the LITERATURE NOTES at the top of the header you are changing and the relevant entry in <code>thesis/literature_notes.md</code>. Find a paper that supports the change, write down the maths, and plan a seeded experiment with a statistical test. If no paper supports it, say so in the code and the thesis. These are project rules (<code>CLAUDE.md</code>).</p></div>
+
+<h3>…I want to add a new input feature (terminal)</h3>
+<ol>
+  <li>If the value is not already a field, add it to <code>Job</code> or <code>Satellite</code> in <code>types.h</code> and to the struct binding in <code>bindings.cpp</code>.</li>
+  <li>Fill it in <code>data_processing/data_factory.py</code>.</li>
+  <li><strong>Append</strong> an entry to <code>buildTerminalRegistry()</code> in <code>registry.h</code>. Appending keeps the indices of existing terminals, which saved trees and tests rely on.</li>
+  <li>If the decoder updates it during a decode (like <code>completedTasks</code>), update it at commit time in <code>greedyDecode</code>, and exempt it in <code>FitnessEvaluator::constantTerminals</code>.</li>
+  <li>Add a row to the terminal table in <code>registry.h</code>'s notes and on the <a href="gp-basics.html">GP basics</a> page.</li>
+</ol>
+
+<h3>…I want to add an operator</h3>
+<ol>
+  <li>Add it to <code>NodeType</code> and <code>ARITY</code> in <code>expr_tree.h</code>, and handle it in <code>eval()</code> and <code>toString()</code>. Keep closure: define it for every input.</li>
+  <li>Add it to <code>kBinaryOps</code> or <code>kUnaryOps</code> in <code>tree_builder.h</code>.</li>
+  <li>Check that every simplification rule is still exact.</li>
+  <li>Expose it in the <code>NodeType</code> enum binding, and update <code>tostr</code> in <code>thesis/experiments/run_experiments.py</code>.</li>
+</ol>
+
+<h3>…I want to change the fitness function</h3>
+<ol>
+  <li><code>FitnessEvaluator::evaluatePointers</code> in <code>fitness_evaluator.h</code>: steps 2 (normalisation) and 3 (weights).</li>
+  <li>Keep <code>evaluate</code> and <code>evaluate_many</code> consistent (one world must equal <code>evaluate</code>; there is a test for it).</li>
+  <li>Read <a href="theory.html#multiobjective">theory §5</a> first. This is the most consequential change you can make.</li>
+  <li>Re-run the main experiment and the weight study; update <a href="results.html">results</a>.</li>
+</ol>
+
+<h3>…I want to change a constraint or the energy model</h3>
+<ol>
+  <li>Constraints are checked inside the inner loop of <code>detail::greedyDecode</code>; energy is deducted at commit.</li>
+  <li>Satellite budgets come from <code>create_satellites_from_csv</code>; the energy rate from <code>SimulationSnapshot.energyPerMinute</code>.</li>
+  <li>Read the <a href="quirks.html#energy">energy quirk</a>: every result depends on it.</li>
+</ol>
+
+<h3>…I want to change a genetic operator or a GP parameter</h3>
+<ol>
+  <li>Operators: <code>tree_operators.h</code>. Loop and selection: <code>solveNextGeneration()</code> in <code>scheduler_gp.h</code>.</li>
+  <li>New parameter: add it to <code>initialize()</code> with a default that reproduces the old behaviour, then to <code>py::arg</code> in <code>bindings.cpp</code>, then to <code>GAConfig</code>, <code>default_config()</code>, argparse and <code>_dest_to_key</code> in <code>main.py</code>.</li>
+  <li>All randomness must use the pair's <code>mt19937</code>, so seeded runs stay reproducible.</li>
+  <li>Add a test to <code>tests/test_paper_features.py</code> and an ablation configuration to <code>thesis/experiments/run_ablation.py</code>.</li>
+</ol>
+
+<h3>…I want to make it faster</h3>
+<ol>
+  <li>Read <code>PERFORMANCE.md</code>: it lists what has already been done and how speed was measured.</li>
+  <li>The hot path is <code>ExprNode::eval</code> inside <code>greedyDecode</code>. Measure before and after with a fixed seed, and check that the output is identical.</li>
+</ol>
+
+<h3>…I want to use different data</h3>
+<ol>
+  <li>Produce a CSV with the same columns as <code>data/example.csv</code>, then run <code>world_splitter</code> on it.</li>
+  <li>Check the rescaling ranges in <code>data_factory.py</code>: they are fixed numbers, not read from the data.</li>
+</ol>
+
+<h3>…a run gives strange results</h3>
+<ol>
+  <li>Re-run with <code>--seed</code> to make it reproducible.</li>
+  <li>Use <code>--inspect-snapshots</code> to look at the world it trained on.</li>
+  <li>Re-score the best tree with <code>evaluate_single</code> (raw objectives), not its fitness.</li>
+  <li>Check <a href="quirks.html">Known quirks</a> before assuming a bug.</li>
+</ol>
+
+<h3>…my change makes a page of this guide wrong</h3>
+<p>Fix the page in the same change, update its "last checked" line, and add a dated line to the <a href="changelog.html">changelog</a>. To add a page, copy an existing one and add it to <code>NAV</code> in <code>docs/onboarding/assets/site.js</code>.</p>
+
+<p class="updated">Last checked against the code on 2026-11-14.</p>
+</main>
+</div>
+</body>
+</html>

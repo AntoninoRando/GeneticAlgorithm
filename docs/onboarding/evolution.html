@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>One Generation Explained</title>
+<link rel="stylesheet" href="assets/style.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css">
+<script defer src="assets/site.js"></script>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.js"></script>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/contrib/auto-render.min.js" onload="onboardingRenderMath()"></script>
+</head>
+<body>
+<div class="layout">
+<aside class="sidebar" id="sidebar"></aside>
+<main class="content">
+
+<div class="eyebrow">The code</div>
+<h1>One generation, step by step</h1>
+<p class="lede">A walk through <code>SchedulerGP::initialize()</code> and <code>SchedulerGP::solveNextGeneration()</code> in <a href="../../include/scheduler/scheduler_gp.h"><code>scheduler_gp.h</code></a>, with the operators from <code>tree_builder.h</code> and <code>tree_operators.h</code>. For each step: what the code does, where it comes from in the literature, and what is specific to this project.</p>
+
+<div class="toc"><strong>On this page</strong>
+<ol>
+  <li><a href="#init">Initialisation</a></li>
+  <li><a href="#sort">Sort and elitism</a></li>
+  <li><a href="#select">Tournament selection</a></li>
+  <li><a href="#crossover">Crossover</a></li>
+  <li><a href="#mutation">Mutation and simplification</a></li>
+  <li><a href="#hoist">Hoist and the size caps</a></li>
+  <li><a href="#options">Optional refinements from the literature</a></li>
+  <li><a href="#parallel">Parallelism and reproducibility</a></li>
+  <li><a href="#params">All parameters vs the papers</a></li>
+</ol></div>
+
+<h2 id="init">1. Initialisation: ramped half-and-half</h2>
+<p><code>initialize(populationSize, crossoverRate, mutationRate, elitismCount, maxDepth, hoistRate, …)</code> stores the parameters and builds the first population with <code>TreeBuilder::rampedHalfAndHalf(count, minDepth, maxDepth)</code>:</p>
+<pre>for i in 0 .. count-1:
+    depth = minDepth + (i mod (maxDepth - minDepth + 1))
+    tree  = grow(depth) if i is even else full(depth)</pre>
+<ul>
+  <li><strong><code>full(d)</code></strong>: every node above depth \(d\) is an operator, so every leaf sits at depth exactly \(d\).</li>
+  <li><strong><code>grow(d)</code></strong>: an operator or a terminal at each node. This version is <em>biased</em>: with 3 or more levels left it always picks an operator, and below that it picks a terminal with probability 0.55. The bias keeps small <code>grow</code> trees, used in subtree mutation, from collapsing into a single leaf.</li>
+  <li>An operator is binary with probability 0.70, unary otherwise, then chosen uniformly within its arity.</li>
+  <li>The depth range is 2 to <code>initialMaxDepth</code>, which defaults to the cap <code>maxDepth</code>.</li>
+</ul>
+<div class="callout why"><span class="callout-title">Literature</span>
+<p>Ramped half-and-half gives "a wide variety of different sizes and shapes" (<a href="references.html#koza1994gp">koza1994gp</a> §4) and is used by every GP-for-scheduling paper we follow (<a href="references.html#mtgp_multicloud">mtgp_multicloud</a> §4.1, <a href="references.html#zhang2025mtgper">zhang2025mtgper</a> §3.2.1, <a href="references.html#gp_fog">gp_fog</a> §VI-A.2). The papers start <em>below</em> the depth cap (2–7 with cap 8; 2–6 with cap 8; 1–3 with cap 7; Koza 6 with cap 17), so crossover has room to grow trees. Here that is the opt-in <code>--initial-max-depth</code>.</p></div>
+<div class="callout warn"><span class="callout-title">Quirk: grow and full can get locked to alternate depths</span>
+<p>When the number of depths in the ramp is even (cap 7 gives depths 2–7, six values), \(i \bmod 6\) and \(i \bmod 2\) have the same parity. Every <code>grow</code> tree then gets depth 2, 4 or 6, and every <code>full</code> tree 3, 5 or 7. Koza's method uses both methods at every depth. With cap 4 (depths 2–4, three values), the setting of the experiments, this does not happen. See <a href="quirks.html#ramped">Known quirks</a>.</p></div>
+
+<h2 id="sort">2. Sort and elitism</h2>
+<p><code>solveNextGeneration()</code> starts by sorting the population <strong>ascending</strong> by fitness with <code>stable_sort</code>, so the best is last and ties keep a fixed order. Then it copies the <code>elitismCount</code> (2) best individuals unchanged into slots 0 and 1 of the next population.</p>
+<p>Elitism guarantees that the best <em>trees</em> survive. It does <strong>not</strong> guarantee that the best <em>fitness value</em> never decreases. Response time and energy are re-normalised against each new population, so an elite with unchanged raw objectives can get a lower fitness next generation. The convergence check in <code>main.py</code> (10 generations without a new best fitness in the current world) is therefore a heuristic stopping signal, not a strict plateau test.</p>
+
+<h2 id="select">3. Tournament selection</h2>
+<pre>tournamentSelectRng(pop, k, rng):
+    best = random index
+    repeat k-1 times: cand = random index;  if fitness[cand] &gt; fitness[best]: best = cand
+    return pop[best]</pre>
+<p>The \(k\) (default 5) draws are uniform <strong>with replacement</strong>. Each offspring pair draws two parents independently.</p>
+<div class="callout why"><span class="callout-title">Literature</span>
+<p>Koza originally used fitness-proportionate selection. The scheduling papers all use tournaments (<a href="references.html#mtgp_multicloud">mtgp_multicloud</a> §4.1, <a href="references.html#zhang2025mtgper">zhang2025mtgper</a> §3.2.1, <a href="references.html#gp_fog">gp_fog</a> §VI-A.4), with \(k = 7\) or \(k = 2\). Tournament selection depends only on the <em>ranking</em> of fitness values, not their scale. That suits a fitness that is re-normalised every generation. The exact selection probabilities are derived on the <a href="theory.html#tournament">theory page</a>.</p></div>
+
+<h2 id="crossover">4. Crossover</h2>
+<p>With probability <code>crossoverRate</code> (0.80) the two parents go through <code>TreeOperators::crossover</code>; otherwise the children start as plain copies.</p>
+<ol>
+  <li>Copy both parents.</li>
+  <li>Pick a node in each copy, uniformly over all nodes by default, and <code>swap</code> the two subtrees in place.</li>
+  <li>If a child breaks the depth cap or the size cap, it is <strong>replaced by a copy of its parent</strong>, not by a new random tree.</li>
+</ol>
+<div class="callout why"><span class="callout-title">Literature</span>
+<p>Subtree crossover is the standard GP operator (<a href="references.html#koza1994gp">koza1994gp</a> §3; <a href="references.html#mtgp_multicloud">mtgp_multicloud</a> Fig. 3a). Reverting an oversized child to its parent plays the role of Koza's depth limit on crossover offspring. Koza chooses an internal (operator) node as crossover point 90% of the time, because in a binary tree about half the nodes are leaves, and a leaf-for-leaf swap is just a point mutation. That bias is the opt-in <code>--internal-crossover-bias 0.9</code>.</p></div>
+
+<h2 id="mutation">5. Mutation and simplification</h2>
+<p><code>TreeOperators::mutate(tree, mutationRate)</code> walks the tree. At each node, with probability <code>mutationRate</code> (0.08):</p>
+<div class="table-wrap"><table>
+<tr><th>Node</th><th>Effect</th><th>Source</th></tr>
+<tr><td>terminal</td><td>redraw the terminal index</td><td>point mutation, project addition</td></tr>
+<tr><td>operator, 10%</td><td>replace the whole subtree with a fresh <code>grow(3)</code> tree and stop there</td><td>subtree mutation (<a href="references.html#mtgp_multicloud">mtgp_multicloud</a> Fig. 3b, <a href="references.html#gp_fog">gp_fog</a> §VI-A.5)</td></tr>
+<tr><td>operator, 90%</td><td>swap for a <em>different</em> operator of the same arity, keep the children, keep walking</td><td>point mutation, project addition</td></tr>
+</table></div>
+<p>Then the tree is <strong>simplified</strong> (<code>ExprNode::simplifyInPlace</code>). Six rules are applied bottom-up, and every one of them is <em>exact</em> under the protected semantics: the score never changes for any (job, satellite) pair.</p>
+$$\text{NEG}(\text{NEG}(x)) \to x \quad \text{ABS}(\text{ABS}(x)) \to \text{ABS}(x) \quad \text{ABS}(\text{NEG}(x)) \to \text{ABS}(x)$$
+$$\text{MAX}(x,x) \to x \quad \text{MIN}(x,x) \to x \quad \text{SUB}(x,x) \to 0$$
+<p>Two tempting rules were deliberately <strong>removed</strong>: \(\text{DIV}(x,x) \to 1\) is wrong when \(x \approx 0\), because protected division returns 0. \(\text{INV}(\text{INV}(x)) \to x\) is wrong when \(|x| \le 10^{-9}\) or \(|x| \ge 10^{9}\). If the result still breaks a cap, the mutation is undone.</p>
+<div class="callout"><span class="callout-title">Rates are per node, not per individual</span>
+<p>In the papers, crossover, mutation and reproduction are <em>alternatives</em> chosen once per offspring (for example 0.80 / 0.15 / 0.05). Here crossover is followed by mutation, so an offspring can get both. A tree with \(n\) nodes receives on average about \(0.08\,n\) point mutations (a bit fewer, because subtree replacement stops the walk). For a 15-node tree that is about 1.2.</p></div>
+
+<h2 id="hoist">6. Hoist and the size caps</h2>
+<p>With probability <code>hoistRate</code> (0.05) per child, <code>hoist</code> replaces the whole tree with one of its non-root subtrees, chosen uniformly. This is a project addition against <strong>bloat</strong>; the papers rely on the depth cap alone.</p>
+<p>Every offspring must satisfy \(\text{depth} \le D_{\max}\) and \(\text{size} \le 2^{D_{\max}+1}\). Depth counts edges, so a lone terminal has depth 0.</p>
+<div class="callout"><span class="callout-title">Two quick consequences, worked out on the theory page</span>
+<ul>
+  <li>Because about half the nodes of a tree are leaves, a hoist lands on a single terminal more than half of the time. That is why a hoist rate of 0.2 collapsed trees to size 1.2 in the experiments.</li>
+  <li>With arity at most 2, a tree of depth \(\le D\) has at most \(2^{D+1} - 1\) nodes, so the size cap can never be the one that fails. See <a href="theory.html#bloat">theory</a>.</li>
+</ul></div>
+
+<h2 id="options">7. Optional refinements from the literature</h2>
+<p>All are off by default, so the default run is unchanged. The measured effect of each is on the <a href="results.html#ablation">results page</a>.</p>
+<div class="table-wrap"><table>
+<tr><th>Option</th><th>What it does</th><th>Source</th></tr>
+<tr><td><code>tournamentSize</code></td><td>Selection pressure (\(k\)).</td><td>7 in mtgp_multicloud, dtgpam; 2 in zhang2025mtgper</td></tr>
+<tr><td><code>initialMaxDepth</code></td><td>Initial trees shallower than the cap.</td><td>Koza; mtgp_multicloud T.6; zhang2025mtgper T.3</td></tr>
+<tr><td><code>internalCrossoverBias</code></td><td>Probability that a crossover point is an operator node.</td><td>koza1994gp §4 (0.9)</td></tr>
+<tr><td><code>cloneRetries</code></td><td>If a child is structurally identical to a parent or an elite, re-mutate it, up to N times, with per-node rate \(\max(r, 1/n)\).</td><td>Structural stand-in for the behavioural repetition test of zhang2025mtgper §3.2.1</td></tr>
+<tr><td><code>terminalWeighting</code></td><td>Learn which terminals mutation should draw more often, from the best 10% (maximum-likelihood fit, solved by water filling).</td><td>dtgpam §IV-D; yang2025thesis §3.2.4</td></tr>
+<tr><td><code>excludedTerminals</code></td><td>Never draw the listed terminals (fed by <code>--prune-constant-terminals</code>).</td><td>Hand-picked terminal sets in all papers</td></tr>
+<tr><td><code>trackBusyUntil</code> (on the evaluator)</td><td>Make <code>sat.cpuBusyUntil</code> report when the satellite is next free.</td><td>NT/CL in zhang2025mtgper; AAT/IAT in mtgp_multicloud</td></tr>
+<tr><td><code>worlds_per_eval</code> (in <code>main.py</code>)</td><td>Score on K worlds per generation, pooled.</td><td>dtgpam §V-A; zhang2025mtgper §4.1</td></tr>
+</table></div>
+<p>The terminal-weighting maths (the likelihood, the KKT solution and a worked example) is on the <a href="theory.html#terminal-weighting">theory page</a>.</p>
+
+<h2 id="parallel">8. Parallelism and reproducibility</h2>
+<p>Offspring are produced in an OpenMP loop over <strong>pairs</strong>. Pair \(p\) writes only to slots \(2p\) and \(2p+1\) of a pre-sized vector, so threads never write to the same place. Each pair gets its own random-number generator:</p>
+<pre>baseSeed = master_rng()                       <span class="c"># drawn once per generation, serially</span>
+pair p:  rng_p = mt19937(seed_seq{baseSeed, p})</pre>
+<p>Because the streams belong to pairs, not threads, a run with <code>--seed</code> gives <strong>bit-identical</strong> results whatever the number of threads or the OpenMP schedule. Independent, reproducible runs are what make the 20-seed statistical comparisons in the thesis valid. Fitness evaluation is a second parallel loop, over individuals.</p>
+
+<h2 id="params">9. All parameters vs the papers</h2>
+<div class="table-wrap"><table>
+<tr><th>Parameter</th><th>Here</th><th>Papers</th></tr>
+<tr><td>Population</td><td class="num">100</td><td>200 (mtgp_multicloud, zhang2025mtgper); 1024 (dtgpam)</td></tr>
+<tr><td>Generations</td><td class="num">200 (CLI), 300–5000 in configs</td><td>50–51</td></tr>
+<tr><td>Elitism</td><td class="num">2</td><td>5; 1; "hall of fame"</td></tr>
+<tr><td>Tournament size</td><td class="num">5</td><td>7; 2</td></tr>
+<tr><td>Crossover / mutation</td><td class="num">0.80 / 0.08 per node</td><td>0.80 / 0.15 per individual; 0.65 / 0.30 (DTGPAM)</td></tr>
+<tr><td>Max depth</td><td class="num">7 (CLI), 4 (configs, thesis)</td><td>8; 7; Koza 17</td></tr>
+<tr><td>Initial depth</td><td class="num">2 – max</td><td>2–7, 2–6, 1–3</td></tr>
+<tr><td>Hoist</td><td class="num">0.05</td><td>not used</td></tr>
+</table></div>
+<p class="small muted">Source: the table in the LITERATURE NOTES of <code>scheduler_gp.h</code>. Every deviation is a choice to justify in the thesis or to test experimentally.</p>
+
+<p class="updated">Last checked against the code on 2026-11-14.</p>
+</main>
+</div>
+</body>
+</html>

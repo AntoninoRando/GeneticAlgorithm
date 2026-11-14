@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Experiments and Findings</title>
+<link rel="stylesheet" href="assets/style.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css">
+<script defer src="assets/site.js"></script>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.js"></script>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/contrib/auto-render.min.js" onload="onboardingRenderMath()"></script>
+</head>
+<body>
+<div class="layout">
+<aside class="sidebar" id="sidebar"></aside>
+<main class="content">
+
+<div class="eyebrow">Science</div>
+<h1>Experiments &amp; findings</h1>
+<p class="lede">What has been measured so far, how, and how much weight each number can bear. Sources: <code>thesis/chapters/experiments.tex</code>, <code>thesis/experiments/results/</code> and the ablation notes in <code>scheduler_gp.h</code> and the readme.</p>
+
+<h2 id="setup">How the experiments are run</h2>
+<ul>
+  <li><strong>Train/test split.</strong> Worlds 0–19 train, worlds 20–29 test. Each world is cut to its first 100 jobs, and satellites use a fixed per-world seed, so every method sees identical scenarios.</li>
+  <li><strong>Training.</strong> The training world changes every 10 generations on a <em>fixed</em> schedule, unlike <code>main.py</code>'s convergence-triggered switch, so runs are comparable. Defaults: population 100, depth 4, hoist 0.05, 300 generations, weights (0.60, 0.25, 0.15).</li>
+  <li><strong>Model selection.</strong> Fitness is not comparable across worlds, so the 20 fittest individuals are re-scored on all training worlds with the raw objectives. The one with the highest mean \(C\) (ties: lowest \(R\)) is evaluated on the test worlds.</li>
+  <li><strong>Baselines</strong> through the same decoder: FCFS (\(-a_j\)), shortest job first (\(-d_j\)), least-loaded (\(-\)completed), most energy left, and the untrained random population.</li>
+  <li><strong>Seeds.</strong> 10 per configuration for the main study, 20 + 20 for the ablation.</li>
+</ul>
+<p>Code: <a href="../../thesis/experiments/run_experiments.py"><code>run_experiments.py</code></a>, <a href="../../thesis/experiments/run_ablation.py"><code>run_ablation.py</code></a>, <a href="../../thesis/experiments/make_report.py"><code>make_report.py</code></a>.</p>
+
+<h2 id="main">Main comparison (1000 generations, test worlds)</h2>
+<div class="table-wrap"><table>
+<tr><th>Method</th><th class="num">\(C\) ↑</th><th class="num">\(R\) (min) ↓</th><th class="num">\(\mathcal E\) ↓</th></tr>
+<tr><td>FCFS (first-fit)</td><td class="num">0.204</td><td class="num">20.60</td><td class="num">158.7</td></tr>
+<tr><td>Shortest job first</td><td class="num"><strong>0.268</strong></td><td class="num">16.75</td><td class="num">159.0</td></tr>
+<tr><td>Least-loaded satellite</td><td class="num">0.216</td><td class="num">20.46</td><td class="num">162.0</td></tr>
+<tr><td>Most energy left</td><td class="num">0.214</td><td class="num">20.24</td><td class="num">157.6</td></tr>
+<tr><td>Random trees (generation 0)</td><td class="num">0.198 ± 0.003</td><td class="num">19.29 ± 0.19</td><td class="num">159.0 ± 0.2</td></tr>
+<tr class="hl"><td>Evolved GP (10 seeds)</td><td class="num">0.197 ± 0.018</td><td class="num"><strong>13.69 ± 0.34</strong></td><td class="num"><strong>156.8 ± 0.2</strong></td></tr>
+</table></div>
+<p><strong>Reading it.</strong> The evolved rules cut the mean response time by about 18% against the best baseline, with very little variance across seeds. They do <em>not</em> complete more jobs: \(C\) is no better than random trees and below shortest-job-first. Energy barely differs between methods (about 1%).</p>
+<p><strong>Why.</strong> \(R\) is averaged only over scheduled jobs, and the fitness is dominated by the normalised cost terms (proof on the <a href="theory.html#multiobjective">theory page</a>). A rule that schedules few, short jobs scores well. Longer training drives the trees toward tiny rules (mean size 2.4 at 1000 generations) that exploit this. The correct conclusion is "the current fitness is misaligned with completing jobs", <strong>not</strong> "GP cannot beat the baselines on \(C\)".</p>
+
+<h2 id="params">Parameter study (300 generations)</h2>
+<div class="table-wrap"><table>
+<tr><th>Parameter</th><th>Finding</th></tr>
+<tr><td>Max depth</td><td>2–3 gives trivial trees (size 2, \(C \approx 0.20\)). Depth ≥ 4 gives \(C\) 0.22–0.24, with differences between 4 and 7 within one standard deviation.</td></tr>
+<tr><td>Population</td><td>The clearest trend: \(C\) rises from 0.199 (20) to 0.250 (400), with lower variance.</td></tr>
+<tr><td>Generations</td><td>\(C\) <em>falls</em> with more generations (0.252 at 50, 0.197 at 1000) while \(R\) falls too: the misalignment again.</td></tr>
+<tr><td>Hoist rate</td><td>0 and 0.05 are equivalent; 0.2 collapses trees to size 1.2 and loses \(C\). See the <a href="theory.html#bloat">hoist analysis</a>.</td></tr>
+<tr><td>World switching</td><td>Switching every generation hurts (\(C\) = 0.208). Every 50 generations, or a single world, gives the highest \(C\) (0.267, 0.258) but higher \(R\). No sign that one world overfits more.</td></tr>
+<tr><td>Fitness weights</td><td>Completion only: best \(C\) (0.254) but \(R\) = 16.6. More weight on \(R\) and \(\mathcal E\): \(C \approx 0.20\) and no better \(R\).</td></tr>
+</table></div>
+
+<h2 id="ablation">Ablation of the literature options</h2>
+<p>Each option vs the unchanged baseline: population 100, depth 4, 300 generations, trained on worlds 0–19, scored on 20–29. Mean test \(C\) over 20 paired seeds, Mann–Whitney test. Only the promising options were re-run on 20 fresh seeds.</p>
+<div class="table-wrap"><table>
+<tr><th>Option</th><th class="num">\(C\), seeds 0–19</th><th class="num">\(C\), seeds 100–119</th></tr>
+<tr><td>baseline</td><td class="num">0.223</td><td class="num">0.227</td></tr>
+<tr class="hl"><td><code>--clone-retries 3</code></td><td class="num">0.251 (p = 0.005)</td><td class="num">0.246 (p = 0.27)</td></tr>
+<tr class="hl"><td><code>--worlds-per-eval 3</code></td><td class="num">0.248 (p = 0.014)</td><td class="num">0.247 (p = 0.045)</td></tr>
+<tr><td><code>--initial-max-depth 3</code></td><td class="num">0.235 (p = 0.29)</td><td class="num">–</td></tr>
+<tr><td><code>--track-busy-until</code></td><td class="num">0.232 (p = 0.33)</td><td class="num">–</td></tr>
+<tr><td><code>--internal-crossover-bias 0.9</code></td><td class="num">0.226 (p = 0.96)</td><td class="num">–</td></tr>
+<tr><td><code>--tournament-size 7</code></td><td class="num">0.224 (p = 0.73)</td><td class="num">–</td></tr>
+<tr><td><code>--terminal-weighting</code></td><td class="num">0.221 (p = 0.68)</td><td class="num">–</td></tr>
+<tr><td><code>--prune-constant-terminals</code></td><td class="num">0.221 (p = 0.47)</td><td class="num">–</td></tr>
+</table></div>
+<p><strong>What the gain really is.</strong> The baseline is <em>bimodal</em>: in 16 of 40 runs it ends on a degenerate one-terminal rule such as <code>job.arrivalTime</code> (\(C \approx 0.19\)), while the others reach about 0.24–0.26. With clone retries, 0 of 40 runs fail this way; with three worlds, 1 of 40. Final structural diversity rises from 0.57 to 0.97 and 0.86. So both options mainly <strong>prevent premature convergence</strong>. The typical successful run improves only a little (median 0.242 → 0.249 / 0.251), and \(R\) gets slightly worse (14.3 → 14.9 / 14.6 min).</p>
+<p><code>python3 main.py -c robust</code> turns on both options.</p>
+
+<h2 id="rules">What the evolved rules look like</h2>
+<pre>C = 0.248, size 15:
+((job.arrivalTime - job.executionTime)
+   - ((MAX(job.disk, job.arrivalTime) * MAX(sat.completedTasks, job.executionTime))
+      /? MAX(sat.networkBusyUntil, sat.bandwidth)))
+
+C = 0.191, size 1:
+job.arrivalTime</pre>
+<p>The large rule combines a shortest-job-like term (\(-e_j\)) with arrival time, satellite load and bandwidth. Note <code>sat.networkBusyUntil</code>, which is always 0, so <code>MAX(sat.networkBusyUntil, sat.bandwidth)</code> is just <code>sat.bandwidth</code>.</p>
+<div class="callout warn"><span class="callout-title">Careful with "FCFS-like"</span>
+<p>The thesis calls the one-terminal rule <code>job.arrivalTime</code> "FCFS-like". Because a <em>higher</em> score wins, it actually schedules the <strong>latest</strong> arrival first (LIFO), the opposite of the FCFS baseline \(-a_j\). Try both in the <a href="decoder.html#playground">playground</a>. Reported as a wording issue in <a href="quirks.html">Known quirks</a>.</p></div>
+
+<h2 id="validity">How much to trust these numbers</h2>
+<ul>
+  <li><strong>One trace.</strong> Train and test worlds come from the same 300-minute simulation, and the test windows are adjacent in time to the training ones.</li>
+  <li><strong>Low completion everywhere</strong> (0.2–0.27), mostly because the energy budget fits only 1–2 jobs per satellite (<a href="data.html">data page</a>). Conclusions may change under other loads.</li>
+  <li><strong>Small differences.</strong> Many configurations differ by about one standard deviation over 10 seeds. The main parameter study ran no significance test, and the ablation p-values are not corrected for 10 comparisons (<a href="theory.html#nfl">statistics</a>).</li>
+  <li><strong>Model selection</strong> uses training \(C\), not the fitness the GP optimised.</li>
+</ul>
+
+<p class="updated">Last checked against the code and thesis on 2026-11-14.</p>
+</main>
+</div>
+</body>
+</html>

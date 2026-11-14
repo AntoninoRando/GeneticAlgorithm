@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Glossary</title>
+<link rel="stylesheet" href="assets/style.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css">
+<script defer src="assets/site.js"></script>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.js"></script>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/contrib/auto-render.min.js" onload="onboardingRenderMath()"></script>
+</head>
+<body>
+<div class="layout">
+<aside class="sidebar" id="sidebar"></aside>
+<main class="content">
+
+<div class="eyebrow">Concepts</div>
+<h1>Glossary</h1>
+<p class="lede">Every term used in the guide, the code and the thesis, in alphabetical order.</p>
+
+<dl class="glossary">
+<dt id="access-point">Access point</dt><dd>The satellite overhead that receives a ground user's job and decides where it runs.</dd>
+<dt id="arity">Arity</dt><dd>Number of children of an operator: 2 for <code>ADD</code>, 1 for <code>NEG</code>, 0 for a terminal.</dd>
+<dt id="baseline">Baseline</dt><dd>A simple hand-written rule (FCFS, shortest job first, …) run through the same decoder, used to judge whether GP helps.</dd>
+<dt id="bloat">Bloat</dt><dd>GP trees growing larger over generations without getting better. Controlled here by the depth cap and hoist. <span class="see"><a href="theory.html#bloat">Theory §6</a></span></dd>
+<dt id="closure">Closure</dt><dd>The requirement that every operator accepts any value its children can produce. It is why division is "protected". <span class="see"><a href="gp-basics.html">GP basics</a></span></dd>
+<dt id="clone">Clone retries</dt><dd>Option that re-mutates an offspring when it is structurally identical to a parent or an elite.</dd>
+<dt id="completion-ratio">Completion ratio \(C\)</dt><dd>Share of the snapshot's jobs that the schedule places. Maximised.</dd>
+<dt id="convergence">Convergence threshold</dt><dd>Number of generations without a new best fitness after which <code>main.py</code> switches to the next world (default 10).</dd>
+<dt id="crossover">Crossover</dt><dd>Making offspring by swapping randomly chosen subtrees between two parents.</dd>
+<dt id="decoder">Decoder (greedy)</dt><dd>The fixed procedure that turns a tree into a schedule by repeatedly committing the feasible (job, satellite) pair with the highest score. <span class="see"><a href="decoder.html">Decoder &amp; fitness</a></span></dd>
+<dt id="depth">Depth</dt><dd>Longest root-to-leaf path in a tree, counted in edges. A single terminal has depth 0.</dd>
+<dt id="diversity">Diversity (structural)</dt><dd>Share of distinct trees in the population: 1.0 means all different, \(1/N\) means all clones.</dd>
+<dt id="elitism">Elitism</dt><dd>Copying the best individuals (2 here) unchanged into the next generation.</dd>
+<dt id="fitness">Fitness</dt><dd>One number per individual, higher is better: \(0.6\,C - 0.25\,\hat R - 0.15\,\hat{\mathcal E}\). Only comparable within one population. <span class="see"><a href="decoder.html#fitness">Details</a></span></dd>
+<dt id="full">Full method</dt><dd>Random tree construction where every leaf is at the target depth.</dd>
+<dt id="function-set">Function set</dt><dd>The operators GP may use: <code>ADD SUB MUL DIV MAX MIN NEG ABS INV</code>.</dd>
+<dt id="generation">Generation</dt><dd>One round of evaluate → select → breed.</dd>
+<dt id="gp">Genetic programming (GP)</dt><dd>Evolutionary search over programs, here formulas stored as trees (Koza).</dd>
+<dt id="gphh">GPHH</dt><dd>Genetic programming hyper-heuristic: GP used to evolve heuristics (here, scheduling rules).</dd>
+<dt id="grow">Grow method</dt><dd>Random tree construction where branches may stop early. Biased here toward operators near the root.</dd>
+<dt id="hoist">Hoist mutation</dt><dd>Replacing a tree with one of its own subtrees. Shrinks trees.</dd>
+<dt id="hyper-heuristic">Hyper-heuristic</dt><dd>A method that searches over heuristics instead of over solutions.</dd>
+<dt id="individual">Individual</dt><dd>One candidate solution: here a <code>GPIndividual</code> with a tree, a fitness and an id.</dd>
+<dt id="leo">LEO</dt><dd>Low Earth orbit, a few hundred kilometres up. Satellites there move fast relative to the ground.</dd>
+<dt id="mutation">Mutation</dt><dd>Random edits: redraw a terminal, swap an operator, or regrow a subtree. Rate 0.08 per node.</dd>
+<dt id="normalisation">Normalisation (min-max)</dt><dd>Rescaling a value to [0, 1] using the population's minimum and maximum.</dd>
+<dt id="openmp">OpenMP</dt><dd>C++ compiler extension for parallel loops (<code>#pragma omp parallel for</code>). Used for evaluation and breeding.</dd>
+<dt id="operational-until">operationalUntil (sunset)</dt><dd>Minute after which a satellite can no longer serve the user. No job may finish later.</dd>
+<dt id="pareto">Pareto optimal</dt><dd>A solution that no other solution beats on every objective at once.</dd>
+<dt id="population">Population</dt><dd>The set of individuals in one generation (100 by default).</dd>
+<dt id="priority">Priority function / score</dt><dd>What a tree computes for a (job, satellite) pair. Higher means "schedule first".</dd>
+<dt id="protected-division">Protected division</dt><dd>\(x/y\), but 0 when \(|y| &lt; 10^{-9}\). Printed as <code>/?</code>.</dd>
+<dt id="pybind11">pybind11</dt><dd>C++ library that exposes C++ classes to Python. Used in <code>bindings.cpp</code>.</dd>
+<dt id="ramped">Ramped half-and-half</dt><dd>Initialisation where half the trees use full and half use grow, over a range of depths.</dd>
+<dt id="registry">Registry (terminal)</dt><dd>The list of 18 terminals with their accessor functions (<code>registry.h</code>).</dd>
+<dt id="response">Response time \(R\)</dt><dd>Completion minute minus arrival minute, averaged over scheduled jobs. Minimised.</dd>
+<dt id="sec">SEC</dt><dd>Satellite edge computing: running computation on satellites.</dd>
+<dt id="seed">Seed</dt><dd>Starting value of the random generator. The same seed gives the same run (<code>--seed</code>).</dd>
+<dt id="selection-pressure">Selection pressure</dt><dd>How strongly selection favours the best individuals. Grows with tournament size. <span class="see"><a href="theory.html#tournament">Theory §4</a></span></dd>
+<dt id="sen">SEN</dt><dd>Satellite edge node: a satellite that runs jobs.</dd>
+<dt id="simplification">Simplification</dt><dd>Exact algebraic clean-up after mutation, such as \(\text{NEG}(\text{NEG}(x)) \to x\).</dd>
+<dt id="snapshot">Snapshot</dt><dd>A frozen picture of the world (satellites + waiting jobs) at one minute \(\tau\). <code>SimulationSnapshot</code> in C++.</dd>
+<dt id="takeover">Takeover time</dt><dd>Generations that selection alone needs to fill the population with copies of the best individual.</dd>
+<dt id="terminal">Terminal</dt><dd>A leaf of the tree: an input such as <code>job.executionTime</code>.</dd>
+<dt id="terminal-weighting">Terminal weighting</dt><dd>Option that makes mutation favour terminals common in the best trees. <span class="see"><a href="theory.html#terminal-weighting">Theory §7</a></span></dd>
+<dt id="tournament">Tournament selection</dt><dd>Pick \(k\) individuals at random and keep the fittest as a parent. \(k = 5\) here.</dd>
+<dt id="world">World</dt><dd>One 10-minute window of the simulator log, about 100 jobs. 30 worlds in total. <span class="see"><a href="data.html">Data pipeline</a></span></dd>
+</dl>
+
+<p class="updated">Last checked against the code on 2026-11-14.</p>
+</main>
+</div>
+</body>
+</html>

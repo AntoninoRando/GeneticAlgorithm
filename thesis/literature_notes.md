@@ -168,3 +168,29 @@ rule, 0 and 1 of 40 with the options), while tournament size, initial depth,
 crossover bias, terminal weighting, constant-terminal pruning and a live
 availability terminal made no significant difference on this data.
 
+
+## 7. Theory references added for the onboarding guide (2026-11-14)
+
+Seven entries were added to `references.bib` to support the theory page of the
+onboarding guide (`docs/onboarding/theory.html`). Their metadata (authors,
+title, venue, volume, pages, year, DOI) was checked against Crossref. **None of
+them was re-read for this note**: each is cited only for a standard, widely
+reproduced result, listed below. Before citing any of them in the thesis for
+something more specific, read the relevant section.
+
+| Bib key | Cited for |
+|---|---|
+| `blickle1996selection` | Order-statistics analysis of tournament selection: P(rank i wins) = (i^k − (i−1)^k)/N^k with replacement, and the takeover-time approximation (ln N + ln ln N)/ln k |
+| `luke2006bloat` | Empirical comparison of bloat-control methods for GP, with Koza-style depth limiting as the standard baseline |
+| `das1997weighted` | A weighted sum of objectives only reaches the convex part of the Pareto front, and even weight spacing does not give even solution spacing |
+| `deb2002nsga2` | NSGA-II, the standard Pareto-based alternative to a weighted-sum fitness |
+| `wolpert1997nfl` | No-free-lunch theorems: no optimiser is better than another averaged over all problems, hence problem-specific baselines |
+| `mann1947test` | The Mann-Whitney U (Wilcoxon rank-sum) test used by `run_ablation.py` |
+| `lenstra1977complexity` | NP-hardness of P‖Cmax (makespan on parallel identical machines), the special case behind "can every job finish before sunset?" |
+
+The derivations on the theory page (tournament probabilities applied to N = 100,
+k = 5; the size bound 2^(D+1) − 1 implied by the depth cap; the hoist leaf
+probability; the fitness-weight inequality ΔC > (w_R + w_E)/w_C ≈ 0.67; the
+reduction of the terminal-weight MLE to empirical frequencies when every
+terminal is active) are worked out from the code and the cited results; they
+are not taken from a paper.
