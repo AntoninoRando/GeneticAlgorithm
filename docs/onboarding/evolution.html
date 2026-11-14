@@ -107,6 +107,7 @@ $$\text{MAX}(x,x) \to x \quad \text{MIN}(x,x) \to x \quad \text{SUB}(x,x) \to 0$
 <tr><td><code>excludedTerminals</code></td><td>Never draw the listed terminals (fed by <code>--prune-constant-terminals</code>).</td><td>Hand-picked terminal sets in all papers</td></tr>
 <tr><td><code>trackBusyUntil</code> (on the evaluator)</td><td>Make <code>sat.cpuBusyUntil</code> report when the satellite is next free.</td><td>NT/CL in zhang2025mtgper; AAT/IAT in mtgp_multicloud</td></tr>
 <tr><td><code>worlds_per_eval</code> (in <code>main.py</code>)</td><td>Score on K worlds per generation, pooled.</td><td>dtgpam §V-A; zhang2025mtgper §4.1</td></tr>
+<tr><td><code>earliestFreeTieBreak</code> (on the evaluator)</td><td>Decoder tie-break: equally scored pairs go to the satellite that is free earliest instead of the lowest index. Lowers response time for job-only rules; can lower completion under tight batteries. Not yet measured.</td><td>graham1966bounds; topcuoglu2002heft; braun2001comparison</td></tr>
 <tr><td><code>fixedBounds</code> (on the evaluator)</td><td>Normalise response time and energy by per-world bounds instead of the population's min and max, and charge unscheduled jobs the worst response. Not yet measured.</td><td>marler2004survey; icdcs_sc; shabtay2013rejection</td></tr>
 </table></div>
 <p>The terminal-weighting maths (the likelihood, the KKT solution and a worked example) is on the <a href="theory.html#terminal-weighting">theory page</a>.</p>

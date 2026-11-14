@@ -255,7 +255,7 @@ Contestualizzare confi.json5 con evaluator.py del configuratore
 
 Every choice in `include/scheduler/*.h` carries a *LITERATURE NOTES* comment that
 names the paper and section it comes from (bib keys of `thesis/references.bib`;
-per-paper summaries in `thesis/literature_notes.md`). Nine refinements are
+per-paper summaries in `thesis/literature_notes.md`). Ten refinements are
 available as opt-in flags; **with none of them the algorithm is bit-for-bit the
 previous one** (same seed, same output).
 
@@ -270,6 +270,7 @@ previous one** (same seed, same output).
 | `--prune-constant-terminals` | never draw terminals that are constant in the data | registry notes (4 of 18 terminals are always 0) |
 | `--worlds-per-eval K` | score each individual on K worlds (pooled) | Yang 2025 (5 instances), Zhang & Yang 2025 (100 runs) |
 | `--fixed-bounds` | fitness with costs divided by per-world bounds and unscheduled jobs penalised, so it no longer depends on the population (not yet measured on the test worlds) | Marler & Arora 2004, Shabtay et al. 2013, same normalisation as Magliarisi & Casalicchio |
+| `--earliest-free-tie-break` | decoder tie-break: equally scored (job, satellite) pairs go to the satellite that is free earliest instead of the lowest index; lowers response time for job-only rules, can lower completion under tight energy budgets (not yet measured on the test worlds) | Graham 1966 (list scheduling), Topcuoglu et al. 2002, Braun et al. 2001 |
 
 `python3 main.py -c robust` turns on the two that helped (`clone_retries: 3`,
 `worlds_per_eval: 3`).

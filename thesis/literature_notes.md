@@ -252,3 +252,71 @@ configurations `fixed` and `fixed+clones+worlds3` in
 `thesis/experiments/run_ablation.py` are there for it. Until they are run, the
 thesis and the guide claim only the mathematical properties, not better test
 metrics, and the option stays off by default.
+
+## 9. References for the decoder tie-break (2026-11-14)
+
+Two entries were added for the opt-in tie-break of the greedy decoder
+(`FitnessEvaluator::earliestFreeTieBreak`, `--earliest-free-tie-break`; maths in
+`thesis/chapters/method.tex`, section "Selection rule and ties"). A third,
+`topcuoglu2002heft`, was already in the bibliography.
+
+| Bib key | Paper | How it was checked | Coverage |
+|---|---|---|---|
+| `graham1966bounds` | Graham (1966), *Bounds for certain multiprocessing anomalies*, Bell System Technical Journal 45(9), 1563–1581 | Crossref record for DOI 10.1002/j.1538-7305.1966.tb01709.x: author, title, journal, volume, issue, pages and year all match | **Metadata only.** Not re-read for this note |
+| `braun2001comparison` | Braun, Siegel, Beck, Bölöni, Maheswaran, Reuther, Robertson, Theys, Yao, Hensgen, Freund (2001), *A comparison of eleven static heuristics for mapping a class of independent tasks onto heterogeneous distributed computing systems*, J. Parallel and Distributed Computing 61(6), 810–837 | Crossref record for DOI 10.1006/jpdc.2000.1714: all eleven authors, title, journal, volume, issue, pages and year match | **Metadata only.** Not read |
+| `topcuoglu2002heft` | Topcuoglu, Hariri, Wu (2002), HEFT | Already listed in section 5 under "entries cited but not read" | **Metadata only** |
+
+**What each is cited for, and how sure that is.**
+
+- `graham1966bounds` is cited for two textbook facts: (1) *list scheduling*, where
+  jobs are taken from a priority list and each goes to the machine that becomes
+  available first, and (2) its worst-case makespan on m identical machines, at
+  most 2 − 1/m times the optimum. Both are recalled from general knowledge of
+  this classic result and are restated in every scheduling textbook; the paper
+  itself was not opened in this session. Note that Graham published two papers
+  with similar titles: this one (1966, Bell System Technical Journal) and
+  *Bounds on multiprocessing timing anomalies* (1969, SIAM J. Appl. Math. 17(2),
+  416–429, DOI 10.1137/0117039). The 2 − 1/m bound for an arbitrary list is
+  attributed here to the 1966 paper; **check this attribution in the paper
+  before the defence**, and cite the 1969 paper as well if the examiner expects
+  it. No section or theorem number is quoted for that reason.
+- `braun2001comparison` and `topcuoglu2002heft` are cited only for the fact that
+  established mapping heuristics choose, for a given task, the machine on which
+  it finishes first (minimum completion time in Braun et al.; earliest finish
+  time in HEFT). Recalled from general knowledge, **not verified by reading**.
+  In our model a job lasts the same on every satellite, so "finishes first" and
+  "is free first" are the same satellite.
+
+**Why these support the choice.** The default tie-break (lowest satellite
+index) is an artefact of the scan order: a rule that does not look at the
+satellite queues every job on satellite 0 while the others are idle. Choosing
+the earliest-available machine is the standard, long-established way to place
+a job once the job has been chosen, so using it for the pairs the tree leaves
+undecided replaces an arbitrary convention with a conventional one.
+
+**What is NOT from the literature.**
+
+- Using the earliest-free machine *only as a tie-break* inside a joint argmax
+  over (job, satellite) pairs, and the key (score, −start, −job index,
+  −satellite index), are project choices. In the cited heuristics the machine
+  rule is the primary rule, not a tie-break.
+- Treating NaN as the lowest score and accepting the first feasible pair (so
+  that −inf and NaN scores are still scheduled) is a project choice. It follows
+  the closure requirement of GP (`koza1994gp` §4: every function must be defined
+  for every value it can receive) but no paper prescribes this exact handling.
+- Proposition 2 in `method.tex` (for a job-only rule and no constraints, the
+  k-th job completes by t0 + (1/S) Σ_{i<k} d + d_k, never later than under the
+  default) is proved in this project. So is the counter-example with tight
+  energy budgets (two satellites with 30 units, jobs 10, 10, 30: the default
+  schedules 3, the option schedules 2).
+
+**Not yet backed by an experiment, and a known risk.** No run with the option
+on the held-out worlds exists (`data/` was not available). In the thesis data
+the energy budget is the binding constraint (each satellite runs one or two
+jobs), which is exactly the regime of the counter-example: the option should
+lower response times and may lower the completion ratio. The configurations
+`tiebreak` and `tiebreak+fixed+clones+worlds3` in
+`thesis/experiments/run_ablation.py` are there to measure it. Because the
+option changes the decoder, the hand-written baselines must be re-scored with
+it too before any comparison. Until then the option stays off by default and
+the thesis and guide claim only what is proved.

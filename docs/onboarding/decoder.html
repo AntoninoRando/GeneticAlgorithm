@@ -47,11 +47,34 @@ loop:
     recompute score[·][s*] for unscheduled jobs   <span class="c"># only s* changed</span></pre>
 <p>Details that matter:</p>
 <ul>
-  <li><strong>Ties</strong> are broken by scan order: jobs in file order, then satellites in order, and a pair only wins if its score is <em>strictly</em> higher. A formula that ignores the satellite (for example <code>job.arrivalTime</code>) therefore always picks the first feasible satellite, which amounts to "first-fit".</li>
+  <li><strong>Ties</strong> are broken by scan order: jobs in file order, then satellites in order, and a pair only wins if its score is <em>strictly</em> higher. A formula that ignores the satellite (for example <code>job.arrivalTime</code>) therefore always picks the first feasible satellite, which amounts to "first-fit". An opt-in alternative sends ties to the satellite that is free earliest; see <a href="#ties">Ties</a> below.</li>
   <li><strong>Infeasible pairs are skipped before the score is read.</strong> A formula cannot "choose" to break a constraint (<a href="references.html#magliarisi2026thesis">magliarisi2026thesis</a> §6.3.1, <a href="references.html#icdcs_sc">icdcs_sc</a> §III-C).</li>
   <li><strong>The decoder chooses the job and the satellite with the same formula.</strong> The papers usually evolve separate rules for "which task next" and "which machine" (<a href="references.html#zhang2025mtgper">zhang2025mtgper</a> §2.2, <a href="references.html#mtgp_multicloud">mtgp_multicloud</a> §4.1). The project starts with one tree deliberately; see <a href="theory.html#single-tree">theory</a>.</li>
   <li><strong>Batch, not dynamic:</strong> every job is visible at once, and the decoder picks the globally best pair each round. The papers instead react to one event at a time.</li>
 </ul>
+
+<h3 id="ties">Ties: who gets the job when the formula does not say?</h3>
+<p>A <strong>tie</strong> happens when two pairs have exactly the same score. It is common: a formula made of job terminals only gives a job the same score on <em>every</em> satellite. The formula has then chosen the job, but not the satellite. Something else must decide, and that something is the <strong>tie-break</strong>.</p>
+<div class="table-wrap"><table>
+<tr><th>Tie-break</th><th>Rule</th><th>What a job-only formula does</th></tr>
+<tr><td>Default (index)</td><td>Highest score; then lowest job index; then lowest satellite index.</td><td>Queues its jobs on satellite 0 until that satellite is infeasible, then on satellite 1, and so on. Other satellites stay idle.</td></tr>
+<tr><td>Earliest free (<code>--earliest-free-tie-break</code>)</td><td>Highest score; then the pair that can <strong>start first</strong>; then lowest job index; then lowest satellite index.</td><td>Gives each job to the satellite that is free first, so jobs spread over the constellation.</td></tr>
+</table></div>
+<p><strong>Example.</strong> Four identical 10-minute jobs, two identical satellites, all at minute 0, formula <code>job.executionTime</code> (every pair scores 10):</p>
+<div class="table-wrap"><table>
+<tr><th></th><th>Assignments</th><th>Completion minutes</th><th class="num">Mean response</th></tr>
+<tr><td>Default</td><td>all four on S0</td><td>10, 20, 30, 40</td><td class="num">25</td></tr>
+<tr class="hl"><td>Earliest free</td><td>S0, S1, S0, S1</td><td>10, 10, 20, 20</td><td class="num">15</td></tr>
+</table></div>
+<p>Three things to know:</p>
+<ul>
+  <li><strong>The formula always wins.</strong> The tie-break only applies when scores are <em>exactly</em> equal. If a formula prefers one satellite, even slightly, its jobs go there in both modes.</li>
+  <li><strong>It is not always better.</strong> With tight batteries, spreading can schedule <em>fewer</em> jobs. Two satellites with 30 energy units, jobs of 10, 10 and 30 minutes, shortest first: the default puts both short jobs on S0 and the long one fits on S1 (3 of 3). Earliest free puts one short job on each, and then no satellite has 30 units left (2 of 3). Filling one satellite first keeps the other one's battery whole. Our data is in exactly this regime (<a href="quirks.html#energy">energy is the binding constraint</a>), so expect lower response times and possibly a lower completion ratio.</li>
+  <li><strong>Infinite and NaN scores.</strong> A score can overflow to \(\pm\infty\), or become NaN ("not a number", for example \(\infty - \infty\)). By default a pair must beat \(-\infty\) strictly, so a pair scoring \(-\infty\) or NaN is never chosen and its job is left out. With the option, NaN counts as the lowest score and such pairs are scheduled when nothing better is feasible.</li>
+</ul>
+<p>The maths, a proof for job-only formulas and the sources are on the <a href="theory.html#ties">theory page</a>. The code is the selection block of <code>detail::greedyDecode</code> in <a href="../../include/scheduler/fitness_evaluator.h"><code>fitness_evaluator.h</code></a>.</p>
+<div class="callout warn"><span class="callout-title">Off by default, and not yet measured</span>
+<p>Every thesis number uses the default tie-break, including the baselines. The option changes the decoder itself, so a rule trained with it must be compared with baselines scored with it too. The playground below implements the default tie-break only.</p></div>
 
 <h2 id="example">2. A worked example</h2>
 <p>Snapshot time \(\tau = 10\), energy rate 1 per minute. Five jobs, two satellites:</p>

@@ -28,6 +28,7 @@ class GAConfig(TypedDict):
     terminal_weighting: bool
     track_busy_until: bool
     fixed_bounds: bool
+    earliest_free_tie_break: bool
     prune_constant_terminals: bool
     worlds_per_eval: int
     # Reproducibility: -1 = fresh randomness every run; >= 0 = deterministic
@@ -62,6 +63,7 @@ def default_config() -> GAConfig:
         terminal_weighting=False,
         track_busy_until=False,
         fixed_bounds=False,
+        earliest_free_tie_break=False,
         prune_constant_terminals=False,
         worlds_per_eval=1,
         seed=-1,
@@ -133,6 +135,11 @@ parser.add_argument("--fixed-bounds", action=argparse.BooleanOptionalAction,
                          "instead of the population's min and max, and charge every unscheduled job "
                          "the worst response (Marler & Arora 2004; Shabtay et al. 2013). The fitness "
                          "becomes absolute, so it is comparable across generations.")
+parser.add_argument("--earliest-free-tie-break", action=argparse.BooleanOptionalAction,
+                    help="Decoder tie-break: among equally scored (job, satellite) pairs prefer the "
+                         "satellite that is free earliest, instead of the lowest index. A rule that "
+                         "ignores the satellite then spreads its jobs like list scheduling (Graham "
+                         "1966) rather than queueing them on the first satellite.")
 parser.add_argument("--prune-constant-terminals", action=argparse.BooleanOptionalAction,
                     help="Never draw terminals that are constant over every loaded world and not "
                          "updated by the decoder (e.g. sat.energyReserved, sat.loadRatio).")
@@ -254,6 +261,7 @@ def run_genetic_algorithm(config: GAConfig):
     terminal_weighting = config["terminal_weighting"]
     track_busy_until   = config["track_busy_until"]
     fixed_bounds       = config["fixed_bounds"]
+    earliest_free_tie_break = config["earliest_free_tie_break"]
     prune_constant_terminals = config["prune_constant_terminals"]
     worlds_per_eval    = max(1, config["worlds_per_eval"])
     seed               = config["seed"]
@@ -385,6 +393,10 @@ def run_genetic_algorithm(config: GAConfig):
         # `scheduler` binary built before the option existed still runs the
         # default mode (it raises AttributeError only if this is asked for).
         fitness_evaluator.fixedBounds = True
+    if earliest_free_tie_break:
+        # Opt-in decoder tie-break, see FitnessEvaluator::earliestFreeTieBreak.
+        # Set only when requested, for the same reason as above.
+        fitness_evaluator.earliestFreeTieBreak = True
 
     excluded_terminals = []
     if prune_constant_terminals:

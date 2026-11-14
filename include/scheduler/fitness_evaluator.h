@@ -136,6 +136,21 @@ using namespace std;
 //    NOT YET MEASURED on the held-out worlds: default stays off until the
 //    ablation (thesis/experiments/run_ablation.py, configs "fixed*") is run.
 //
+//  * Tie-break (opt-in, FitnessEvaluator::earliestFreeTieBreak).  The decoder
+//    is an argmax over (job, satellite) pairs, and a tree that does not look at
+//    the satellite scores every satellite alike.  By default such ties go to
+//    the lowest satellite index, so the rule queues its jobs on satellite 0
+//    while the others are idle: an artefact of the scan order, not a decision
+//    of the tree.  With the option the tie goes to the satellite that is free
+//    earliest, which is how list scheduling places a job (Graham 1966,
+//    graham1966bounds) and what the earliest-finish-time and
+//    minimum-completion-time rules do (Topcuoglu et al. 2002,
+//    topcuoglu2002heft; Braun et al. 2001, braun2001comparison).  For a rule
+//    that orders jobs only, and without the sunset and energy filters, every
+//    job then completes no later than under the default (Proposition 2,
+//    thesis/chapters/method.tex).  With the filters this is not guaranteed.
+//    NOT YET MEASURED on the held-out worlds; default stays off.
+//
 //  * Several worlds per evaluation.  The papers never score an individual on a
 //    single instance: dtgpam §V-A evaluates every individual on 5 randomly
 //    drawn training instances per generation (yang2025thesis §3.3.1),
@@ -276,13 +291,18 @@ struct Assignment {
 ///         job's completion minute, so the `sat.cpuBusyUntil` terminal reports
 ///         when a satellite becomes free (see types.h).  Off by default
 ///         because it changes what an existing terminal means.
+/// @param  earliestFreeTieBreak  When true, equally scored pairs are ordered
+///         by start minute (earliest-free satellite first) instead of by scan
+///         order, and scores are compared in a total order (NaN lowest).  See
+///         the selection code below and FitnessEvaluator::earliestFreeTieBreak.
 // ─────────────────────────────────────────────────────────────────────────────
 inline void greedyDecode(const ExprNode&               tree,
                           const vector<TerminalDef>&    registry,
                           const SimulationSnapshot&     snap,
                           vector<Assignment>&           assignments,
                           vector<SatState>&             satStates,
-                          bool                          trackBusyUntil = false)
+                          bool                          trackBusyUntil = false,
+                          bool                          earliestFreeTieBreak = false)
 {
     // ── Working state ─────────────────────────────────────────────────────
     // Each individual decoded in the same generation must see an identical,
@@ -374,6 +394,7 @@ inline void greedyDecode(const ExprNode&               tree,
         double bestScore = -numeric_limits<double>::infinity();
         int    bestJob   = -1;
         int    bestSat   = -1;
+        double bestStart = 0.0;     // start minute of the best pair (tie-break)
 
         for (int j = 0; j < nJob; ++j) {
             if (scheduled[j]) continue;
@@ -406,10 +427,45 @@ inline void greedyDecode(const ExprNode&               tree,
                 // The GP maximises this score; both constraints above must
                 // pass before the cached score is considered.
                 const double sc = score[base + s];
-                if (sc > bestScore) {
-                    bestScore = sc;
-                    bestJob   = j;
-                    bestSat   = s;
+                if (!earliestFreeTieBreak) {
+                    // Default selection: a pair wins only with a STRICTLY
+                    // higher score, so ties go to the first pair of the scan
+                    // (lowest job index, then lowest satellite index).
+                    if (sc > bestScore) {
+                        bestScore = sc;
+                        bestJob   = j;
+                        bestSat   = s;
+                    }
+                } else {
+                    // Opt-in selection (FitnessEvaluator::earliestFreeTieBreak):
+                    // lexicographic maximum of
+                    //     ( score,  -start minute,  -job index,  -satellite index ).
+                    // Among equally scored pairs the one that can START first
+                    // wins, i.e. the satellite that is free earliest: the
+                    // machine choice of list scheduling [graham1966bounds] and
+                    // of the earliest-finish-time rules [topcuoglu2002heft,
+                    // braun2001comparison] (start and finish order coincide
+                    // here, a job lasts the same on every satellite).  The
+                    // remaining ties keep the scan order, as before.
+                    //
+                    // The order is made total: NaN counts as the lowest score
+                    // and the first feasible pair is always accepted, so a
+                    // pair scoring -inf or NaN is still scheduled when nothing
+                    // better is feasible.  (With the strict `>` above such a
+                    // pair can never beat the initial -inf, which lets a tree
+                    // leave feasible jobs unscheduled.)
+                    const double value = (sc != sc)
+                        ? -numeric_limits<double>::infinity() : sc;
+                    const bool better =
+                        bestJob == -1 ||
+                        value > bestScore ||
+                        (value == bestScore && startTime < bestStart);
+                    if (better) {
+                        bestScore = value;
+                        bestJob   = j;
+                        bestSat   = s;
+                        bestStart = startTime;
+                    }
                 }
             }
         }
@@ -671,6 +727,28 @@ public:
     ///         [-(weightTime + weightEnergy), weightJobs].
     bool fixedBounds = false;
 
+    /// @brief  Tie-break of the greedy decoder.  Default false: among equally
+    ///         scored feasible pairs the first of the scan wins (lowest job
+    ///         index, then lowest satellite index).  A rule that ignores the
+    ///         satellite then sends every job to satellite 0 until it is
+    ///         infeasible, while the others sit idle ("first-fit").
+    ///
+    ///         When true the decoder takes the lexicographic maximum of
+    ///         (score, -start minute, -job index, -satellite index): among
+    ///         equally scored pairs, the satellite that is free earliest.
+    ///         That is the machine choice of list scheduling
+    ///         (graham1966bounds) and of the earliest-finish-time /
+    ///         minimum-completion-time rules (topcuoglu2002heft,
+    ///         braun2001comparison).  A strictly higher score still always
+    ///         wins: the tree keeps full control, the option only decides
+    ///         what the tree leaves undecided.  Scores are also compared in a
+    ///         total order (NaN lowest, -inf selectable), so the decoder
+    ///         schedules as long as a feasible pair exists.
+    ///         Maths and proposition: thesis/chapters/method.tex.
+    ///         NOT YET MEASURED on the held-out worlds (run_ablation.py,
+    ///         configs "tiebreak*"); the thesis results use the default.
+    bool earliestFreeTieBreak = false;
+
 
 
     // ── Constructors ──────────────────────────────────────────────────────
@@ -776,7 +854,8 @@ public:
                               snap,
                               assignments,
                               satStates,
-                              trackBusyUntil);
+                              trackBusyUntil,
+                              earliestFreeTieBreak);
 
         detail::computeRawObjectives(assignments,
                                       satStates,
@@ -875,7 +954,8 @@ private:
                                       *sn,
                                       assignments,
                                       satStates,
-                                      trackBusyUntil);
+                                      trackBusyUntil,
+                                      earliestFreeTieBreak);
 
                 int    scheduled = 0;
                 double response  = 0.0;

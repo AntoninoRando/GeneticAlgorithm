@@ -448,6 +448,202 @@ class FixedBoundFitness(unittest.TestCase):
         self.assertEqual(legacy, [ind.fitness for ind in pop])
 
 
+# ── decoder tie-break (Graham 1966; Topcuoglu et al. 2002; Braun et al. 2001) ─
+class EarliestFreeTieBreak(unittest.TestCase):
+    """Hand-computed.  Snapshot minute 0, every job has arrived, no sunset, ample
+    energy, so only the selection rule matters.
+
+    The decoder picks the feasible pair with the highest score.  By default a tie
+    goes to the first pair of the scan (lowest job, then lowest satellite).  With
+    earliestFreeTieBreak it goes to the pair that can start first, i.e. the
+    lexicographic maximum of (score, -start, -job index, -satellite index).
+    """
+
+    @staticmethod
+    def individual(tree):
+        gp = SchedulerGP([], [], seed=1)
+        gp.initialize(populationSize=2, crossoverRate=0.8, mutationRate=0.08, maxDepth=3)
+        ind = gp.getPopulation()[0]
+        ind.tree = tree
+        return gp, ind
+
+    @staticmethod
+    def evaluator(tie_break):
+        ev = FitnessEvaluator(REG)
+        ev.earliestFreeTieBreak = tie_break
+        return ev
+
+    def test_off_by_default(self):
+        self.assertFalse(FitnessEvaluator(REG).earliestFreeTieBreak)
+
+    def test_job_only_rule_spreads_over_idle_satellites(self):
+        # Four identical 10-minute jobs, two identical satellites, rule =
+        # job.executionTime: every pair scores 10.
+        #   default      : all four on satellite 0 -> done at 10, 20, 30, 40 (mean 25)
+        #   earliest free: 0,1,0,1                 -> done at 10, 10, 20, 20 (mean 15)
+        snap = SimulationSnapshot(0.0, [make_sat(0), make_sat(1)], [make_job(i) for i in range(4)])
+        gp, ind = self.individual(terminal("job.executionTime"))
+        ratio, mean_default, _ = self.evaluator(False).evaluate_single(ind, snap)
+        self.assertEqual(ratio, 1.0)
+        self.assertAlmostEqual(mean_default, 25.0)
+        ratio, mean_spread, _ = self.evaluator(True).evaluate_single(ind, snap)
+        self.assertEqual(ratio, 1.0)
+        self.assertAlmostEqual(mean_spread, 15.0)
+
+    def test_job_order_still_follows_the_rule(self):
+        # Shortest job first on two satellites.  Durations 30, 10, 20, 40.
+        # Order of selection: 10, 20, 30, 40.
+        #   10 -> sat 0 (both free at 0: lowest index)   done 10
+        #   20 -> sat 1 (free at 0 < 10)                 done 20
+        #   30 -> sat 0 (free at 10 < 20)                done 40
+        #   40 -> sat 1 (free at 20 < 40)                done 60
+        # mean response = (10 + 20 + 40 + 60) / 4 = 32.5.
+        # Default: all on satellite 0: 10, 30, 60, 100 -> mean 50.
+        jobs = [make_job(i, execution=d) for i, d in enumerate([30, 10, 20, 40])]
+        snap = SimulationSnapshot(0.0, [make_sat(0), make_sat(1)], jobs)
+        gp, ind = self.individual(unary(NodeType.NEG, terminal("job.executionTime")))
+        self.assertAlmostEqual(self.evaluator(False).evaluate_single(ind, snap)[1], 50.0)
+        self.assertAlmostEqual(self.evaluator(True).evaluate_single(ind, snap)[1], 32.5)
+
+    def test_equal_start_keeps_the_lowest_satellite_index(self):
+        # One job, two idle satellites: score and start both tie, so the scan
+        # order decides and satellite 0 gets it.  The satellites differ only in
+        # energy rate (1 and 3 per minute), which makes the choice observable:
+        # energy 10 on satellite 0, 30 on satellite 1.
+        snap = SimulationSnapshot(0.0, [make_sat(0), make_sat(1)], [make_job(0)])
+        snap.energyPerMinute = [1.0, 3.0]
+        gp, ind = self.individual(terminal("job.executionTime"))
+        for tie_break in (False, True):
+            self.assertAlmostEqual(self.evaluator(tie_break).evaluate_single(ind, snap)[2], 10.0)
+
+    def test_a_strictly_higher_score_beats_an_earlier_start(self):
+        # The tree prefers satellite 1 outright (higher bandwidth).  The option
+        # must not override that: all four jobs queue on satellite 1 (mean 25)
+        # although satellite 0 is idle the whole time.
+        sats = [make_sat(0), make_sat(1)]
+        sats[1].bandwidth = 5.0
+        snap = SimulationSnapshot(0.0, sats, [make_job(i) for i in range(4)])
+        snap.energyPerMinute = [1.0, 3.0]
+        gp, ind = self.individual(terminal("sat.bandwidth"))
+        for tie_break in (False, True):
+            ratio, mean_resp, energy = self.evaluator(tie_break).evaluate_single(ind, snap)
+            self.assertEqual(ratio, 1.0)
+            self.assertAlmostEqual(mean_resp, 25.0)
+            self.assertAlmostEqual(energy, 4 * 10 * 3.0)        # everything on satellite 1
+
+    def test_infinite_and_nan_scores_are_still_scheduled(self):
+        # job.ram = 1e200, so ram * ram overflows to +inf.
+        #   -(ram * ram)              = -inf for every pair
+        #   (ram * ram) - (ram * ram) =  NaN for every pair
+        # Default: a pair must beat the initial -inf with a strict '>', which
+        # neither -inf nor NaN can do, so nothing is scheduled.  With the
+        # option the order is total and the first feasible pair is accepted.
+        def big(i):
+            job = make_job(i)
+            job.ram = 1e200
+            return job
+
+        def product():
+            n = ExprNode()
+            n.nodeType = NodeType.MUL
+            n.children = [terminal("job.ram"), terminal("job.ram")]
+            return n
+
+        minus_inf = unary(NodeType.NEG, product())
+        nan = ExprNode()
+        nan.nodeType = NodeType.SUB
+        nan.children = [product(), product()]
+
+        snap = SimulationSnapshot(0.0, [make_sat(0), make_sat(1)], [big(i) for i in range(4)])
+        for tree in (minus_inf, nan):
+            gp, ind = self.individual(tree)
+            self.assertEqual(self.evaluator(False).evaluate_single(ind, snap)[0], 0.0)
+            ratio, mean_resp, _ = self.evaluator(True).evaluate_single(ind, snap)
+            self.assertEqual(ratio, 1.0)
+            self.assertAlmostEqual(mean_resp, 15.0)
+
+    def test_nan_ranks_below_every_number(self):
+        # One satellite.  Job 0 (30 minutes) scores NaN, job 1 (10 minutes)
+        # scores a finite number: job 1 must go first -> done at 10 and 40,
+        # mean 25 (the other order would give 30 and 40, mean 35).
+        # Tree: (ram * ram) - (ram * ram) is NaN for ram = 1e200 and 0 for ram = 1.
+        def product():
+            n = ExprNode()
+            n.nodeType = NodeType.MUL
+            n.children = [terminal("job.ram"), terminal("job.ram")]
+            return n
+
+        tree = ExprNode()
+        tree.nodeType = NodeType.SUB
+        tree.children = [product(), product()]
+        slow = make_job(0, execution=30)
+        slow.ram = 1e200
+        snap = SimulationSnapshot(0.0, [make_sat(0)], [slow, make_job(1, execution=10)])
+        gp, ind = self.individual(tree)
+        ratio, mean_resp, _ = self.evaluator(True).evaluate_single(ind, snap)
+        self.assertEqual(ratio, 1.0)
+        self.assertAlmostEqual(mean_resp, 25.0)
+
+    def test_no_job_finishes_later_for_a_job_only_rule(self):
+        # Proposition 2 (thesis, method chapter): for a rule that looks at the
+        # job only, without sunset or energy limits, every job completes no
+        # later with the earliest-free tie-break than with the default.  The
+        # mean response is therefore never larger.  Checked on 20 random
+        # job-only trees and a world with unequal jobs.
+        jobs = [make_job(i, arrival=0, execution=5 + (i * 7) % 23, transfer=(i * 3) % 6)
+                for i in range(30)]
+        for j in jobs:                      # make the job terminals differ
+            j.ram, j.disk, j.imageSize = 1.0 + j.id % 4, 2.0 + j.id % 7, 3.0 + j.id % 5
+        snap = SimulationSnapshot(0.0, [make_sat(s) for s in range(5)], jobs)
+        job_terminals = [i for i, t in enumerate(REG) if t.name.startswith("job.")]
+        satellite_terminals = [i for i, t in enumerate(REG) if t.name.startswith("sat.")]
+
+        gp = SchedulerGP([], [], seed=4)
+        gp.initialize(populationSize=20, crossoverRate=0.8, mutationRate=0.08, maxDepth=4,
+                      excludedTerminals=satellite_terminals)
+        for ind in gp.getPopulation():
+            self.assertTrue(set(terminals_in(ind.tree)) <= set(job_terminals))
+            ratio_a, mean_default, _ = self.evaluator(False).evaluate_single(ind, snap)
+            ratio_b, mean_spread, _ = self.evaluator(True).evaluate_single(ind, snap)
+            # -inf / NaN scores can make the default schedule fewer jobs; the
+            # proposition compares schedules of the same jobs.
+            if ratio_a == ratio_b == 1.0:
+                self.assertLessEqual(mean_spread, mean_default + 1e-9)
+
+    def test_tight_energy_can_make_spreading_schedule_fewer_jobs(self):
+        # The caveat of Proposition 2: with the energy filter the option is NOT
+        # always better.  Two satellites with 30 energy units each, jobs of 10,
+        # 10 and 30 minutes, shortest job first.
+        #   default      : 10 -> sat 0 (20 left), 10 -> sat 0 (10 left),
+        #                  30 -> sat 1 (fits exactly)           3 of 3 scheduled
+        #   earliest free: 10 -> sat 0 (20 left), 10 -> sat 1 (20 left),
+        #                  30 fits nowhere                      2 of 3 scheduled
+        # Filling one satellite first keeps the other one's budget whole, as
+        # first-fit does in bin packing.  This is why the option is off by
+        # default and has to be measured on the real worlds.
+        jobs = [make_job(i, execution=d) for i, d in enumerate([10, 10, 30])]
+        snap = SimulationSnapshot(0.0, [make_sat(0, energy=30.0), make_sat(1, energy=30.0)], jobs)
+        gp, ind = self.individual(unary(NodeType.NEG, terminal("job.executionTime")))
+        self.assertAlmostEqual(self.evaluator(False).evaluate_single(ind, snap)[0], 1.0)
+        self.assertAlmostEqual(self.evaluator(True).evaluate_single(ind, snap)[0], 2 / 3)
+
+    def test_bounds_of_the_fixed_bound_fitness_still_hold(self):
+        # The tie-break changes which pair is picked, not the decoder's
+        # constraints, so Rmax and Emax remain upper bounds.
+        snap = FixedBoundFitness.synthetic_world()
+        r_max, e_max = FitnessEvaluator.world_bounds(snap)
+        gp = SchedulerGP([], [], seed=3)
+        gp.initialize(populationSize=60, crossoverRate=0.8, mutationRate=0.08, maxDepth=5)
+        ev = self.evaluator(True)
+        ev.fixedBounds = True
+        ev.evaluate(gp.getPopulation(), snap)
+        for ind in gp.getPopulation():
+            _, resp, energy = ev.evaluate_single(ind, snap)
+            self.assertLessEqual(resp, r_max + 1e-9)
+            self.assertLessEqual(energy, e_max + 1e-9)
+            self.assertGreaterEqual(ind.fitness, -(ev.weightTime + ev.weightEnergy) - 1e-12)
+
+
 # ── GP options ───────────────────────────────────────────────────────────────
 @unittest.skipUnless(os.path.exists(WORLD0), "needs data/worlds")
 class GPOptions(unittest.TestCase):

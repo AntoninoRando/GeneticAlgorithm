@@ -19,6 +19,18 @@
 <h1>Changelog</h1>
 <p class="lede">One dated entry per change to this guide, newest first. Say which pages changed and which code change made them necessary.</p>
 
+<h2>2026-11-14: earliest-free decoder tie-break (opt-in)</h2>
+<ul>
+  <li><strong>Code change:</strong> <code>FitnessEvaluator.earliestFreeTieBreak</code> in <code>fitness_evaluator.h</code> / <code>bindings.cpp</code>, the <code>--earliest-free-tie-break</code> flag in <code>main.py</code>, two configurations in <code>thesis/experiments/run_ablation.py</code>, and an <code>EarliestFreeTieBreak</code> test class. With the option, equally scored pairs go to the satellite that is free earliest, and scores are compared in a total order (NaN lowest). The default selection is unchanged.</li>
+  <li><strong>Decoder &amp; fitness:</strong> new subsection "Ties" with both rules, a worked example, the battery counter-example and the NaN case.</li>
+  <li><strong>Theory &amp; maths §3:</strong> new subsection on ties (both rules as lexicographic maxima, sources, the completion-time bound for job-only rules, why it fails with batteries); two new rows in the design map.</li>
+  <li><strong>Known quirks:</strong> new entry "Job-only rules pile onto the first satellite".</li>
+  <li><strong>Experiments:</strong> a "not measured yet" box with the command and two warnings (re-score the baselines; expect two effects of opposite sign).</li>
+  <li><strong>Day one, One generation, Glossary, Where to start:</strong> the flag and option, two glossary terms (tie-break, list scheduling), a new "change how the decoder picks a pair" recipe.</li>
+  <li><strong>References:</strong> added Graham 1966, Braun et al. 2001 and the HEFT paper (Topcuoglu et al. 2002, already in the bibliography but missing from this page). Metadata verified on Crossref; not read. Also in <code>thesis/references.bib</code> and <code>thesis/literature_notes.md</code> §9.</li>
+  <li><strong>Not done:</strong> no experiment on the held-out worlds.</li>
+</ul>
+
 <h2>2026-11-14: build flags follow the build type</h2>
 <ul>
   <li><strong>Code change:</strong> <code>CMakeLists.txt</code> used to add <code>-O3</code> to every build, so <code>Debug</code> was not a debug build, and its flags were GCC-only. Now <code>RelWithDebInfo</code> (optimised, with symbols) is the default and the build for experiments, <code>Debug</code> is really unoptimised, and the GCC flags are skipped on other compilers. Every script, the dev container, the VS Code tasks and CI pass the build type explicitly. The module reports <code>scheduler.build_type</code> and <code>scheduler.optimized</code>, and importing an unoptimised module raises a <code>RuntimeWarning</code>. No algorithm change; the optimised build uses the same flags as before.</li>

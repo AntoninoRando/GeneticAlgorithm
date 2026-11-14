@@ -48,6 +48,14 @@
   <li>Re-run the main experiment and the weight study; update <a href="results.html">results</a>.</li>
 </ol>
 
+<h3>…I want to change how the decoder picks a pair</h3>
+<ol>
+  <li>The selection is the innermost block of <code>detail::greedyDecode</code> in <code>fitness_evaluator.h</code>. It has two branches: the default (strictly higher score, ties by index) and <code>earliestFreeTieBreak</code>.</li>
+  <li>Keep the default branch byte-for-byte: every thesis number and every seeded run depends on it. Add a new behaviour as a new opt-in branch.</li>
+  <li>Read <a href="theory.html#ties">theory §3, ties</a>. Proposition 2 in <code>thesis/chapters/method.tex</code> assumes the key (score, −start, −job, −satellite).</li>
+  <li>A decoder change affects baselines as much as evolved rules. Re-score both (<a href="results.html#ablation">results</a>).</li>
+</ol>
+
 <h3>…I want to change a constraint or the energy model</h3>
 <ol>
   <li>Constraints are checked inside the inner loop of <code>detail::greedyDecode</code>; energy is deducted at commit.</li>

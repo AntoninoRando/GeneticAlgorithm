@@ -380,6 +380,20 @@ Sources: Marler & Arora 2004 (fixed-bound normalisation of weighted sums),
 Shabtay et al. 2013 (rejection penalty).
             )doc")
 
+        .def_readwrite("earliestFreeTieBreak", &FitnessEvaluator::earliestFreeTieBreak,
+            R"doc(
+Tie-break of the greedy decoder.  Default ``False``: among equally scored
+feasible pairs the first of the scan wins (lowest job index, then lowest
+satellite index), so a rule that ignores the satellite fills satellite 0 first.
+
+If ``True`` the decoder takes the lexicographic maximum of
+``(score, -start minute, -job index, -satellite index)``: among equally scored
+pairs, the satellite that is free earliest (the machine choice of list
+scheduling, Graham 1966).  A strictly higher score always wins.  Scores are
+then compared in a total order (NaN lowest, ``-inf`` selectable), so the
+decoder keeps scheduling while a feasible pair exists.
+            )doc")
+
         .def_static("world_bounds",
              [](const SimulationSnapshot& snap) -> py::tuple
              {

@@ -36,6 +36,83 @@ Only the committed satellite changes, so only its column of the score matrix is
 refreshed. Tree evaluations drop from $O(J^2 S)$ to $O(JS + J^2)$ for $J$ tasks
 and $S$ satellites, with identical results.
 
+\subsection{Selection rule and ties}
+\label{sec:ties}
+Let $\mathcal{F}$ be the set of feasible pairs of a round, tasks and satellites
+being numbered in the order of the input. ``Highest score'' in line~4 is made
+precise by a lexicographic maximum. The \emph{default} rule is
+\begin{equation}
+  (j^\star,s^\star)=\operatorname*{lex\,max}_{(j,s)\in\mathcal{F}}
+  \bigl(T(j,s),\,-j,\,-s\bigr),
+  \label{eq:sel-index}
+\end{equation}
+so a tie goes to the lowest task index and then to the lowest satellite index.
+(In the implementation a pair must beat $-\infty$ strictly, so a pair whose
+score is $-\infty$ or not a number is never selected.) All experiments of
+Chapter~\ref{ch:exp} use this rule.
+
+A tree that does not read any satellite terminal gives every satellite the same
+score. Under \eqref{eq:sel-index} it sends each task to the first satellite that
+is still feasible, while the others stay idle: the satellite is chosen by the
+input order, not by the tree. The optional \emph{earliest-free} rule removes this
+artefact:
+\begin{equation}
+  (j^\star,s^\star)=\operatorname*{lex\,max}_{(j,s)\in\mathcal{F}}
+  \bigl(\bar T(j,s),\,-f_s,\,-j,\,-s\bigr),
+  \label{eq:sel-free}
+\end{equation}
+where $f_s$ is the time at which $s$ becomes free and $\bar T$ equals $T$ with
+``not a number'' replaced by $-\infty$, so that the order is total and a pair is
+selected whenever $\mathcal{F}\neq\emptyset$. Among equally scored pairs the one
+that can start first wins. A strictly higher score always wins, so the tree
+keeps full control over every choice it actually expresses.
+
+Sending a task to the machine that becomes available first is the machine
+choice of list scheduling \citep{graham1966bounds}. Since $d_j$ does not depend
+on the satellite, earliest start and earliest finish coincide, and the rule is
+also the processor selection of the earliest-finish-time and
+minimum-completion-time heuristics
+\citep{topcuoglu2002heft,braun2001comparison}. Using it only to break ties, and
+the particular key \eqref{eq:sel-free}, are choices of this work.
+
+\paragraph{Proposition 2 (task-only rules without constraints).} Assume that no
+pair is ever infeasible ($\omega_s=E_s=\infty$) and that the score is a finite
+function of the task only, $T(j,s)=g(j)$. Then both rules schedule the tasks in
+the same order $\pi$ (by decreasing $g$, ties by index), and for every $k$
+\begin{equation}
+  c^{\mathrm{free}}_{\pi(k)}\;\le\;t_0+\frac1S\sum_{i<k}d_{\pi(i)}+d_{\pi(k)}
+  \;\le\;t_0+\sum_{i\le k}d_{\pi(i)}\;=\;c^{\mathrm{index}}_{\pi(k)} .
+\end{equation}
+Every task completes no later under \eqref{eq:sel-free}; hence $R$ is not larger,
+and $C=1$ under both rules.
+
+\emph{Proof.} With all pairs feasible, the pairs of maximal score are those of the
+tasks with the largest $g$, each combined with every satellite. Under both rules
+the task selected is the one of lowest index among them, which gives the same
+order $\pi$. Under \eqref{eq:sel-index} the satellite is always the first one, so
+the tasks run in sequence on it and $c^{\mathrm{index}}_{\pi(k)}=t_0+\sum_{i\le k}d_{\pi(i)}$.
+Under \eqref{eq:sel-free} the $k$-th task starts at $\min_s f_s$. The satellites
+are never idle before their last task, so $\sum_s(f_s-t_0)=\sum_{i<k}d_{\pi(i)}$,
+and the minimum is at most the mean: $\min_sf_s\le t_0+\frac1S\sum_{i<k}d_{\pi(i)}$.
+\hfill$\square$
+
+The schedule of \eqref{eq:sel-free} is then exactly the list schedule of the list
+$\pi$, whose makespan is at most $2-1/S$ times the optimum
+\citep{graham1966bounds}.
+
+\paragraph{No guarantee with constraints.} With the energy filter, spreading the
+tasks can schedule \emph{fewer} of them. Take two satellites with $E_s=30$,
+$\rho_s=1$, and three tasks of duration $10$, $10$, $30$ under shortest-task-first.
+Rule \eqref{eq:sel-index} puts both short tasks on the first satellite and the
+long one fits on the second ($C=1$). Rule \eqref{eq:sel-free} puts one short task
+on each satellite, and no satellite has $30$ units left ($C=2/3$). Filling one
+satellite first keeps the budget of the other whole, as first-fit does in bin
+packing. In the data of Chapter~\ref{ch:exp} the energy budget is the binding
+constraint, so the earliest-free rule is expected to lower response times and
+may lower the completion ratio. Its effect has not been measured; it is off by
+default. The bounds of Section~\ref{sec:fixed} hold under both rules, since
+Proposition~1 does not depend on which feasible pair is selected.
+
 \section{Fitness}
 For individual $i$ with raw objectives $(C_i, R_i, \mathcal{E}_i)$, the response
 time and energy are normalised across the population and

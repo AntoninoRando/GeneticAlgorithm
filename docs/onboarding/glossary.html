@@ -44,6 +44,7 @@
 <dt id="hyper-heuristic">Hyper-heuristic</dt><dd>A method that searches over heuristics instead of over solutions.</dd>
 <dt id="individual">Individual</dt><dd>One candidate solution: here a <code>GPIndividual</code> with a tree, a fitness and an id.</dd>
 <dt id="leo">LEO</dt><dd>Low Earth orbit, a few hundred kilometres up. Satellites there move fast relative to the ground.</dd>
+<dt id="list-scheduling">List scheduling</dt><dd>The classic rule for several identical machines: take jobs from a priority list and give each one to the machine that becomes free first. The earliest-free tie-break makes a job-only formula behave this way.</dd>
 <dt id="mutation">Mutation</dt><dd>Random edits: redraw a terminal, swap an operator, or regrow a subtree. Rate 0.08 per node.</dd>
 <dt id="normalisation">Normalisation (min-max)</dt><dd>Rescaling a value to [0, 1] using the population's minimum and maximum. The default for the two cost terms of the fitness; see also <a href="#fixed-bound">fixed-bound normalisation</a>.</dd>
 <dt id="fixed-bound">Normalisation (fixed-bound)</dt><dd>Rescaling a value to [0, 1] by dividing it by a bound that depends on the world only (\(R^{\max}\), \(\mathcal{E}^{\max}\)), not on the other individuals. Opt-in with <code>--fixed-bounds</code>. The fitness then means the same thing in every generation.</dd>
@@ -67,6 +68,7 @@
 <dt id="takeover">Takeover time</dt><dd>Generations that selection alone needs to fill the population with copies of the best individual.</dd>
 <dt id="terminal">Terminal</dt><dd>A leaf of the tree: an input such as <code>job.executionTime</code>.</dd>
 <dt id="terminal-weighting">Terminal weighting</dt><dd>Option that makes mutation favour terminals common in the best trees. <span class="see"><a href="theory.html#terminal-weighting">Theory §7</a></span></dd>
+<dt id="tie-break">Tie-break</dt><dd>What decides between two (job, satellite) pairs with exactly the same score. Default: lowest job index, then lowest satellite index. With <code>--earliest-free-tie-break</code>: the pair that can start first. See <a href="decoder.html#ties">decoder</a>.</dd>
 <dt id="tournament">Tournament selection</dt><dd>Pick \(k\) individuals at random and keep the fittest as a parent. \(k = 5\) here.</dd>
 <dt id="world">World</dt><dd>One 10-minute window of the simulator log, about 100 jobs. 30 worlds in total. <span class="see"><a href="data.html">Data pipeline</a></span></dd>
 </dl>

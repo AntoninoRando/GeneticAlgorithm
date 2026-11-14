@@ -28,6 +28,11 @@ Where each option comes from (see include/scheduler/*.h for section numbers):
   fixed          fixed-bound fitness: cost terms divided by per-world bounds and
                  unscheduled jobs charged the worst response (Marler & Arora
                  2004; Shabtay et al. 2013; same normalisation as icdcs_sc)
+  tiebreak       decoder tie-break: equally scored pairs go to the satellite
+                 that is free earliest (list scheduling, Graham 1966; earliest
+                 finish time, Topcuoglu et al. 2002, Braun et al. 2001).  The
+                 rule is trained and scored with this decoder, so compare it
+                 with baselines scored the same way.
 
 To measure only the fixed-bound fitness against the baseline, with 30 seeds:
 
@@ -71,6 +76,13 @@ CONFIGS = {
     # that the earlier ablation files stay comparable).
     "fixed":       dict(fixedBounds=True),
     "fixed+clones+worlds3": dict(fixedBounds=True, cloneRetries=3, worldsPerEval=3),
+    # Earliest-free decoder tie-break (added 2026-11-14).  NOTE: this changes
+    # the decoder, so the evolved rule is trained AND scored with it; the
+    # hand-written baselines of run_experiments.py are scored with the default
+    # tie-break unless they are re-run the same way.
+    "tiebreak":    dict(earliestFreeTieBreak=True),
+    "tiebreak+fixed+clones+worlds3": dict(earliestFreeTieBreak=True, fixedBounds=True,
+                                          cloneRetries=3, worldsPerEval=3),
 }
 
 _TRAIN = _TEST = None
@@ -88,11 +100,14 @@ def train_one(args):
     track = opts.pop("trackBusyUntil", False)
     k = opts.pop("worldsPerEval", 1)
     fixed = opts.pop("fixedBounds", False)
+    tiebreak = opts.pop("earliestFreeTieBreak", False)
 
     fe = FitnessEvaluator(rx.REG)
     fe.trackBusyUntil = track
     if fixed:
         fe.fixedBounds = True
+    if tiebreak:
+        fe.earliestFreeTieBreak = True
 
     excluded = []
     if prune:
