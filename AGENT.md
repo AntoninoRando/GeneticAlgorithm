@@ -15,35 +15,34 @@ What the scheduler does
 - For each simulation snapshot, formulas are used to select satellites for jobs; formulas are scored by a fitness combining completed jobs, average completion time, and energy.
 
 How to work on this repo (recommended workflow for an AI)
-- Inspect key files: [bindings.cpp](bindings.cpp#L1), [include/scheduler](include/scheduler), [main.py](main.py#L1), and [data_factory.py](data_factory.py#L1).
+- Inspect key files: [bindings.cpp](bindings.cpp#L1), [include/scheduler](include/scheduler), [main.py](main.py#L1), and [data_processing/data_factory.py](data_processing/data_factory.py#L1).
 - Run the CMake build to compile the extension before running Python scripts.
 - Prefer small, focused changes and run a local simulation to validate behavior.
 
 Build & run commands
-- Build the Python extension (from repo root):
+- Build the Python extension (from repo root). CMake writes `scheduler*.so` straight into the repo root, so there is nothing to copy:
 ```
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug -DPYTHON_EXECUTABLE=$(which python3)
-cmake --build build
-cp build/scheduler*.so .
+cmake --build build --target scheduler
 ```
-- Build the CLI target:
-```
-cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug -DPYTHON_EXECUTABLE=$(which python3)
-cmake --build build --target scheduler_cli
-```
-- Short helper (existing tasks are available in the workspace tasks): use the VS Code task `Build scheduler module (Debug)` or `Build scheduler cli (Debug)`.
+  `CMakeLists.txt` adds `-O3` whatever the build type; `Debug` only adds symbols.
+- The compiled module is **not** in the repository (`.gitignore`): it must be built on each machine and rebuilt after every change to `bindings.cpp` or `include/scheduler`.
+- There is no CLI target; the only CMake target is `scheduler`.
+- Short helper: the VS Code tasks `Build scheduler module (Debug)` and `Run tests`, or `scripts/build.sh`.
 - Run a Python simulation example:
 ```
-python3 main.py
+python3 main.py --no-start-prompt --generations 5
 ```
-or use the provided `scripts/run.sh` for example runs.
+or `scripts/run.sh` (build, then run), or `./run <config>` for a named file in `runConfigurations/`.
+- The input data (`data/`) is not in the repository either; without it `main.py` stops with a message and the data-dependent tests are skipped. See "Data" in `readme.md`.
 
 Key files & directories
 - `bindings.cpp`: Python bindings / glue.
 - `include/scheduler`: public headers and core types.
-- `data_factory.py`: dataset / snapshot helpers.
-- `main.py`, `run/`, and `scripts/`: runners and example scripts.
-- `metrics/` and `snapshots/`: sample outputs and inputs.
+- `data_processing/data_factory.py`: dataset / snapshot helpers.
+- `main.py`, `run` (launcher script), and `scripts/`: runners and helper scripts.
+- `tests/`: unit tests.
+- `metrics/` and `snapshots/`: run outputs (not tracked).
 
 Coding conventions & constraints for AI changes
 - Keep C++ ABI/API stable: avoid renaming public functions in `include/scheduler` without updating bindings.
@@ -52,8 +51,10 @@ Coding conventions & constraints for AI changes
 - Run the build after C++ changes and verify Python scripts still import `scheduler` successfully.
 
 Testing & validation
-- There are no formal unit tests in the repo; validate changes by running small simulations and checking output in `metrics/` or console logs.
-- When adding tests, prefer lightweight Python tests that import `scheduler` and run deterministic small snapshots.
+- Unit tests live in `tests/`. Run them from the repo root after building: `python3 -m unittest discover -s tests -v`. Tests that need `data/worlds` are skipped when the data is absent.
+- CI (`.github/workflows/ci.yml`) builds the extension and runs the same command on every push and pull request.
+- Also validate behaviour changes by running small simulations and checking output in `metrics/` or console logs.
+- When adding tests, prefer lightweight Python tests that import `scheduler` and run deterministic small snapshots built in code, so they also run without `data/`.
 
 Reporting changes
 - For every PR or patch, include:
@@ -66,7 +67,7 @@ If you are unsure
 - When editing configuration files (CMakeLists, scripts), prefer minimal changes and explain the reason.
 
 Contact points in the code (good start points)
-- `data_factory.py` — dataset generation and snapshots.
+- `data_processing/data_factory.py` — dataset generation and snapshots.
 - `metrics_tracker.py` — metrics aggregation and saving.
 - `bindings.cpp` — Python/C++ interface.
 

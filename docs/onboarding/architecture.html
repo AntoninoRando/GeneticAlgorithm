@@ -69,7 +69,6 @@
 <tr><td><a href="../../include/scheduler/tree_operators.h"><code>tree_operators.h</code></a></td><td><code>TreeOperators</code>: <code>crossover</code>, <code>mutate</code>, <code>hoist</code>, and the size/depth caps.</td><td>you change a genetic operator.</td></tr>
 <tr><td><a href="../../include/scheduler/scheduler_gp.h"><code>scheduler_gp.h</code></a></td><td><code>GPIndividual</code> (tree + fitness + id) and <code>SchedulerGP</code>: <code>initialize()</code>, <code>solveNextGeneration()</code>, tournament selection, elitism, clone retries, terminal weighting, diversity.</td><td>you change the evolutionary loop or its parameters.</td></tr>
 <tr><td><a href="../../include/scheduler/fitness_evaluator.h"><code>fitness_evaluator.h</code></a></td><td><code>SimulationSnapshot</code>, the greedy decoder <code>detail::greedyDecode</code>, and <code>FitnessEvaluator</code> (<code>evaluate</code>, <code>evaluateMany</code>, <code>evaluateSingle</code>, <code>constantTerminals</code>).</td><td>you change constraints, objectives or the fitness formula.</td></tr>
-<tr><td><code>data_factories.h</code></td><td>Two declarations with no implementation. Leftover; nothing uses it.</td><td>never.</td></tr>
 </table></div>
 <div class="callout"><span class="callout-title">Read the top comment of every header first</span>
 <p>Each header starts with a <em>LITERATURE NOTES</em> block that explains which paper each design choice comes from and where the project deviates. It is the fastest way to understand <em>why</em> the code looks the way it does.</p></div>
@@ -94,12 +93,21 @@
 <h3>Other folders</h3>
 <ul>
   <li><code>thesis/</code>: LaTeX thesis, <code>references.bib</code> and <code>literature_notes.md</code>, which holds reading notes for every cited paper. Read the notes before changing the algorithm.</li>
-  <li><code>docs/source</code>, <code>docs/build</code>: Sphinx API documentation of the <code>scheduler</code> module (<code>scripts/make-doc.sh</code>).</li>
+  <li><code>docs/source</code>, <code>docs/build</code>: Sphinx API documentation of the <code>scheduler</code> module (<code>scripts/make-doc.sh</code>). <code>docs/build</code> is generated; only the PDF that the readme links to (<code>docs/build/latex/schedulerlib.pdf</code>) is kept in git.</li>
   <li><code>docs/onboarding</code>: this guide.</li>
   <li><code>runConfigurations/</code>: named JSON run settings.</li>
   <li><code>scripts/</code>: small shell helpers for building, running and debugging.</li>
   <li><code>.devcontainer/</code>: the Docker development environment.</li>
+  <li><code>.github/workflows/ci.yml</code>: the automatic build-and-test run on GitHub.</li>
 </ul>
+<h3>What is deliberately not in git</h3>
+<ul>
+  <li><strong>The compiled module</strong> (<code>scheduler*.so</code>) and <code>build/</code>: built per machine, stale after any C++ change.</li>
+  <li><strong>The data</strong> (<code>data/</code>): see <a href="running.html#data">Day one, step 2</a>.</li>
+  <li><strong>Run outputs</strong> (<code>metrics/</code>, <code>snapshots/</code>).</li>
+  <li><strong>Generated documentation</strong> (<code>docs/build</code>, except the linked PDF) and the papers in <code>thesis/papers/</code>.</li>
+</ul>
+<p>The rules are in <a href="../../.gitignore"><code>.gitignore</code></a>. <a href="../../.gitattributes"><code>.gitattributes</code></a> fixes the line endings of shell scripts (see <a href="running.html#env">Day one, step 1</a>).</p>
 
 <h2>One call, end to end</h2>
 <p>What happens when <code>main.py</code> runs one generation:</p>

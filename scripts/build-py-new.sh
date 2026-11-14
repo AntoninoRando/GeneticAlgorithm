@@ -1,7 +1,9 @@
-cd ..
+#!/usr/bin/env bash
+# Clean rebuild: delete the CMake cache, reconfigure and build the extension.
+# Use it after changing compilers, Python versions or CMake options.
+set -euo pipefail
+cd "$(dirname "${BASH_SOURCE[0]}")/.."
 
-# Clean the existing build cache and reconfigure CMake
-rm -rf build && cmake -S . -B build -DPYTHON_EXECUTABLE=$(which python3)
-
-# Build the python extension
+rm -rf build
+cmake -S . -B build -DPYTHON_EXECUTABLE="$(command -v python3)"
 cmake --build build --target scheduler

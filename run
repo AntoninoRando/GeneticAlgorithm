@@ -174,4 +174,9 @@ for token in args:
 PY
 )
 
-exec "$python_bin" main.py "${config_args[@]}" "$@"
+# main.py reads the flat keys of the file itself (generations, population_size,
+# clone_retries, ...) through --config.  Without it a flat configuration such
+# as runConfigurations/default.json was silently ignored, because the expansion
+# above only knows the older nested layout.  CLI flags, including the ones
+# expanded above, still take precedence over the file.
+exec "$python_bin" main.py --config "$config_name" "${config_args[@]}" "$@"

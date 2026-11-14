@@ -223,6 +223,17 @@ def run_genetic_algorithm(config: GAConfig):
         print(f"Loaded {len(world_paths)} pre-processed world(s) from data/worlds/.")
     else:
         world_paths = ["data/example.csv"]
+        # data/ is not in the repository (.gitignore), so on a fresh clone
+        # neither exists.  Say so, instead of failing later with a bare
+        # FileNotFoundError from the CSV loader.
+        from pathlib import Path
+        if not (Path(__file__).resolve().parent / world_paths[0]).is_file():
+            raise SystemExit(
+                "No data found: neither data/worlds/ nor data/example.csv exists.\n"
+                "The simulation trace is not stored in the repository. Copy it to "
+                "data/example.csv, then run\n"
+                "    python3 -m data_processing.csv_preprocessing.world_splitter\n"
+                "to create data/worlds/ (see the Data section of readme.md).")
         print("No pre-processed worlds in data/worlds/; falling back to "
               "data/example.csv. Run "
               "`python -m data_processing.csv_preprocessing.world_splitter` "

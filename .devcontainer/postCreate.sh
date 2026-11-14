@@ -22,9 +22,14 @@ echo "==> [2/3] Installing Python libraries from requirements.txt…"
 pip3 install --no-cache-dir --break-system-packages -r requirements.txt
 
 echo "==> [3/3] Building the C++ 'scheduler' module…"
+# CMake writes the .so straight into the repository root
+# (LIBRARY_OUTPUT_DIRECTORY in CMakeLists.txt): there is nothing to copy.  The
+# old `cp build/scheduler*.so .` matched no file and, under `set -e`, made this
+# script exit with an error after a successful build.
+# The build type stays Debug, as before: CMakeLists.txt adds -O3 regardless, so
+# this gives an optimised module that still carries debug symbols for gdb.
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug -DPYTHON_EXECUTABLE="$(which python3)"
 cmake --build build
-cp build/scheduler*.so .
 
 echo ""
 echo "==> Setup complete. Run the genetic algorithm with:"

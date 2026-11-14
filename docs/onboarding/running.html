@@ -33,13 +33,15 @@
 </ol></div>
 
 <h2 id="env">1. Get an environment</h2>
-<p>The project is developed on <strong>Linux inside a VS Code dev container</strong>. The compiled modules in the repository root (<code>scheduler.cpython-313-x86_64-linux-gnu.so</code>, <code>…-aarch64-…</code>) are Linux binaries, so they will not load in Python on Windows or macOS directly.</p>
+<p>The project is developed on <strong>Linux inside a VS Code dev container</strong>. The <code>scheduler</code> module is a compiled extension (a <code>.so</code> file) that only loads in the Python version and on the CPU it was built for. For that reason it is <strong>not stored in git</strong>: every machine builds its own copy (step 3), and the container does it for you on first start.</p>
 <ol>
   <li>Install Docker and VS Code with the <em>Dev Containers</em> extension.</li>
   <li>Open the repository folder and choose <strong>Reopen in Container</strong>.</li>
   <li>The first start runs <a href="../../.devcontainer/postCreate.sh"><code>.devcontainer/postCreate.sh</code></a>. It installs numpy, matplotlib, pybind11 and the debug tools, then builds the module.</li>
 </ol>
 <p class="small muted">Without the container you need Python 3, CMake ≥ 3.15, a C++17 compiler, pybind11, numpy and matplotlib (see <a href="../../requirements.txt"><code>requirements.txt</code></a>). OpenMP is optional: without it everything still works, just on one core.</p>
+<div class="callout"><span class="callout-title">On Windows: line endings</span>
+<p>Windows text files end lines with two characters (CR LF), Linux with one (LF). A shell script with Windows endings fails inside the container with <code>bash\r: No such file or directory</code>. The file <a href="../../.gitattributes"><code>.gitattributes</code></a> tells git to keep <code>*.sh</code> and <code>run</code> in LF on every platform, so a Windows checkout works in the container. If you still see that error, your copy is older than that file: run <code>git add --renormalize . &amp;&amp; git checkout -- run scripts .devcontainer</code>.</p></div>
 
 <h2 id="data">2. Get the data</h2>
 <p>The <code>data/</code> folder is <strong>not in git</strong> (it is listed in <code>.gitignore</code>). Ask your supervisor for <code>data/example.csv</code>, the task log of one 300-minute simulation (2960 rows). Then split it into 30 "worlds" of 10 minutes each:</p>
@@ -47,13 +49,13 @@
     --csv data/example.csv --output-dir data/worlds --window-minutes 10</pre>
 <p>You now have <code>data/worlds/world_000.csv</code> … <code>world_029.csv</code> and a <code>manifest.json</code>. The <a href="data.html">data pipeline page</a> explains what the splitter does and why.</p>
 <div class="callout"><span class="callout-title">No worlds?</span>
-<p><code>main.py</code> falls back to <code>data/example.csv</code> if <code>data/worlds/</code> is empty, and prints a reminder to run the splitter.</p></div>
+<p><code>main.py</code> falls back to <code>data/example.csv</code> if <code>data/worlds/</code> is empty, and prints a reminder to run the splitter. If <code>data/example.csv</code> is missing too, it stops with a message that tells you where to put the file. The unit tests that need <code>data/worlds</code> are skipped.</p></div>
 
 <h2 id="build">3. Build the <code>scheduler</code> module</h2>
 <p>From the repository root:</p>
 <pre>cmake -S . -B build -DPYTHON_EXECUTABLE=$(which python3)
-cmake --build build</pre>
-<p>What happens:</p>
+cmake --build build --target scheduler</pre>
+<p>The helper <a href="../../scripts/build.sh"><code>scripts/build.sh</code></a> runs exactly these two commands, from any directory. What happens:</p>
 <ul>
   <li><a href="../../CMakeLists.txt"><code>CMakeLists.txt</code></a> compiles <a href="../../bindings.cpp"><code>bindings.cpp</code></a> (which includes every header in <code>include/scheduler/</code>) into a pybind11 module called <code>scheduler</code>.</li>
   <li>The <code>.so</code> file is written <strong>directly into the repository root</strong> (<code>LIBRARY_OUTPUT_DIRECTORY</code>), so <code>import scheduler</code> works from there. You do not need to copy it.</li>
@@ -62,8 +64,19 @@ cmake --build build</pre>
 </ul>
 <p>Check it worked:</p>
 <pre>python3 -c "import scheduler; print(scheduler.SchedulerGP)"</pre>
-<div class="callout warn"><span class="callout-title">Outdated instructions elsewhere</span>
-<p><code>AGENT.md</code> and the readme still mention a <code>scheduler_cli</code> target and copying <code>build/scheduler*.so</code>. The current <code>CMakeLists.txt</code> has no CLI target and writes the module to the root. Trust <code>CMakeLists.txt</code>. See <a href="quirks.html">Known quirks</a>.</p></div>
+<div class="callout warn"><span class="callout-title">Rebuild after every C++ change</span>
+<p>Python runs the <code>.so</code>, not the headers. If you edit <code>bindings.cpp</code> or anything in <code>include/scheduler/</code> and forget to rebuild, Python silently keeps running the old code. A new option then fails with <code>AttributeError</code> or <code>TypeError</code>; a changed formula just gives the old numbers. The <code>.so</code> is ignored by git (<code>*.so</code> in <a href="../../.gitignore"><code>.gitignore</code></a>), so it never arrives with a <code>git pull</code> either.</p></div>
+<p>The helper scripts in <a href="../../scripts"><code>scripts/</code></a> all work from any directory:</p>
+<div class="table-wrap"><table>
+<tr><th>Script</th><th>What it does</th></tr>
+<tr><td><code>scripts/build.sh</code></td><td>Configure if needed, then build.</td></tr>
+<tr><td><code>scripts/build-py.sh</code></td><td>Rebuild only (fast; needs an existing <code>build/</code>).</td></tr>
+<tr><td><code>scripts/build-py-new.sh</code></td><td>Delete <code>build/</code>, reconfigure and build. Use after changing compiler, Python version or CMake options.</td></tr>
+<tr><td><code>scripts/build-debug.sh</code></td><td>Build with debug symbols (still <code>-O3</code>). This is what the dev container uses.</td></tr>
+<tr><td><code>scripts/run.sh</code></td><td>Build, then <code>python3 main.py</code> with your arguments.</td></tr>
+<tr><td><code>scripts/debug_cpp.sh</code></td><td>Build with symbols and start <code>main.py</code> under <code>gdb</code>.</td></tr>
+<tr><td><code>scripts/make-doc.sh</code></td><td>Build the Sphinx API documentation into <code>docs/build</code>.</td></tr>
+</table></div>
 
 <h2 id="run">4. Run an evolution</h2>
 <p>A short, reproducible run that finishes in seconds:</p>
@@ -88,7 +101,7 @@ cmake --build build</pre>
   <li>command-line flags that differ from their default.</li>
 </ol>
 <pre>python3 main.py -c robust --no-start-prompt          <span class="c"># 5000 gens, depth 4, clone retries + 3 worlds</span>
-./run default --generations 10                       <span class="c"># same thing through the launcher script</span></pre>
+./run default --generations 10                       <span class="c"># ./run NAME is short for: python3 main.py -c NAME</span></pre>
 <h3>The flags you will use most</h3>
 <div class="table-wrap"><table>
 <tr><th>Flag</th><th>Default</th><th>Meaning</th></tr>
@@ -121,7 +134,8 @@ cmake --build build</pre>
 
 <h2 id="tests">7. Run the tests</h2>
 <pre>python3 -m unittest discover -s tests -v</pre>
-<p><a href="../../tests/test_paper_features.py"><code>tests/test_paper_features.py</code></a> checks the literature features against independent computations: the terminal-weight solver against the worked example in Yang's thesis, multi-world pooling, the busy-until terminal, seeded reproducibility, depth caps, excluded terminals, clone retries and tournament pressure. Run it after every C++ change, together with a short seeded run.</p>
+<p><a href="../../tests/test_paper_features.py"><code>tests/test_paper_features.py</code></a> checks the literature features against independent computations: the terminal-weight solver against the worked example in Yang's thesis, multi-world pooling, the busy-until terminal, seeded reproducibility, depth caps, excluded terminals, clone retries, tournament pressure and the fixed-bound fitness. Run it after every C++ change, together with a short seeded run.</p>
+<p>Tests that read <code>data/worlds</code> are reported as <em>skipped</em> when the data is missing; the others build small worlds in code. <strong>Continuous integration</strong> (CI, a service that runs checks automatically) does the same on GitHub: <a href="../../.github/workflows/ci.yml"><code>.github/workflows/ci.yml</code></a> builds the module and runs this command on every push and pull request. It has no data, so it runs only the tests that need none.</p>
 
 <h2 id="experiments">8. Re-run the thesis experiments</h2>
 <pre>python3 thesis/experiments/run_experiments.py --out thesis/experiments/results
@@ -133,7 +147,7 @@ python3 thesis/experiments/run_ablation.py --seeds 20</pre>
 <p>The C++ runs inside the Python process, so you debug it by attaching <code>gdb</code> to Python:</p>
 <ul>
   <li><strong>VS Code:</strong> use the <em>(debug) Launch main.py</em> configuration, or start <code>python3 main.py</code> and use <em>(debug) Attach to main.py</em> with the printed PID. The prompt "Press Enter to start" gives you time to attach.</li>
-  <li><strong>Terminal:</strong> <code>gdb -p &lt;PID&gt;</code>, or <code>gdb python3</code> then <code>set breakpoint pending on</code> and <code>run main.py</code>.</li>
+  <li><strong>Terminal:</strong> <code>scripts/debug_cpp.sh --generations 5</code> builds with symbols and starts <code>main.py</code> under <code>gdb</code>. By hand: <code>gdb -p &lt;PID&gt;</code>, or <code>gdb python3</code> then <code>set breakpoint pending on</code> and <code>run main.py</code>.</li>
 </ul>
 <p class="small muted">Because the module is always built with <code>-O3 -DNDEBUG</code>, some variables are optimised away. For step-by-step debugging, temporarily remove those flags in <code>CMakeLists.txt</code>.</p>
 

@@ -7,20 +7,24 @@
       "command": "bash",
       "args": [
         "-lc",
-        "cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug -DPYTHON_EXECUTABLE=$(which python3) && cmake --build build && cp build/scheduler*.so ."
+        "cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug -DPYTHON_EXECUTABLE=$(which python3) && cmake --build build --target scheduler"
       ],
-      "group": "build",
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      },
       "problemMatcher": []
     },
     {
-      "label": "Build scheduler cli (Debug)",
+      "label": "Run tests",
       "type": "shell",
       "command": "bash",
       "args": [
         "-lc",
-        "cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug -DPYTHON_EXECUTABLE=$(which python3) && cmake --build build --target scheduler_cli"
+        "python3 -m unittest discover -s tests -v"
       ],
-      "group": "build",
+      "group": "test",
+      "dependsOn": "Build scheduler module (Debug)",
       "problemMatcher": []
     }
   ]

@@ -41,17 +41,18 @@
 <p>The thesis (Evolved Rules section) calls <code>job.arrivalTime</code> FCFS-like. With higher-is-better scoring it is latest-arrival-first. The FCFS baseline is \(-a_j\). This is a wording fix in <code>thesis/chapters/experiments.tex</code>.</p>
 
 <h3 id="dead">Four terminals never vary</h3>
-<p><code>sat.cpuBusyUntil</code>, <code>sat.networkBusyUntil</code>, <code>sat.energyReserved</code> and <code>sat.loadRatio</code> are 0 for every satellite in our data: 4 of 18 terminals, about 22% of uniform draws. The comment in <code>registry.h</code> says "4 of the 17 terminals"; the registry actually has 18 (7 job + 11 satellite).</p>
+<p><code>sat.cpuBusyUntil</code>, <code>sat.networkBusyUntil</code>, <code>sat.energyReserved</code> and <code>sat.loadRatio</code> are 0 for every satellite in our data: 4 of 18 terminals (7 job + 11 satellite), about 22% of uniform draws.</p>
 
 <h2>Inconsistencies in the code and docs</h2>
 <div class="table-wrap"><table>
 <tr><th>Where</th><th>What</th></tr>
 <tr><td><code>tree_operators.h</code></td><td>The size cap \(2^{D+1}\) can never fail once the depth cap holds (<a href="theory.html#bloat">proof</a>). Harmless.</td></tr>
 <tr><td><code>main.py</code></td><td>The crossover rate (0.80) and mutation rate (0.08) are not passed to <code>initialize()</code>, so the binding defaults always apply. The fitness weights are not exposed either.</td></tr>
-<tr><td><code>AGENT.md</code>, readme</td><td>Mention a <code>scheduler_cli</code> target and copying <code>build/scheduler*.so</code>; <code>CMakeLists.txt</code> has no CLI target and writes the module to the root. A stale <code>build/scheduler_cli</code> binary is tracked in git.</td></tr>
+<tr><td><code>CMakeLists.txt</code></td><td>Adds <code>-O3 -funroll-loops</code> whatever the build type, and those flags are GCC/Clang only. A real debug build (<code>-O0</code>) needs editing the file, and the module does not build with MSVC.</td></tr>
+<tr><td><code>main.py</code></td><td>A command-line flag set to its own default value cannot override a JSON configuration: <code>-c default --generations 200</code> keeps the file's 5000, because overrides are detected by comparing with the default.</td></tr>
+<tr><td><code>runConfigurations/default.json</code></td><td>Has a <code>jobsCSV</code> block that nothing reads; the ignored columns are hard-coded in <code>data_factory.py</code>.</td></tr>
 <tr><td><code>config.json5</code></td><td>Upstream simulator configuration; nothing here reads it.</td></tr>
 <tr><td><code>data_factory.py</code></td><td>CSV satellites get <code>cpuCapacity</code>, <code>networkCapacity</code>, <code>latency</code> and <code>bandwidth</code> scaled twice (× 0.2, then × 0.22 inside the perturbation). This only changes the magnitude of those terminals.</td></tr>
-<tr><td><code>include/scheduler/data_factories.h</code></td><td>Declarations with no implementation; unused.</td></tr>
 <tr><td><code>thesis/references.bib</code></td><td>The <code>icdcs_sc</code> entry still has <code>TODO</code> for venue and year.</td></tr>
 </table></div>
 

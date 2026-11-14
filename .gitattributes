@@ -1,0 +1,23 @@
+# Line endings.
+#
+# The project is built and run on Linux (dev container, WSL, CI) but is also
+# checked out on Windows.  With core.autocrlf=true Git converts text files to
+# CRLF on checkout, and a shell script with CRLF endings does not run under
+# Linux bash ("bash\r: No such file or directory").  The rules below keep the
+# files that Linux executes in LF on every platform.
+
+# Store text files with LF in the repository, whatever the platform.
+* text=auto
+
+# Executed by bash inside Linux: always LF in the working tree too.
+*.sh        text eol=lf
+/run        text eol=lf
+Dockerfile  text eol=lf
+
+# Never touch binary files.
+*.pdf   binary
+*.png   binary
+*.jpg   binary
+*.npz   binary
+*.so    binary
+*.pyd   binary

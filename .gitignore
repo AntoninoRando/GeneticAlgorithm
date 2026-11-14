@@ -1,3 +1,5 @@
+# ── CMake ────────────────────────────────────────────────────────────────────
+/build/
 CMakeLists.txt.user
 CMakeCache.txt
 CMakeFiles
@@ -10,9 +12,37 @@ compile_commands.json
 CTestTestfile.cmake
 _deps
 CMakeUserPresets.json
+
+# ── Compiled artefacts ───────────────────────────────────────────────────────
+# The `scheduler` extension is written into the repository root by CMake
+# (LIBRARY_OUTPUT_DIRECTORY).  It is specific to one Python version and one CPU
+# architecture, and it goes stale as soon as a header changes: build it, do
+# not commit it.
+*.so
+*.pyd
+/main
+
+# ── Python ───────────────────────────────────────────────────────────────────
 __pycache__
+*.pyc
+.venv/
+venv/
+
+# ── Generated documentation ──────────────────────────────────────────────────
+# Sphinx output (scripts/make-doc.sh).  Only the PDF that readme.md links to
+# stays in the repository.
+/docs/build/*
+!/docs/build/latex/
+/docs/build/latex/*
+!/docs/build/latex/schedulerlib.pdf
+/docs/get-pip.py
+
+# ── Data and run outputs ─────────────────────────────────────────────────────
+# The simulation trace is not redistributed with the code; see "Data" in
+# readme.md for where to put it.
 /data
 /skills
 /metrics
 /snapshots
+
 .DS_Store

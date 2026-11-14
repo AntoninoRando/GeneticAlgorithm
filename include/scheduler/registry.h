@@ -60,7 +60,7 @@ using namespace std;
     inspected), `sat.cpuBusyUntil`, `sat.networkBusyUntil`, `sat.energyReserved`
     and `sat.loadRatio` are 0 for every satellite at the snapshot: the data
     factory never sets a backlog, reserved energy or a task list.  That is 4 of
-    the 17 terminals (about 24% of random terminal draws) contributing a
+    the 18 terminals (about 22% of random terminal draws) contributing a
     constant.  `sat.completedTasks` is also 0 at the snapshot but it is
     updated by the decoder, so it is NOT dead.  SchedulerGP can exclude dead
     terminals (see FitnessEvaluator::constantTerminals), which mirrors how the
