@@ -25,6 +25,15 @@ Where each option comes from (see include/scheduler/*.h for section numbers):
   busy           live availability terminal (Zhang & Yang NT/CL, Sun AAT/IAT)
   worlds3        score each individual on 3 worlds (Yang 5 instances, Zhang & Yang
                  100 simulations)
+  fixed          fixed-bound fitness: cost terms divided by per-world bounds and
+                 unscheduled jobs charged the worst response (Marler & Arora
+                 2004; Shabtay et al. 2013; same normalisation as icdcs_sc)
+
+To measure only the fixed-bound fitness against the baseline, with 30 seeds:
+
+    python3 thesis/experiments/run_ablation.py --seeds 30 \
+        --configs baseline,fixed,clones+worlds3,fixed+clones+worlds3 \
+        --out thesis/experiments/results_fixed
 """
 import argparse
 import json
@@ -58,6 +67,10 @@ CONFIGS = {
     "all":         dict(tournamentSize=7, initialMaxDepth=3, internalCrossoverBias=0.9,
                         cloneRetries=3, terminalWeighting=True, prune=True,
                         trackBusyUntil=True, worldsPerEval=3),
+    # Fixed-bound fitness (added 2026-11-14, not part of the "all" config so
+    # that the earlier ablation files stay comparable).
+    "fixed":       dict(fixedBounds=True),
+    "fixed+clones+worlds3": dict(fixedBounds=True, cloneRetries=3, worldsPerEval=3),
 }
 
 _TRAIN = _TEST = None
@@ -74,9 +87,12 @@ def train_one(args):
     prune = opts.pop("prune", False)
     track = opts.pop("trackBusyUntil", False)
     k = opts.pop("worldsPerEval", 1)
+    fixed = opts.pop("fixedBounds", False)
 
     fe = FitnessEvaluator(rx.REG)
     fe.trackBusyUntil = track
+    if fixed:
+        fe.fixedBounds = True
 
     excluded = []
     if prune:

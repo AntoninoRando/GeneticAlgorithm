@@ -100,6 +100,42 @@ using namespace std;
 //    A lexicographic fitness is the natural next step if the weights prove hard
 //    to defend.
 //
+//  * Fixed-bound normalisation (opt-in, FitnessEvaluator::fixedBounds).
+//    The population-relative fitness has two measured defects (thesis
+//    ch. Experiments): response time is averaged over the scheduled jobs only,
+//    so scheduling few short jobs is rewarded, and min-max stretches any
+//    spread of a cost term to the full [0,1] range, however small (energy
+//    differs by about 1% between rules and still moves the fitness by up to
+//    w_energy).  With fixedBounds the cost terms are instead divided by bounds
+//    that depend on the WORLD ONLY, never on the population:
+//
+//        R~ = (1/J) * [ sum over scheduled jobs of r_j / Rmax
+//                       + number of unscheduled jobs ]
+//           = 1 - C * (1 - Rbar / Rmax)                       (one world)
+//        E~ = E / Emax
+//        fitness = w_jobs * C  -  w_time * R~  -  w_energy * E~
+//
+//    Sources.  (1) Normalising each objective by fixed lower/upper bounds
+//    (utopia value and maximum) so that the weights compare like with like is
+//    the standard transformation for weighted sums (Marler & Arora 2004,
+//    marler2004survey), and it is what icdcs_sc does in this very setting
+//    (energy over the maximum battery, time over the largest response).
+//    (2) Charging a job that is NOT scheduled a fixed penalty, added to the
+//    time criterion of the scheduled ones, is the objective of "scheduling
+//    with rejection" (Shabtay, Gaspar & Kaspi 2013, shabtay2013rejection):
+//    here the rejection cost is Rmax, i.e. 1 after normalisation.
+//    The particular bounds Rmax and Emax are derived in this project from the
+//    decoder's own constraints (detail::computeWorldBounds; proof in
+//    thesis/chapters/method.tex), they are not taken from a paper.
+//
+//    Properties (proved in method.tex): the fitness of a tree no longer
+//    depends on the other individuals, so it is comparable across generations
+//    and the best fitness cannot decrease under elitism while the worlds stay
+//    the same; and r_j <= Rmax for every schedule the decoder can produce, so
+//    leaving a job unscheduled is never cheaper than scheduling it.
+//    NOT YET MEASURED on the held-out worlds: default stays off until the
+//    ablation (thesis/experiments/run_ablation.py, configs "fixed*") is run.
+//
 //  * Several worlds per evaluation.  The papers never score an individual on a
 //    single instance: dtgpam §V-A evaluates every individual on 5 randomly
 //    drawn training instances per generation (yang2025thesis §3.3.1),
@@ -480,6 +516,77 @@ inline void computeRawObjectives(const vector<Assignment>& assignments,
                                   : 0.0;
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+/// @brief  Fixed bounds of one world, used by the fixed-bound fitness
+///         (FitnessEvaluator::fixedBounds).  They depend on the snapshot only,
+///         never on a tree or on the population.
+struct WorldBounds {
+    /// Upper bound Rmax on the response time (completion - arrival, minutes)
+    /// of ANY job in ANY schedule greedyDecode can produce for this world.
+    double maxResponse = 0.0;
+    /// Upper bound Emax on the total energy of any such schedule.
+    double maxEnergy   = 0.0;
+};
+
+/// @brief  Computes the bounds of `snap`.  O(J + S).
+///
+/// Notation: t0 = snapshot minute; a job j is *available* if a_j <= t0 and has
+/// duration d_j = executionTime + transferTime; D = sum of d_j over available
+/// jobs; a_min = earliest available arrival.  Satellite s has sunset U_s,
+/// energy budget B_s and energy rate rho_s.
+///
+/// The decoder starts every satellite at t0 and runs its jobs back to back
+/// (start = freeAtMinute, no idle time), so a job on s completes at
+/// t0 + (total duration committed to s so far).  That total is bounded by
+///
+///     T_s = max(0, min( D,  U_s - t0,  B_s / rho_s ))      (last term only if rho_s > 0)
+///
+/// (all work there is; the sunset filter; the energy filter, since the
+/// energy committed to s never exceeds B_s).  Hence, for every scheduled job,
+///
+///     r_j = c_j - a_j  <=  (t0 + max_s T_s) - a_min  =:  Rmax,
+///     E   = sum_s rho_s * (duration on s)  <=  min( sum_s rho_s T_s,  rho_max * D )  =:  Emax.
+///
+/// With the shipped worlds the energy filter is the binding one, so
+/// Emax = sum of the batteries, the bound icdcs_sc divides by.
+///
+/// The caller must have validated `snap` (energyPerMinute empty or one entry
+/// per satellite).  A world with no available job has both bounds 0.
+inline WorldBounds computeWorldBounds(const SimulationSnapshot& snap) {
+    WorldBounds b;
+    const double t0 = snap.currentMinute;
+
+    double totalDuration   = 0.0;                                   // D
+    double earliestArrival = numeric_limits<double>::infinity();    // a_min
+    for (const Job& j : snap.jobs) {
+        const double arrival = static_cast<double>(j.arrivalTime);
+        if (arrival > t0) continue;                                 // not available
+        totalDuration  += static_cast<double>(j.executionTime + j.transferTime);
+        earliestArrival = std::min(earliestArrival, arrival);
+    }
+    if (!(earliestArrival <= t0)) return b;                         // nothing to schedule
+
+    double longestBusy = 0.0;       // max_s T_s
+    double energyCap   = 0.0;       // sum_s rho_s T_s
+    double maxRate     = 0.0;       // rho_max
+    for (size_t s = 0; s < snap.satellites.size(); ++s) {
+        const Satellite& sat  = snap.satellites[s];
+        const double     rate = snap.energyPerMinute.empty() ? 1.0 : snap.energyPerMinute[s];
+
+        double busy = std::min(totalDuration, sat.operationalUntil - t0);
+        if (rate > 0.0) busy = std::min(busy, sat.remainingEnergy / rate);
+        busy = std::max(busy, 0.0);                                 // T_s
+
+        longestBusy = std::max(longestBusy, busy);
+        energyCap  += std::max(rate, 0.0) * busy;
+        maxRate     = std::max(maxRate, rate);
+    }
+
+    b.maxResponse = (t0 - earliestArrival) + longestBusy;
+    b.maxEnergy   = std::min(energyCap, maxRate * totalDuration);
+    return b;
+}
+
 } // namespace detail
 
 
@@ -521,6 +628,11 @@ inline void computeRawObjectives(const vector<Assignment>& assignments,
 ///           − w_energy * energy_norm
 ///
 /// with default weights  w_jobs=0.6,  w_time=0.25,  w_energy=0.15.
+/// (compRatio is used as is; only the two cost terms are normalised.)
+///
+/// With `fixedBounds = true` the two cost terms are divided by per-world
+/// bounds instead of by population statistics, and unscheduled jobs are
+/// charged the worst response; the fitness is then absolute.
 class FitnessEvaluator {
 public:
 
@@ -545,6 +657,19 @@ public:
     ///         routing feature in zhang2025mtgper (§5.2.2: NT, CL) and the
     ///         available-time terminals of mtgp_multicloud (Table 2: AAT, IAT).
     bool trackBusyUntil = false;
+
+    /// @brief  Fixed-bound normalisation of the cost terms (see the "Fixed-bound
+    ///         normalisation" note at the top of this file).  Default false:
+    ///         the population-relative fitness, exactly as before.
+    ///
+    ///         When true the fitness is absolute:
+    ///           fitness = weightJobs * C - weightTime * R~ - weightEnergy * E~
+    ///         with R~ the mean over ALL jobs of r_j / Rmax (an unscheduled job
+    ///         counts as 1, the rejection penalty of shabtay2013rejection) and
+    ///         E~ = E / Emax, both in [0,1] and independent of the population
+    ///         (marler2004survey, icdcs_sc).  Fitness then lies in
+    ///         [-(weightTime + weightEnergy), weightJobs].
+    bool fixedBounds = false;
 
 
 
@@ -662,6 +787,14 @@ public:
                                       outEnergy);
     }
 
+    /// @brief  The fixed bounds (Rmax, Emax) that the fixed-bound fitness
+    ///         divides by for `snap`; see detail::computeWorldBounds.  Exposed
+    ///         so the normalisation can be inspected and tested.
+    static detail::WorldBounds worldBounds(const SimulationSnapshot& snap) {
+        validateSnapshot(snap);
+        return detail::computeWorldBounds(snap);
+    }
+
     /// @brief  Return the terminal registry held by this evaluator.
     const vector<TerminalDef>& registry() const { return registry_; }
 
@@ -697,8 +830,23 @@ private:
             return;
         }
 
+        // Fixed bounds of every usable world (fixed-bound fitness only).  They
+        // are computed once, before the parallel loop, and only read there.
+        vector<detail::WorldBounds> bounds;
+        double totalMaxEnergy = 0.0;
+        if (fixedBounds) {
+            bounds.reserve(use.size());
+            for (const SimulationSnapshot* sn : use) {
+                bounds.push_back(detail::computeWorldBounds(*sn));
+                totalMaxEnergy += bounds.back().maxEnergy;
+            }
+        }
+
         // ── Step 1: decode every individual ──────────────────────────────
         vector<double> compRatios(n), meanResps(n), energies(n);
+        // Fixed-bound response term R~ of each individual (left empty in the
+        // population-relative mode, which never reads it).
+        vector<double> fixedResps(fixedBounds ? n : 0);
 
         // Each individual is decoded independently: greedyDecode takes its own
         // working copies of the satellites/jobs, the expression tree and the
@@ -718,8 +866,10 @@ private:
             long long scheduledSum = 0;
             double    responseSum  = 0.0;
             double    energySum    = 0.0;
+            double    normRespSum  = 0.0;   // sum of r_j / Rmax over scheduled jobs
 
-            for (const SimulationSnapshot* sn : use) {
+            for (size_t w = 0; w < use.size(); ++w) {
+                const SimulationSnapshot* sn = use[w];
                 detail::greedyDecode(population[i].tree,
                                       registry_,
                                       *sn,
@@ -735,6 +885,10 @@ private:
                 scheduledSum += scheduled;
                 responseSum  += response;
                 energySum    += energy;
+                // Each world is normalised by its OWN bound before pooling, so
+                // a world with a long horizon cannot dominate the term.
+                if (fixedBounds && bounds[w].maxResponse > 1e-12)
+                    normRespSum += response / bounds[w].maxResponse;
             }
 
             compRatios[i] = static_cast<double>(scheduledSum) / static_cast<double>(totalJobs);
@@ -742,6 +896,32 @@ private:
                                 ? responseSum / static_cast<double>(scheduledSum)
                                 : 0.0;
             energies[i]   = energySum;
+
+            if (fixedBounds) {
+                // R~ = (sum of normalised responses + one unit per unscheduled
+                // job) / J.  Jobs that have not arrived count as unscheduled,
+                // exactly as they already do in the completion ratio.
+                const double unscheduled = static_cast<double>(totalJobs - scheduledSum);
+                fixedResps[i] = (normRespSum + unscheduled) / static_cast<double>(totalJobs);
+            }
+        }
+
+        // ── Fixed-bound fitness (opt-in): absolute, no population statistics ──
+        // marler2004survey / icdcs_sc (fixed bounds), shabtay2013rejection
+        // (rejection penalty).  The clamps only absorb floating-point drift:
+        // both terms are in [0,1] by construction (see computeWorldBounds).
+        if (fixedBounds) {
+            for (int i = 0; i < n; ++i) {
+                const double respTerm   = std::min(1.0, std::max(0.0, fixedResps[i]));
+                const double energyTerm = (totalMaxEnergy > 1e-12)
+                    ? std::min(1.0, std::max(0.0, energies[i] / totalMaxEnergy))
+                    : 0.0;
+                population[i].fitness =
+                    weightJobs     * compRatios[i]
+                    - weightTime   * respTerm
+                    - weightEnergy * energyTerm;
+            }
+            return;
         }
 
         // ── Step 2: normalise penalty objectives only ─────────────────────────

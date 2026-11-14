@@ -84,9 +84,46 @@ $$\tau^{*} \approx \frac{\ln N + \ln \ln N}{\ln k} .$$
 <p>\(\hat R\) and \(\hat{\mathcal E}\) are min-max normalised <em>within the population</em>, while \(C\) is not. Take two individuals \(a\) and \(b\) where \(a\) has the population's best costs (\(\hat R = \hat{\mathcal E} = 0\)) and \(b\) the worst (\(\hat R = \hat{\mathcal E} = 1\)). Then \(b\) has the higher fitness only if</p>
 $$w_C\,(C_b - C_a) > w_R + w_E \quad\Longleftrightarrow\quad C_b - C_a > \frac{0.25 + 0.15}{0.60} \approx 0.67 .$$
 <p>In our data every reasonable rule (baselines, random trees, evolved rules) lands between about 0.19 and 0.27 on the test worlds (<a href="results.html#main">results</a>), so completion differences between sensible rules are below 0.1. No such advantage can make up for being the costliest. <strong>Fitness is effectively decided by response time and energy</strong>, and \(C\) acts mainly as a tie-breaker. This is the formal reason behind the misalignment the thesis observed: more generations, lower \(R\), lower \(C\). The weight study supports it, since a completion-only fitness gave the highest \(C\) (<a href="results.html">results</a>).</p>
-<div class="callout why"><span class="callout-title">Open design question</span>
-<p>A fixed-bound normalisation (as in <a href="references.html#icdcs_sc">icdcs_sc</a>, dividing energy by the battery size and time by the largest response), a lexicographic fitness with \(C\) first, or a Pareto method would each remove this imbalance. Any of them is a change to the algorithm and needs the full literature-and-experiment treatment from <code>CLAUDE.md</code>.</p></div>
 <p>Population-relative normalisation also makes the fitness <strong>non-stationary</strong>: the same tree scores differently in different populations. Selection and elitism are unaffected, since they only compare individuals of the same generation, but fitness values cannot be compared across generations or worlds.</p>
+
+<h3 id="fixed-bounds">Fixed-bound normalisation (opt-in)</h3>
+<p>Since 2026-11-14 the evaluator has a second mode, <code>fixedBounds</code> (<code>--fixed-bounds</code>). It keeps the weighted sum but changes how the two costs are scaled. Two ideas from the literature are combined:</p>
+<ul>
+  <li><strong>Normalise by fixed bounds.</strong> The usual way to make the terms of a weighted sum comparable is to divide each objective by the width of its range, between a lower and an upper bound that do not depend on the solutions being compared (<a href="references.html#marler2004survey">marler2004survey</a>). Magliarisi and Casalicchio do this in our setting: energy over the battery, time over the largest response (<a href="references.html#icdcs_sc">icdcs_sc</a>).</li>
+  <li><strong>Charge a rejection cost.</strong> In <em>scheduling with rejection</em> a job may be left out, and the objective is a time criterion over the accepted jobs plus a cost for each rejected one (<a href="references.html#shabtay2013rejection">shabtay2013rejection</a>). Our decoder "rejects" a job when no satellite can take it.</li>
+</ul>
+<h4>The bounds</h4>
+<p>Let \(t_0\) be the snapshot minute, \(D\) the total duration of the available jobs, \(a_{\min}\) their earliest arrival, and for satellite \(s\): sunset \(\omega_s\), energy budget \(E_s\), energy rate \(\rho_s\). Define the longest time satellite \(s\) can possibly be busy:</p>
+$$T_s = \max\!\Big(0,\ \min\big(D,\ \ \omega_s - t_0,\ \ E_s/\rho_s\big)\Big)$$
+$$R^{\max} = (t_0 - a_{\min}) + \max_s T_s, \qquad \mathcal E^{\max} = \min\Big(\sum_s \rho_s T_s,\ \ \rho_{\max} D\Big)$$
+<p><strong>Why they are valid.</strong> The decoder starts every satellite at \(t_0\) and runs its jobs back to back, so a job on \(s\) finishes at \(t_0 + L_s\), where \(L_s\) is the work committed to \(s\) so far. \(L_s\) cannot exceed the work that exists (\(D\)), the time to sunset (\(\omega_s - t_0\), the window filter) or the work the battery pays for (\(E_s/\rho_s\), the energy filter). So \(L_s \le T_s\), every completion is at most \(t_0 + \max_s T_s\), and every response \(c_j - a_j\) is at most \(R^{\max}\). The energy bound follows the same way. The full proof is Proposition 1 in <code>thesis/chapters/method.tex</code>. These bounds are derived in this project; they are not copied from a paper.</p>
+<h4>The fitness</h4>
+$$\tilde R_i = \frac1N\Big[\sum_{(j,s)\in\mathcal A_i}\frac{c_j - a_j}{R^{\max}} + \big(N - |\mathcal A_i|\big)\Big] = 1 - C_i\Big(1 - \frac{R_i}{R^{\max}}\Big), \qquad \tilde{\mathcal E}_i = \frac{\mathcal E_i}{\mathcal E^{\max}}, \qquad f^{\text{fix}}_i = w_C C_i - w_R \tilde R_i - w_E \tilde{\mathcal E}_i$$
+<p>An unscheduled job adds 1 to the bracket: it is charged the worst response \(R^{\max}\). That is the smallest penalty for which leaving a job out is never cheaper than scheduling it.</p>
+<h4>What this guarantees</h4>
+<div class="table-wrap"><table>
+<tr><th>Property</th><th>Why</th><th>What it fixes</th></tr>
+<tr><td>Both cost terms are in [0, 1]; \(f^{\text{fix}} \in [-(w_R + w_E),\ w_C]\)</td><td>The bounds are valid for every schedule</td><td>The empty schedule gets \(\tilde R = 1\) with no special case</td></tr>
+<tr><td>No reward for dropping jobs</td><td>A scheduled job costs \(\le 1\), an unscheduled one costs 1. For a fixed \(R_i\), \(\tilde R_i\) falls as \(C_i\) grows</td><td>The "few, fast jobs" drift</td></tr>
+<tr><td>Independent of the population</td><td>\(f^{\text{fix}}_i\) is a function of tree \(i\) and the worlds only</td><td>A third individual can no longer change the order of two others</td></tr>
+<tr><td>Best fitness never decreases</td><td>An elite is copied unchanged and scores the same again (same worlds)</td><td>"No new best for 10 generations" becomes an exact stagnation test</td></tr>
+<tr><td>Small spreads stay small</td><td>A 1% change in \(\mathcal E\) moves the fitness by at most \(0.01\,w_E\)</td><td>Min-max turned that 1% into the full \(w_E\)</td></tr>
+</table></div>
+<p><strong>Worked example</strong> (the world used by the unit tests). Snapshot minute 4. Jobs (arrival, duration): (0, 10), (2, 20), (4, 30). Satellite 0 has 30 energy units and no sunset; satellite 1 has 25 units and sets at minute 19. Rate 1 per minute.</p>
+<ul>
+  <li>\(D = 60\). \(T_0 = \min(60, \infty, 30) = 30\). \(T_1 = \min(60, 19 - 4, 25) = 15\).</li>
+  <li>\(R^{\max} = (4 - 0) + 30 = 34\). \(\mathcal E^{\max} = \min(30 + 15,\ 60) = 45\).</li>
+  <li>Shortest-job-first schedules job 0 on satellite 0 (done at 14, response 14), then job 1 on satellite 0 (done at 34, response 32). Job 2 fits nowhere. So \(C = 2/3\), \(R = 23\), \(\mathcal E = 30\).</li>
+  <li>\(\tilde R = (14/34 + 32/34 + 1)/3 = 80/102 \approx 0.784\), which is also \(1 - \tfrac23(1 - 23/34)\). \(\tilde{\mathcal E} = 30/45\).</li>
+  <li>\(f^{\text{fix}} = 0.60\cdot\tfrac23 - 0.25\cdot\tfrac{80}{102} - 0.15\cdot\tfrac{30}{45} \approx 0.104\).</li>
+</ul>
+<div class="callout warn"><span class="callout-title">What it does not solve</span>
+<ul>
+  <li>It is still a weighted sum: only the convex part of the Pareto front is reachable (<a href="references.html#das1997weighted">das1997weighted</a>), and the weights are still a choice. Lexicographic and Pareto fitness remain open alternatives.</li>
+  <li>Fitness is comparable across generations of the <em>same</em> worlds, not across worlds: each world has its own bounds.</li>
+  <li>With our data the decoder fills every battery whatever the rule, so \(\mathcal E\) barely differs between rules. The energy term then says little in either mode; fixed bounds only stop it from being amplified.</li>
+  <li><strong>No experiment yet.</strong> The properties above are proved, and tested on hand-built worlds. Whether the evolved rules score better on the held-out worlds has not been measured, which is why the option is off by default.</li>
+</ul></div>
 
 <h2 id="bloat">6. Bloat, caps and hoist</h2>
 <p><strong>Bloat</strong> is the growth of GP trees without a matching improvement in fitness. Luke and Panait compare the main bloat-control methods, with Koza-style depth limiting as the standard baseline (<a href="references.html#luke2006bloat">luke2006bloat</a>). This project uses a depth cap (as in all the scheduling papers), a size cap, and hoist mutation.</p>
@@ -141,7 +178,8 @@ $$p = \Big(\tfrac38 - \tfrac13,\ \tfrac58 - \tfrac13,\ 1 - \tfrac13\Big) = \Big(
 <tr><td>Hoist mutation, size cap</td><td>bloat control in general: luke2006</td><td><span class="pill bad">project</span></td></tr>
 <tr><td>Exact algebraic simplification</td><td>proved exact in <code>expr_tree.h</code></td><td><span class="pill ok">proved</span></td></tr>
 <tr><td>Hard sunset and energy filters</td><td>magliarisi2025orbit, magliarisi2026thesis, icdcs_sc</td><td><span class="pill ok">literature</span></td></tr>
-<tr><td>Weighted sum, population-relative normalisation</td><td>das1997 (limits), magliarisi2026thesis §6.3.2 (warning)</td><td><span class="pill bad">open question</span></td></tr>
+<tr><td>Weighted sum, population-relative normalisation (default)</td><td>das1997 (limits), magliarisi2026thesis §6.3.2 (warning)</td><td><span class="pill bad">open question</span></td></tr>
+<tr><td>Fixed-bound normalisation with rejection penalty (opt-in)</td><td>marler2004survey, icdcs_sc, shabtay2013rejection; bounds proved in <code>method.tex</code></td><td><span class="pill ok">literature + proved</span>, not yet measured</td></tr>
 <tr><td>Several worlds per evaluation</td><td>dtgpam §V-A, zhang2025mtgper §4.1</td><td><span class="pill ok">literature + measured</span></td></tr>
 <tr><td>Clone retries</td><td>zhang2025mtgper §3.2.1 (behavioural version)</td><td><span class="pill ok">adapted + measured</span></td></tr>
 <tr><td>Terminal weighting</td><td>dtgpam, yang2025thesis, riley2016</td><td><span class="pill ok">literature</span></td></tr>

@@ -43,6 +43,105 @@ time and energy are normalised across the population and
   f_i = w_C\, C_i - w_R\, \hat R_i - w_E\, \hat{\mathcal{E}}_i ,
 \end{equation}
 with default weights $w_C=0.60$, $w_R=0.25$, $w_E=0.15$.
+Here $\hat R_i$ and $\hat{\mathcal{E}}_i$ are min--max normalised over the current
+population $P$, e.g.\ $\hat R_i = (R_i-\min_{k\in P}R_k)/(\max_{k\in P}R_k-\min_{k\in P}R_k)$;
+an individual that schedules nothing gets $\hat R_i=1$. We call this the
+\emph{population-relative} fitness. It is the one used in all experiments of
+Chapter~\ref{ch:exp}.
+
+\subsection{Fixed-bound fitness}
+\label{sec:fixed}
+The population-relative fitness has two weaknesses, both visible in
+Chapter~\ref{ch:exp}. (i) $R$ is a mean over the scheduled tasks only, so a rule
+that schedules few, short tasks is rewarded. (ii) Min--max normalisation maps
+any spread of a cost to $[0,1]$, however small: $\mathcal{E}$ differs by about
+$1\%$ between rules, yet it moves the fitness by up to $w_E$, more than any
+realistic difference in $C$. Moreover $f_i$ depends on the other individuals, so
+its values cannot be compared between generations.
+
+The optional \emph{fixed-bound} fitness replaces the population statistics by
+bounds that depend on the world only. This is the standard normalisation for
+weighted sums, where each objective is divided by the distance between a lower
+and an upper bound of its range \citep{marler2004survey}, and it is how
+\citet{icdcs_sc} combine time and energy in the same setting (time over the
+largest response, energy over the battery). Tasks that are not scheduled are
+charged a fixed penalty that is added to the time criterion, as in scheduling
+with rejection \citep{shabtay2013rejection}. The two bounds below are derived
+here from the constraints of the decoder; they are not taken from those papers.
+
+\paragraph{Bounds.} Let $t_0$ be the snapshot time, $\mathcal{J}=\{j: a_j\le t_0\}$
+the available tasks, $D=\sum_{j\in\mathcal{J}}d_j$ and $a_{\min}=\min_{j\in\mathcal{J}}a_j$.
+For each satellite let
+\begin{equation}
+  T_s=\max\!\Bigl(0,\;\min\bigl(D,\;\omega_s-t_0,\;E_s/\rho_s\bigr)\Bigr),
+  \label{eq:Ts}
+\end{equation}
+where the last term is dropped if $\rho_s\le0$, and define
+\begin{equation}
+  R^{\max}=(t_0-a_{\min})+\max_s T_s,\qquad
+  \mathcal{E}^{\max}=\min\Bigl(\sum_s\rho_sT_s,\;\rho_{\max}D\Bigr).
+  \label{eq:bounds}
+\end{equation}
+
+\paragraph{Proposition 1 (validity).} For every tree, the schedule produced by
+the greedy decoder satisfies $c_j-a_j\le R^{\max}$ for each scheduled task and
+$\mathcal{E}\le\mathcal{E}^{\max}$.
+
+\emph{Proof.} The decoder sets $f_s=t_0$ for every satellite and starts a task
+at $f_s$, so the tasks of $s$ run back to back and a task on $s$ completes at
+$t_0+L_s$, where $L_s$ is the total duration committed to $s$ up to and
+including that task. Three facts bound $L_s$: only available tasks are
+scheduled, so $L_s\le D$; the window constraint gives $t_0+L_s\le\omega_s$; and
+the energy constraint is checked against the \emph{remaining} energy, so the
+energy committed to $s$ never exceeds its initial budget, $\rho_sL_s\le E_s$.
+Hence $L_s\le T_s$ and $c_j\le t_0+\max_sT_s$; with $a_j\ge a_{\min}$ this gives
+the first claim. For the second, $\mathcal{E}=\sum_s\rho_sL_s\le\sum_s\rho_sT_s$,
+and also $\mathcal{E}\le\rho_{\max}\sum_sL_s\le\rho_{\max}D$ because each task
+runs on one satellite. \hfill$\square$
+
+\paragraph{Fitness.} With $N$ tasks in the world and $\mathcal{A}_i$ the schedule
+of individual $i$,
+\begin{align}
+  \tilde R_i &= \frac1N\Bigl[\sum_{(j,s)\in\mathcal{A}_i}\frac{c_j-a_j}{R^{\max}}
+                 +\bigl(N-|\mathcal{A}_i|\bigr)\Bigr]
+              = 1-C_i\Bigl(1-\frac{R_i}{R^{\max}}\Bigr), \label{eq:Rtilde}\\
+  \tilde{\mathcal{E}}_i &= \mathcal{E}_i/\mathcal{E}^{\max},\qquad
+  f^{\mathrm{fix}}_i = w_C\,C_i-w_R\,\tilde R_i-w_E\,\tilde{\mathcal{E}}_i . \label{eq:ffix}
+\end{align}
+An unscheduled task contributes $1$ to the bracket, i.e.\ it is charged the
+response $R^{\max}$. With several worlds $w$ the bracket and $N$ are summed over
+the worlds, each response being divided by the bound $R^{\max}_w$ of its own
+world, and $\tilde{\mathcal{E}}_i=\sum_w\mathcal{E}_{i,w}/\sum_w\mathcal{E}^{\max}_w$.
+
+\paragraph{Properties.}
+\begin{enumerate}
+  \item \emph{Range.} By Proposition~1, $\tilde R_i,\tilde{\mathcal{E}}_i\in[0,1]$,
+        so $f^{\mathrm{fix}}_i\in[-(w_R+w_E),\,w_C]$. The empty schedule has
+        $\tilde R=1$, the worst value, without a special case.
+  \item \emph{No reward for dropping tasks.} A scheduled task costs
+        $(c_j-a_j)/R^{\max}\le1$ in \eqref{eq:Rtilde}, an unscheduled one costs
+        $1$. Equivalently, for a fixed mean response $R_i$, $\tilde R_i$
+        decreases when $C_i$ grows. This removes weakness~(i).
+  \item \emph{Independence of the population.} $f^{\mathrm{fix}}_i$ is a function
+        of tree $i$ and of the worlds only. Hence the order of two individuals
+        cannot be changed by a third one. Under the population-relative fitness
+        it can: $f_a-f_b=w_C\Delta C-w_R\Delta R/\mathrm{range}(R)-w_E\Delta\mathcal{E}/\mathrm{range}(\mathcal{E})$,
+        and an outlier that widens one range but not the other can change the
+        sign.
+  \item \emph{Monotone best fitness.} With at least one elite and an unchanged
+        set of worlds, $\max_i f^{\mathrm{fix}}_i$ is non-decreasing over the
+        generations, because the elite is copied unchanged and re-evaluated to
+        the same value. The stagnation test of Section~\ref{sec:worlds} is then
+        exact.
+  \item \emph{Scale.} A relative change of $\mathcal{E}$ by $\varepsilon$ changes
+        the fitness by at most $w_E\varepsilon$, instead of up to $w_E$. This
+        removes weakness~(ii).
+\end{enumerate}
+The fitness is still a weighted sum: it can only reach the convex part of the
+Pareto front \citep{das1997weighted}, and the weights remain a modelling choice.
+Tournament selection only uses the order of the fitness values, so the change
+affects selection through the ranking alone. The effect on the test metrics
+has not been measured yet; the option is off by default.
 
 \section{Evolution}
 \begin{description}
@@ -60,9 +159,12 @@ $\text{size}\le 2^{D_{\max}+1}$; a child that violates a cap is replaced by a co
 of its parent. Trees are algebraically simplified after mutation to remove redundancy.
 
 \section{Changing Worlds and Convergence}
+\label{sec:worlds}
 The population is evaluated on a snapshot of one world. In \texttt{main.py}, if the best fitness
 in the current world does not improve for a number of generations (the \emph{convergence
 threshold}, default 10), the next pre-processed world is loaded. The population therefore faces
 different scenarios over time, which should limit overfitting to one instance. Because fitness is
 normalised within the population, it is comparable only inside one world; for this reason the
 experiments of Chapter~\ref{ch:exp} use a fixed switching schedule and held-out test worlds.
+With the fixed-bound fitness of Section~\ref{sec:fixed} the values are comparable between
+generations of the same world (but still not between worlds, whose bounds differ).

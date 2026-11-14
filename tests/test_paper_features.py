@@ -251,6 +251,188 @@ class BusyUntilTracking(unittest.TestCase):
         self.assertNotIn("sat.cpuBusyUntil", {REG[i].name for i in ev.constant_terminals(snap)})
 
 
+# ── fixed-bound fitness (Marler & Arora 2004; Shabtay et al. 2013) ───────────
+class FixedBoundFitness(unittest.TestCase):
+    """Hand-computed world.  Snapshot minute 4; jobs (arrival, duration) =
+    (0, 10), (2, 20), (4, 30); satellite 0 has 30 energy units and no sunset,
+    satellite 1 has 25 units and sets at minute 19; energy rate 1 per minute.
+
+    Bounds (detail::computeWorldBounds).  D = 60, the work available.
+    T_0 = min(60, inf, 30) = 30 and T_1 = min(60, 19 - 4, 25) = 15, so
+        Rmax = (4 - 0) + 30 = 34,    Emax = min(30 + 15, 1 * 60) = 45.
+
+    Shortest job first (-job.executionTime): job 0 goes to satellite 0 (done at
+    14, response 14), job 1 to satellite 0 (done at 34, response 32), job 2 fits
+    nowhere.  C = 2/3, mean response 23, energy 30, hence
+        R~ = (14/34 + 32/34 + 1) / 3 = 80/102,    E~ = 30/45,
+        fitness = 0.60 * 2/3 - 0.25 * 80/102 - 0.15 * 30/45 = 0.10392...
+    """
+
+    def world(self):
+        return SimulationSnapshot(
+            4.0,
+            [make_sat(0, energy=30.0), make_sat(1, energy=25.0, until=19.0)],
+            [make_job(0, arrival=0, execution=10), make_job(1, arrival=2, execution=20),
+             make_job(2, arrival=4, execution=30)])
+
+    @staticmethod
+    def synthetic_world():
+        # 40 jobs and 8 satellites with different budgets and sunsets; built in
+        # code so the test needs no data file.
+        jobs = [make_job(i, arrival=i % 9, execution=5 + (i * 7) % 23, transfer=(i * 3) % 6)
+                for i in range(40)]
+        sats = [make_sat(s, energy=20.0 + 7.0 * s, until=48.0 + 15.0 * s) for s in range(8)]
+        return SimulationSnapshot(8.0, sats, jobs)
+
+    @staticmethod
+    def population(trees):
+        gp = SchedulerGP([], [], seed=1)
+        gp.initialize(populationSize=len(trees), crossoverRate=0.8, mutationRate=0.08, maxDepth=3)
+        pop = gp.getPopulation()
+        for i, tree in enumerate(trees):
+            pop[i].tree = tree
+        return gp, pop
+
+    @staticmethod
+    def trees():
+        return [unary(NodeType.NEG, terminal("job.executionTime")),   # shortest job first
+                terminal("job.executionTime"),                        # longest job first
+                terminal("sat.remainingEnergy")]
+
+    @staticmethod
+    def formula(ev, pooled):
+        """Fixed-bound fitness from raw per-world results.
+
+        `pooled` is a list of (C, mean response, energy, jobs, Rmax, Emax)."""
+        jobs = sum(p[3] for p in pooled)
+        scheduled = [p[0] * p[3] for p in pooled]
+        comp = sum(scheduled) / jobs
+        resp = (sum(k * p[1] / p[4] for k, p in zip(scheduled, pooled)) + jobs - sum(scheduled)) / jobs
+        energy = sum(p[2] for p in pooled) / sum(p[5] for p in pooled)
+        return ev.weightJobs * comp - ev.weightTime * resp - ev.weightEnergy * energy
+
+    def test_off_by_default(self):
+        self.assertFalse(FitnessEvaluator(REG).fixedBounds)
+
+    def test_world_bounds_by_hand(self):
+        r_max, e_max = FitnessEvaluator.world_bounds(self.world())
+        self.assertAlmostEqual(r_max, 34.0, places=12)
+        self.assertAlmostEqual(e_max, 45.0, places=12)
+
+    def test_fitness_by_hand(self):
+        gp, pop = self.population(self.trees())
+        ev = FitnessEvaluator(REG)
+        for got, want in zip(ev.evaluate_single(pop[0], self.world()), (2 / 3, 23.0, 30.0)):
+            self.assertAlmostEqual(got, want, places=12)
+        ev.fixedBounds = True
+        ev.evaluate(pop, self.world())
+        self.assertAlmostEqual(pop[0].fitness, 0.60 * 2 / 3 - 0.25 * 80 / 102 - 0.15 * 30 / 45,
+                               places=12)
+
+    def test_fitness_does_not_depend_on_the_population(self):
+        # The defining property: the same tree scores the same whatever the
+        # other individuals are (population-relative fitness cannot promise it).
+        snap = self.synthetic_world()
+        ev = FitnessEvaluator(REG)
+        ev.fixedBounds = True
+        gp, pop = self.population(self.trees())
+        ev.evaluate(pop, snap)
+        alone = pop[0].fitness
+        gp2, pop2 = self.population([self.trees()[0], terminal("job.arrivalTime"),
+                                     unary(NodeType.NEG, terminal("sat.completedTasks")),
+                                     terminal("job.imageSize"), terminal("sat.bandwidth")])
+        ev.evaluate(pop2, snap)
+        self.assertEqual(pop2[0].fitness, alone)
+
+    def test_every_schedule_respects_the_bounds(self):
+        # Rmax and Emax are upper bounds for ANY tree, so both terms are in
+        # [0, 1] and the fitness is in [-(wT + wE), wJ].
+        snap = self.synthetic_world()
+        r_max, e_max = FitnessEvaluator.world_bounds(snap)
+        gp = SchedulerGP([], [], seed=3)
+        gp.initialize(populationSize=60, crossoverRate=0.8, mutationRate=0.08, maxDepth=5)
+        pop = gp.getPopulation()
+        ev = FitnessEvaluator(REG)
+        ev.fixedBounds = True
+        ev.evaluate(pop, snap)
+        for ind in pop:
+            comp, resp, energy = ev.evaluate_single(ind, snap)
+            self.assertLessEqual(resp, r_max + 1e-9)
+            self.assertLessEqual(energy, e_max + 1e-9)
+            self.assertLessEqual(ind.fitness, ev.weightJobs + 1e-12)
+            self.assertGreaterEqual(ind.fitness, -(ev.weightTime + ev.weightEnergy) - 1e-12)
+            self.assertAlmostEqual(
+                ind.fitness,
+                self.formula(ev, [(comp, resp, energy, len(snap.jobs), r_max, e_max)]), places=12)
+
+    def test_empty_schedule_gets_the_worst_response(self):
+        # No energy anywhere: nothing can run.  C = 0, R~ = 1, E~ = 0, so the
+        # fitness is exactly -weightTime.  (Population-relative fitness needed a
+        # special case for this; here it follows from the rejection penalty.)
+        jobs = [make_job(0, arrival=0, execution=10), make_job(1, arrival=4, execution=20)]
+        snap = SimulationSnapshot(4.0, [make_sat(0, energy=0.0), make_sat(1, energy=0.0)], jobs)
+        gp, pop = self.population(self.trees())
+        ev = FitnessEvaluator(REG)
+        ev.fixedBounds = True
+        ev.evaluate(pop, snap)
+        for ind in pop:
+            self.assertAlmostEqual(ind.fitness, -ev.weightTime, places=12)
+
+    def test_several_worlds_are_pooled_per_job(self):
+        # World 2: minute 3, jobs (0,5) (1,7) (3,9) and one that arrives at 9
+        # (not available: it counts as unscheduled).  Budgets 12 and 9, no
+        # sunset.  D = 21, T = (12, 9): Rmax = 3 + 12 = 15, Emax = min(21, 21).
+        snap1 = self.world()
+        snap2 = SimulationSnapshot(
+            3.0, [make_sat(0, energy=12.0), make_sat(1, energy=9.0)],
+            [make_job(0, arrival=0, execution=5), make_job(1, arrival=1, execution=7),
+             make_job(2, arrival=3, execution=9), make_job(3, arrival=9, execution=4)])
+        b1, b2 = FitnessEvaluator.world_bounds(snap1), FitnessEvaluator.world_bounds(snap2)
+        self.assertAlmostEqual(b2[0], 15.0, places=12)
+        self.assertAlmostEqual(b2[1], 21.0, places=12)
+
+        gp, pop = self.population(self.trees())
+        ev = FitnessEvaluator(REG)
+        ev.fixedBounds = True
+        ev.evaluate_many(pop, [snap1, snap2])
+        for ind in pop:
+            c1, r1, e1 = ev.evaluate_single(ind, snap1)
+            c2, r2, e2 = ev.evaluate_single(ind, snap2)
+            want = self.formula(ev, [(c1, r1, e1, 3, b1[0], b1[1]), (c2, r2, e2, 4, b2[0], b2[1])])
+            self.assertAlmostEqual(ind.fitness, want, places=12)
+
+    def test_best_fitness_never_decreases_under_elitism(self):
+        # Absolute fitness + elitism on a fixed world => the best fitness is
+        # monotone.  With the population-relative fitness it can go down
+        # (docs/onboarding/quirks.html), so this is the property that makes
+        # "N generations without improvement" a meaningful stagnation test.
+        snap = self.synthetic_world()
+        gp = SchedulerGP([], [], seed=7)
+        gp.initialize(populationSize=40, crossoverRate=0.8, mutationRate=0.08,
+                      elitismCount=2, maxDepth=5)
+        ev = FitnessEvaluator(REG)
+        ev.fixedBounds = True
+        best = -math.inf
+        for _ in range(40):
+            ev.evaluate(gp.getPopulation(), snap)
+            current = max(ind.fitness for ind in gp.getPopulation())
+            self.assertGreaterEqual(current, best)
+            best = current
+            gp.solveNextGeneration()
+
+    def test_switching_back_restores_the_population_relative_fitness(self):
+        snap = self.synthetic_world()
+        gp, pop = self.population(self.trees())
+        ev = FitnessEvaluator(REG)
+        ev.evaluate(pop, snap)
+        legacy = [ind.fitness for ind in pop]
+        ev.fixedBounds = True
+        ev.evaluate(pop, snap)
+        ev.fixedBounds = False
+        ev.evaluate(pop, snap)
+        self.assertEqual(legacy, [ind.fitness for ind in pop])
+
+
 # ── GP options ───────────────────────────────────────────────────────────────
 @unittest.skipUnless(os.path.exists(WORLD0), "needs data/worlds")
 class GPOptions(unittest.TestCase):

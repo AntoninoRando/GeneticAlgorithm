@@ -194,3 +194,61 @@ probability; the fitness-weight inequality ΔC > (w_R + w_E)/w_C ≈ 0.67; the
 reduction of the terminal-weight MLE to empirical frequencies when every
 terminal is active) are worked out from the code and the cited results; they
 are not taken from a paper.
+
+## 8. References for the fixed-bound fitness (2026-11-14)
+
+Two entries were added for the opt-in fixed-bound fitness
+(`FitnessEvaluator::fixedBounds`, `--fixed-bounds`; maths in
+`thesis/chapters/method.tex`, section "Fixed-bound fitness").
+
+| Bib key | Paper | How it was checked | Coverage |
+|---|---|---|---|
+| `marler2004survey` | Marler, Arora (2004), *Survey of multi-objective optimization methods for engineering*, Struct. Multidisc. Optim. 26(6), 369–395 | Crossref record for DOI 10.1007/s00158-003-0368-6: authors, title, journal, volume, issue, pages and year all match | **Metadata only.** The publisher page is paywalled and no legitimate open copy was found, so the text was **not read** for this note |
+| `shabtay2013rejection` | Shabtay, Gaspar, Kaspi (2013), *A survey on offline scheduling with rejection*, J. Scheduling 16(1), 3–28 | Crossref record for DOI 10.1007/s10951-012-0303-z: all fields match. Crossref also lists an erratum (J. Scheduling 18(3), 329, 2015, DOI 10.1007/s10951-015-0417-1), which is not cited | **Metadata only**, plus fragments of the abstract shown by search engines. The text was **not read** |
+
+**What each is cited for, and how sure that is.**
+
+- `marler2004survey` is cited for one standard statement: in a weighted sum the
+  objectives should first be made comparable by a transformation that uses fixed
+  bounds of each objective's range (the ideal or "utopia" value as the lower
+  bound and a maximum as the upper bound), which gives dimensionless terms in
+  [0, 1]. This is recalled from general knowledge of the survey, not from a
+  reading in this session. **Before the defence, open the paper and check the
+  passage on objective-function transformations**; no section or equation
+  number is quoted anywhere in the code, thesis or guide for that reason.
+- `shabtay2013rejection` is cited for the problem class: jobs may be rejected,
+  and the objective combines a criterion over the accepted jobs' completion
+  times with the total rejection cost (the search fragments describe exactly
+  this: one criterion depending on completion times, the other the total
+  rejection cost, with a rejection cost e_j per job). The fixed-bound response
+  term is of that form, with total flow time as the criterion and a uniform
+  rejection cost e_j = R^max. The survey treats rejection as a *decision* of an
+  offline algorithm; here a job is "rejected" when the greedy decoder finds no
+  feasible satellite for it. The analogy is in the objective, not in the
+  algorithm. **Same caveat: read the introduction and problem definition before
+  quoting anything more specific.**
+- `icdcs_sc` (already in the bibliography, read earlier through
+  `magliarisi2026thesis` Ch. 6) is the closest support: it normalises energy by
+  the battery and time by the largest response in the same satellite setting.
+  Its venue is still unconfirmed (section 5).
+
+**Why these support the choice.** The population-relative fitness had two
+documented defects (the mean response ignores unscheduled jobs; min-max
+stretches a 1% energy spread to the full weight). Fixed bounds are the textbook
+remedy for the second, and a rejection cost is the standard way to make
+"did not schedule" comparable with "scheduled late", which addresses the first.
+
+**What is NOT from the literature.** The bounds themselves,
+R^max = (t0 − a_min) + max_s T_s and E^max = min(Σ_s ρ_s T_s, ρ_max D) with
+T_s = max(0, min(D, ω_s − t0, E_s/ρ_s)), are derived in this project from the
+decoder's constraints (Proposition 1 in `method.tex`), and so are the five
+properties listed there. Choosing the rejection cost equal to R^max (rather
+than a tunable penalty) is also a project choice: it is the smallest penalty
+for which an unscheduled job is never cheaper than a scheduled one.
+
+**Not yet backed by an experiment.** No run with `fixedBounds` on the held-out
+worlds exists yet (`data/` was not available when the option was written). The
+configurations `fixed` and `fixed+clones+worlds3` in
+`thesis/experiments/run_ablation.py` are there for it. Until they are run, the
+thesis and the guide claim only the mathematical properties, not better test
+metrics, and the option stays off by default.

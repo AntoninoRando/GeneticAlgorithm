@@ -330,6 +330,37 @@ completion minute of the last job placed on the satellite), turning the
 ``False``: that terminal is then constantly 0.
             )doc")
 
+        .def_readwrite("fixedBounds", &FitnessEvaluator::fixedBounds,
+            R"doc(
+If ``True`` the two cost terms are normalised by fixed per-world bounds instead
+of by the population's minimum and maximum, and every unscheduled job is
+charged the worst possible response::
+
+    fitness = weightJobs * C - weightTime * R~ - weightEnergy * E~
+    R~ = mean over ALL jobs of r_j / Rmax   (an unscheduled job counts as 1)
+    E~ = E / Emax
+
+The fitness of a tree then does not depend on the rest of the population, so
+it can be compared across generations.  ``(Rmax, Emax)`` are returned by
+:py:meth:`world_bounds`.  Default ``False`` (population-relative fitness).
+Sources: Marler & Arora 2004 (fixed-bound normalisation of weighted sums),
+Shabtay et al. 2013 (rejection penalty).
+            )doc")
+
+        .def_static("world_bounds",
+             [](const SimulationSnapshot& snap) -> py::tuple
+             {
+                 const detail::WorldBounds b = FitnessEvaluator::worldBounds(snap);
+                 return py::make_tuple(b.maxResponse, b.maxEnergy);
+             },
+             py::arg("snap"),
+             R"doc(
+Fixed bounds ``(Rmax, Emax)`` of *snap* used when ``fixedBounds`` is on:
+``Rmax`` bounds the response time (minutes) of any job in any schedule the
+decoder can produce, ``Emax`` bounds the total energy of any such schedule.
+Both depend on the snapshot only.
+             )doc")
+
         // ── Weights ───────────────────────────────────────────────────────
         .def_readwrite("weightJobs", &FitnessEvaluator::weightJobs,
             R"doc(

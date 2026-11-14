@@ -102,6 +102,7 @@ cmake --build build</pre>
 <tr><td><code>--clone-retries</code></td><td class="num">0</td><td>Re-mutate offspring that are copies of a parent or an elite. 3 helps (see <a href="results.html">results</a>).</td></tr>
 <tr><td><code>--worlds-per-eval</code></td><td class="num">1</td><td>Score every formula on K worlds at once. 3 helps.</td></tr>
 <tr><td><code>--tournament-size</code></td><td class="num">5</td><td>Selection pressure.</td></tr>
+<tr><td><code>--fixed-bounds</code></td><td class="num">off</td><td>Fixed-bound fitness: costs divided by per-world bounds, unscheduled jobs penalised. Makes fitness comparable across generations. Not yet measured (see <a href="decoder.html#fixed-bounds">decoder &amp; fitness</a>).</td></tr>
 <tr><td><code>--disable-metrics</code></td><td></td><td>Skip the CSV/NPZ/PNG metrics.</td></tr>
 </table></div>
 <p>Other literature options (<code>--initial-max-depth</code>, <code>--internal-crossover-bias</code>, <code>--terminal-weighting</code>, <code>--track-busy-until</code>, <code>--prune-constant-terminals</code>) are explained on the <a href="evolution.html">generation page</a>. Run <code>python3 main.py --help</code> for the full list.</p>
@@ -116,7 +117,7 @@ cmake --build build</pre>
   <li><strong>Snapshots</strong> (<code>--inspect-snapshots</code>, <code>--save-snapshots</code>) print or save the world the population was scored on, at the start, at each reset and at the end. Draw one with <code>python3 snapshot_timeline_plot.py snapshots/&lt;file&gt;.json</code>.</li>
 </ul>
 <div class="callout warn"><span class="callout-title">Do not compare fitness across worlds</span>
-<p>Fitness is normalised <em>within the current population</em> (see <a href="decoder.html#fitness">Decoder &amp; fitness</a>). A best fitness of 0.40 in world 3 and 0.35 in world 4 does not mean the formula got worse. Compare the raw metrics instead (completion ratio, mean response, energy).</p></div>
+<p>Fitness is normalised <em>within the current population</em> (see <a href="decoder.html#fitness">Decoder &amp; fitness</a>). A best fitness of 0.40 in world 3 and 0.35 in world 4 does not mean the formula got worse. Compare the raw metrics instead (completion ratio, mean response, energy). With <code>--fixed-bounds</code> fitness <em>is</em> comparable between generations of the same world, but still not between worlds, because each world has its own bounds.</p></div>
 
 <h2 id="tests">7. Run the tests</h2>
 <pre>python3 -m unittest discover -s tests -v</pre>

@@ -41,7 +41,8 @@
 
 <h3>…I want to change the fitness function</h3>
 <ol>
-  <li><code>FitnessEvaluator::evaluatePointers</code> in <code>fitness_evaluator.h</code>: steps 2 (normalisation) and 3 (weights).</li>
+  <li><code>FitnessEvaluator::evaluatePointers</code> in <code>fitness_evaluator.h</code>: steps 2 (normalisation) and 3 (weights). There are two modes. The default is population-relative. With <code>fixedBounds</code> the function returns early from the block marked "Fixed-bound fitness", and the bounds come from <code>detail::computeWorldBounds</code>.</li>
+  <li>If you change a decoder constraint (sunset, energy, start times), re-check <code>computeWorldBounds</code>: its proof (Proposition 1 in <code>thesis/chapters/method.tex</code>) relies on jobs running back to back from the snapshot minute and on the two feasibility filters.</li>
   <li>Keep <code>evaluate</code> and <code>evaluate_many</code> consistent (one world must equal <code>evaluate</code>; there is a test for it).</li>
   <li>Read <a href="theory.html#multiobjective">theory §5</a> first. This is the most consequential change you can make.</li>
   <li>Re-run the main experiment and the weight study; update <a href="results.html">results</a>.</li>

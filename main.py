@@ -27,6 +27,7 @@ class GAConfig(TypedDict):
     clone_retries: int
     terminal_weighting: bool
     track_busy_until: bool
+    fixed_bounds: bool
     prune_constant_terminals: bool
     worlds_per_eval: int
     # Reproducibility: -1 = fresh randomness every run; >= 0 = deterministic
@@ -60,6 +61,7 @@ def default_config() -> GAConfig:
         clone_retries=0,
         terminal_weighting=False,
         track_busy_until=False,
+        fixed_bounds=False,
         prune_constant_terminals=False,
         worlds_per_eval=1,
         seed=-1,
@@ -115,6 +117,11 @@ parser.add_argument("--track-busy-until", action="store_true",
                     help="Make the sat.cpuBusyUntil terminal live: the decoder writes each satellite's "
                          "next free minute into it (availability/queue-load feature of Zhang & Yang "
                          "2025 and Sun et al. 2024).")
+parser.add_argument("--fixed-bounds", action="store_true",
+                    help="Fixed-bound fitness: divide response time and energy by per-world bounds "
+                         "instead of the population's min and max, and charge every unscheduled job "
+                         "the worst response (Marler & Arora 2004; Shabtay et al. 2013). The fitness "
+                         "becomes absolute, so it is comparable across generations.")
 parser.add_argument("--prune-constant-terminals", action="store_true",
                     help="Never draw terminals that are constant over every loaded world and not "
                          "updated by the decoder (e.g. sat.energyReserved, sat.loadRatio).")
@@ -186,6 +193,7 @@ def run_genetic_algorithm(config: GAConfig):
     clone_retries      = config["clone_retries"]
     terminal_weighting = config["terminal_weighting"]
     track_busy_until   = config["track_busy_until"]
+    fixed_bounds       = config["fixed_bounds"]
     prune_constant_terminals = config["prune_constant_terminals"]
     worlds_per_eval    = max(1, config["worlds_per_eval"])
     seed               = config["seed"]
@@ -300,6 +308,12 @@ def run_genetic_algorithm(config: GAConfig):
     fitness_evaluator = FitnessEvaluator(buildTerminalRegistry())
     if track_busy_until:
         fitness_evaluator.trackBusyUntil = True
+    if fixed_bounds:
+        # Opt-in, see the "Fixed-bound normalisation" note in
+        # include/scheduler/fitness_evaluator.h.  Set only when requested, so a
+        # `scheduler` binary built before the option existed still runs the
+        # default mode (it raises AttributeError only if this is asked for).
+        fitness_evaluator.fixedBounds = True
 
     excluded_terminals = []
     if prune_constant_terminals:
@@ -364,6 +378,8 @@ def run_genetic_algorithm(config: GAConfig):
         # the current population) and world-dependent, so best_overall_fitness
         # is only an informational indicator across world resets; the actual
         # convergence decision uses best_world_fitness, which resets per world.
+        # With --fixed-bounds the fitness is absolute within a world set, so
+        # "no new best for G generations" is then an exact stagnation test.
         current_best = max(population, key=lambda ind: ind.fitness)
         if current_best.fitness > best_overall_fitness:
             print(f"New best overall fitness: {current_best.fitness:.4f} (previous: {best_overall_fitness:.4f})")
@@ -514,6 +530,7 @@ if __name__ == "__main__":
         "clone_retries":        "clone_retries",
         "terminal_weighting":   "terminal_weighting",
         "track_busy_until":     "track_busy_until",
+        "fixed_bounds":         "fixed_bounds",
         "prune_constant_terminals": "prune_constant_terminals",
         "worlds_per_eval":      "worlds_per_eval",
         "seed":                 "seed",

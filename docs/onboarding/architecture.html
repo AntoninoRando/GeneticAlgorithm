@@ -106,7 +106,7 @@
 <ol>
   <li><code>fitness_evaluator.evaluate(population, snapshot)</code> crosses into C++.</li>
   <li>In <code>FitnessEvaluator::evaluatePointers</code>, an OpenMP loop gives each thread some individuals. For each one, <code>detail::greedyDecode</code> builds a schedule and <code>sumObjectives</code> measures it.</li>
-  <li>Back on one thread, response time and energy are min-max normalised across the population, and <code>fitness</code> is written into each <code>GPIndividual</code>. The objects are shared with Python, not copied.</li>
+  <li>Back on one thread, response time and energy are min-max normalised across the population (or, with <code>fixedBounds</code>, divided by bounds computed once per world), and <code>fitness</code> is written into each <code>GPIndividual</code>. The objects are shared with Python, not copied.</li>
   <li>Python reads the best fitness, decides whether to switch worlds, records metrics.</li>
   <li><code>genetic_algorithm.solveNextGeneration()</code> crosses into C++ again: sort, elitism, then a second OpenMP loop breeds offspring pairs. Each pair has its own random-number stream, so a seeded run gives the same result on any number of threads.</li>
 </ol>

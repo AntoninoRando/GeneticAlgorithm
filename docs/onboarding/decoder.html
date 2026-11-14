@@ -144,10 +144,31 @@ $$\hat x_i = \frac{x_i - \min_k x_k}{\max_k x_k - \min_k x_k} \in [0,1], \qquad 
 <div class="callout warn"><span class="callout-title">Fitness is only comparable inside one population and one world</span>
 <p>The same tree gets a different fitness in a different population or a different world. To compare trees across runs, re-score them with <code>evaluate_single</code>, which returns the raw \((C, R, \mathcal{E})\). The experiments do exactly that.</p></div>
 
+<h3 id="fixed-bounds">The fixed-bound alternative (<code>--fixed-bounds</code>)</h3>
+<p>The example shows two problems. The mean response time \(R\) ignores the jobs that were <em>not</em> scheduled, and min-max stretches every cost to the full [0, 1] range, whatever its real spread. The opt-in <strong>fixed-bound fitness</strong> (<code>FitnessEvaluator.fixedBounds = True</code>, or <code>--fixed-bounds</code> in <code>main.py</code>) changes two things:</p>
+<ul>
+  <li><strong>Divide by bounds of the world, not of the population.</strong> For each world the evaluator computes \(R^{\max}\), the longest response time any schedule could produce, and \(\mathcal{E}^{\max}\), the most energy any schedule could spend. Both depend on the snapshot only.</li>
+  <li><strong>Charge unscheduled jobs.</strong> A job that is not scheduled counts as if it had the worst response, \(R^{\max}\). This is a <a href="glossary.html#rejection-penalty">rejection penalty</a>.</li>
+</ul>
+$$\tilde R_i = \frac{1}{N}\Big[\sum_{\text{scheduled } j} \frac{c_j - a_j}{R^{\max}} + (\text{number unscheduled})\Big] = 1 - C_i\Big(1 - \frac{R_i}{R^{\max}}\Big), \qquad \tilde{\mathcal E}_i = \frac{\mathcal E_i}{\mathcal E^{\max}}$$
+$$ f_i^{\text{fix}} \;=\; w_C\, C_i \;-\; w_R\, \tilde R_i \;-\; w_E\, \tilde{\mathcal E}_i $$
+<p>The same three individuals, in a world with \(R^{\max} = 30\) minutes and \(\mathcal{E}^{\max} = 40\):</p>
+<div class="table-wrap"><table>
+<tr><th></th><th class="num">\(C\)</th><th class="num">\(R\)</th><th class="num">\(\mathcal{E}\)</th><th class="num">\(\tilde R\)</th><th class="num">\(\tilde{\mathcal E}\)</th><th class="num">fitness</th></tr>
+<tr class="hl"><td>A: schedules many</td><td class="num">0.75</td><td class="num">17.3</td><td class="num">28</td><td class="num">1 − 0.75·(1 − 17.3/30) = 0.683</td><td class="num">0.70</td><td class="num">0.450 − 0.171 − 0.105 = <strong>0.174</strong></td></tr>
+<tr><td>B: schedules few, fast</td><td class="num">0.50</td><td class="num">12.0</td><td class="num">16</td><td class="num">1 − 0.50·(1 − 12/30) = 0.700</td><td class="num">0.40</td><td class="num">0.300 − 0.175 − 0.060 = <strong>0.065</strong></td></tr>
+<tr><td>C: schedules nothing</td><td class="num">0</td><td class="num">n/a</td><td class="num">0</td><td class="num">1</td><td class="num">0</td><td class="num">0 − 0.25 − 0 = <strong>−0.250</strong></td></tr>
+</table></div>
+<p><strong>Now A beats B.</strong> B's jobs are faster, but half of its jobs are missing and each missing job costs a full unit, so its response term (0.700) is worse than A's (0.683). The numbers also stay the same if a fourth individual joins the population, which is not true of the table above.</p>
+<p>How \(R^{\max}\) and \(\mathcal{E}^{\max}\) are computed, why they are valid bounds, and the sources are on the <a href="theory.html#fixed-bounds">theory page</a>. The code is <code>detail::computeWorldBounds</code> in <a href="../../include/scheduler/fitness_evaluator.h"><code>fitness_evaluator.h</code></a>; from Python, <code>FitnessEvaluator.world_bounds(snapshot)</code> returns the pair.</p>
+<div class="callout warn"><span class="callout-title">Off by default, and not yet measured</span>
+<p>All thesis results use the population-relative fitness. The fixed-bound fitness has proven properties (see theory) and unit tests, but nobody has yet run it on the held-out worlds. Do not write that it "works better" until the ablation has been run (<a href="results.html#ablation">results</a>).</p></div>
+
 <h2 id="many">6. Several worlds at once</h2>
 <p><code>evaluate_many(population, snapshots)</code> decodes each individual on every world and <strong>pools</strong> the raw sums before normalising:</p>
 $$C_i = \frac{\sum_w |\mathcal A_{i,w}|}{\sum_w N_w}, \qquad R_i = \frac{\sum_w \sum_{\mathcal A_{i,w}} (c_j - a_j)}{\sum_w |\mathcal A_{i,w}|}, \qquad \mathcal E_i = \sum_w \mathcal E_{i,w}$$
 <p>Pooling, rather than averaging per-world ratios, gives every job the same weight and keeps "no job scheduled" well defined. Empty worlds are skipped. With one world, <code>evaluate_many</code> gives exactly the same result as <code>evaluate</code>, and a unit test checks this.</p>
+<p>With the fixed-bound fitness the pooling is per job too: each response is divided by the \(R^{\max}_w\) of <em>its own</em> world before the sum, and the energy term is \(\sum_w \mathcal E_{i,w} / \sum_w \mathcal E^{\max}_w\).</p>
 
 <p class="updated">Last checked against the code on 2026-11-14.</p>
 </main>

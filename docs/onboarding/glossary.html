@@ -45,7 +45,8 @@
 <dt id="individual">Individual</dt><dd>One candidate solution: here a <code>GPIndividual</code> with a tree, a fitness and an id.</dd>
 <dt id="leo">LEO</dt><dd>Low Earth orbit, a few hundred kilometres up. Satellites there move fast relative to the ground.</dd>
 <dt id="mutation">Mutation</dt><dd>Random edits: redraw a terminal, swap an operator, or regrow a subtree. Rate 0.08 per node.</dd>
-<dt id="normalisation">Normalisation (min-max)</dt><dd>Rescaling a value to [0, 1] using the population's minimum and maximum.</dd>
+<dt id="normalisation">Normalisation (min-max)</dt><dd>Rescaling a value to [0, 1] using the population's minimum and maximum. The default for the two cost terms of the fitness; see also <a href="#fixed-bound">fixed-bound normalisation</a>.</dd>
+<dt id="fixed-bound">Normalisation (fixed-bound)</dt><dd>Rescaling a value to [0, 1] by dividing it by a bound that depends on the world only (\(R^{\max}\), \(\mathcal{E}^{\max}\)), not on the other individuals. Opt-in with <code>--fixed-bounds</code>. The fitness then means the same thing in every generation.</dd>
 <dt id="openmp">OpenMP</dt><dd>C++ compiler extension for parallel loops (<code>#pragma omp parallel for</code>). Used for evaluation and breeding.</dd>
 <dt id="operational-until">operationalUntil (sunset)</dt><dd>Minute after which a satellite can no longer serve the user. No job may finish later.</dd>
 <dt id="pareto">Pareto optimal</dt><dd>A solution that no other solution beats on every objective at once.</dd>
@@ -54,6 +55,7 @@
 <dt id="protected-division">Protected division</dt><dd>\(x/y\), but 0 when \(|y| &lt; 10^{-9}\). Printed as <code>/?</code>.</dd>
 <dt id="pybind11">pybind11</dt><dd>C++ library that exposes C++ classes to Python. Used in <code>bindings.cpp</code>.</dd>
 <dt id="ramped">Ramped half-and-half</dt><dd>Initialisation where half the trees use full and half use grow, over a range of depths.</dd>
+<dt id="rejection-penalty">Rejection penalty</dt><dd>A fixed cost charged for a job that is not scheduled, so that leaving a job out is never cheaper than scheduling it late. With <code>--fixed-bounds</code> an unscheduled job counts as the worst possible response time, \(R^{\max}\).</dd>
 <dt id="registry">Registry (terminal)</dt><dd>The list of 18 terminals with their accessor functions (<code>registry.h</code>).</dd>
 <dt id="response">Response time \(R\)</dt><dd>Completion minute minus arrival minute, averaged over scheduled jobs. Minimised.</dd>
 <dt id="sec">SEC</dt><dd>Satellite edge computing: running computation on satellites.</dd>

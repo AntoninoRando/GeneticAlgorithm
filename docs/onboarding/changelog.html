@@ -19,6 +19,17 @@
 <h1>Changelog</h1>
 <p class="lede">One dated entry per change to this guide, newest first. Say which pages changed and which code change made them necessary.</p>
 
+<h2>2026-11-14: fixed-bound fitness (opt-in)</h2>
+<ul>
+  <li><strong>Code change:</strong> <code>FitnessEvaluator.fixedBounds</code> and <code>FitnessEvaluator.world_bounds()</code> in <code>fitness_evaluator.h</code> / <code>bindings.cpp</code>, the <code>--fixed-bounds</code> flag in <code>main.py</code>, two configurations in <code>thesis/experiments/run_ablation.py</code>, and a <code>FixedBoundFitness</code> test class. The default behaviour is unchanged.</li>
+  <li><strong>Decoder &amp; fitness:</strong> new section "The fixed-bound alternative" with the formulas and the worked example redone; a note on pooling over several worlds.</li>
+  <li><strong>Theory &amp; maths §5:</strong> new subsection "Fixed-bound normalisation" (bounds, why they are valid, five properties, a hand-computed example, limits); the design map has a new row. It replaces the "open design question" box.</li>
+  <li><strong>Known quirks:</strong> the misalignment and best-fitness quirks now point to the opt-in fix; the open question on fitness design is updated.</li>
+  <li><strong>Day one, One generation, Experiments, Glossary, Architecture, Where to start:</strong> the new flag and option, two glossary terms (fixed-bound normalisation, rejection penalty), a "not measured yet" box with the command to run.</li>
+  <li><strong>References:</strong> added Marler &amp; Arora 2004 and Shabtay, Gaspar &amp; Kaspi 2013 (metadata verified on Crossref, full text not read yet), also in <code>thesis/references.bib</code> and <code>thesis/literature_notes.md</code> §8.</li>
+  <li><strong>Not done:</strong> no experiment on the held-out worlds. No page claims the new fitness gives better results.</li>
+</ul>
+
 <h2>2026-11-14: first version</h2>
 <ul>
   <li>Created the guide with 15 pages: welcome, day one, the problem, GP from zero, glossary, architecture, data pipeline, decoder &amp; fitness (with an interactive decoder playground), one generation, theory &amp; maths (with a selection-pressure calculator), experiments &amp; findings, known quirks, where to start, references and this changelog.</li>
