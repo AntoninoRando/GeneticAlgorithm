@@ -18,6 +18,17 @@ class GAConfig(TypedDict):
     hoist_rate: float
     convergence_threshold: int
     csv_row_limit: int
+    # Opt-in refinements from the GP-for-scheduling literature (see the
+    # LITERATURE NOTES in include/scheduler/*.h).  All default to the earlier
+    # behaviour, so existing runs and the thesis experiments are unchanged.
+    tournament_size: int
+    initial_max_depth: int
+    internal_crossover_bias: float
+    clone_retries: int
+    terminal_weighting: bool
+    track_busy_until: bool
+    prune_constant_terminals: bool
+    worlds_per_eval: int
     # Reproducibility: -1 = fresh randomness every run; >= 0 = deterministic
     # run (seeds both the C++ GP evolution and the Python world sampling).
     seed: int
@@ -43,6 +54,14 @@ def default_config() -> GAConfig:
         hoist_rate=0.05,
         convergence_threshold=10,
         csv_row_limit=100,
+        tournament_size=5,
+        initial_max_depth=-1,
+        internal_crossover_bias=0.0,
+        clone_retries=0,
+        terminal_weighting=False,
+        track_busy_until=False,
+        prune_constant_terminals=False,
+        worlds_per_eval=1,
         seed=-1,
         metrics_dir="metrics",
         metrics_prefix="",
@@ -76,6 +95,33 @@ parser.add_argument("--convergence-threshold", type=int, default=10,
 parser.add_argument("--csv-row-limit", type=int, default=100,
                     help="Maximum number of rows to load from the CSV file for satellites and jobs. "
                          "Set to 0 or a negative number to load all rows (e.g. --csv-row-limit 50).")
+parser.add_argument("--tournament-size", type=int, default=5,
+                    help="Candidates per selection tournament (selection pressure). The papers use "
+                         "7 (Sun 2024, Yang 2025) or 2 (Zhang & Yang 2025).")
+parser.add_argument("--initial-max-depth", type=int, default=-1,
+                    help="Maximum depth of the initial random trees; -1 = same as --max-depth. "
+                         "The papers start below the cap (e.g. 2-6 with a cap of 8 in Yang 2025) so "
+                         "that crossover has room to grow trees.")
+parser.add_argument("--internal-crossover-bias", type=float, default=0.0,
+                    help="Probability [0..1] that a crossover point is an operator node rather than "
+                         "a leaf. 0 = uniform over all nodes; Koza (1994) uses 0.9.")
+parser.add_argument("--clone-retries", type=int, default=0,
+                    help="Re-mutation attempts for an offspring identical to a parent or an elite "
+                         "(structural proxy of the repetition test in Zhang & Yang 2025). 0 = off.")
+parser.add_argument("--terminal-weighting", action="store_true",
+                    help="Adaptive terminal weighting for mutation: terminal probabilities follow the "
+                         "maximum-likelihood fit to the best individuals (Yang et al. 2025, Sec. IV-D).")
+parser.add_argument("--track-busy-until", action="store_true",
+                    help="Make the sat.cpuBusyUntil terminal live: the decoder writes each satellite's "
+                         "next free minute into it (availability/queue-load feature of Zhang & Yang "
+                         "2025 and Sun et al. 2024).")
+parser.add_argument("--prune-constant-terminals", action="store_true",
+                    help="Never draw terminals that are constant over every loaded world and not "
+                         "updated by the decoder (e.g. sat.energyReserved, sat.loadRatio).")
+parser.add_argument("--worlds-per-eval", type=int, default=1,
+                    help="Number of worlds each individual is scored on per generation (pooled). "
+                         "The papers score every individual on several instances (5 in Yang 2025, "
+                         "100 simulations in Zhang & Yang 2025). 1 = a single world, as before.")
 parser.add_argument("--seed", type=int, default=-1,
                     help="Random seed for reproducible runs (seeds both the C++ evolution and the "
                          "Python world sampling). -1 (default) uses fresh randomness every run.")
@@ -134,6 +180,14 @@ def run_genetic_algorithm(config: GAConfig):
     hoist_rate         = config["hoist_rate"]
     convergence_threshold = config["convergence_threshold"]
     csv_row_limit      = config["csv_row_limit"]
+    tournament_size    = config["tournament_size"]
+    initial_max_depth  = config["initial_max_depth"]
+    internal_crossover_bias = config["internal_crossover_bias"]
+    clone_retries      = config["clone_retries"]
+    terminal_weighting = config["terminal_weighting"]
+    track_busy_until   = config["track_busy_until"]
+    prune_constant_terminals = config["prune_constant_terminals"]
+    worlds_per_eval    = max(1, config["worlds_per_eval"])
     seed               = config["seed"]
     metrics_dir        = config["metrics_dir"]
     metrics_prefix     = config["metrics_prefix"]
@@ -219,13 +273,58 @@ def run_genetic_algorithm(config: GAConfig):
         )
         return satellites_local, jobs_local, minute, world_seed
 
-    satellites, jobs, current_minute, _ = build_world(select_world_path(0), initial_job_limit)
+    def build_snapshots(first_world_index: int):
+        """Builds the `worlds_per_eval` snapshots that the population is scored on.
+
+        Papers never score an individual on a single instance: Yang et al. 2025
+        draw 5 training instances per individual per generation (Sec. V-A,
+        thesis Sec. 3.3.1) and Zhang & Yang 2025 average 100 simulations per
+        individual (Sec. 4.1).  With one world the GP can overfit that world's
+        quirks (the convergence-triggered rotation below only limits this
+        across time); several worlds at once do it within a generation.
+        Consecutive worlds are used so that a reset moves to fresh ones.
+        """
+        built = []
+        for k in range(worlds_per_eval):
+            sats_k, jobs_k, minute_k, _ = build_world(
+                select_world_path(first_world_index + k), initial_job_limit)
+            built.append((sats_k, jobs_k, minute_k, SimulationSnapshot(minute_k, sats_k, jobs_k)))
+        return built
+
+    world_pool = build_snapshots(0)
+    satellites, jobs, current_minute, snapshot = world_pool[0]
+    snapshots = [entry[3] for entry in world_pool]
+
+    # The evaluator is built first because it also tells the GP which terminals
+    # are dead (constant in every world), see include/scheduler/registry.h.
+    fitness_evaluator = FitnessEvaluator(buildTerminalRegistry())
+    if track_busy_until:
+        fitness_evaluator.trackBusyUntil = True
+
+    excluded_terminals = []
+    if prune_constant_terminals:
+        # A terminal is excluded only if it is constant in *all* loaded worlds
+        # (intersection): one that varies somewhere may still carry signal.
+        per_world = [set(fitness_evaluator.constant_terminals(sn)) for sn in snapshots]
+        excluded_terminals = sorted(set.intersection(*per_world))
+        names = [t.name for t in buildTerminalRegistry()]
+        print("Excluding constant terminals: "
+              + (", ".join(names[i] for i in excluded_terminals) or "none"))
+
+    # Only options that differ from their defaults are passed on, so a
+    # `scheduler` binary built before these options existed keeps working in
+    # the default mode (it raises a clear TypeError only if one is requested).
+    gp_options = {}
+    if tournament_size != 5:           gp_options["tournamentSize"] = tournament_size
+    if initial_max_depth >= 0:         gp_options["initialMaxDepth"] = initial_max_depth
+    if internal_crossover_bias > 0:    gp_options["internalCrossoverBias"] = internal_crossover_bias
+    if clone_retries > 0:              gp_options["cloneRetries"] = clone_retries
+    if terminal_weighting:             gp_options["terminalWeighting"] = True
+    if excluded_terminals:             gp_options["excludedTerminals"] = excluded_terminals
 
     genetic_algorithm = SchedulerGP(satellites, jobs, seed=seed)
     genetic_algorithm.initialize(populationSize=population_size, maxDepth=max_depth,
-                                 hoistRate=hoist_rate)
-    fitness_evaluator = FitnessEvaluator(buildTerminalRegistry())
-    snapshot = SimulationSnapshot(current_minute, satellites, jobs)
+                                 hoistRate=hoist_rate, **gp_options)
     inspect_snapshot(snapshot, generation=0, reset_count=0, label="Initial simulation snapshot")
     last_evaluation_snapshot = None
     metrics_collector = None
@@ -249,7 +348,11 @@ def run_genetic_algorithm(config: GAConfig):
         #region >> Evaluation
         # Evaluare fitness of population by scheduling tasks
         population = genetic_algorithm.getPopulation()
-        fitness_evaluator.evaluate(population, snapshot)
+        if len(snapshots) == 1:
+            fitness_evaluator.evaluate(population, snapshot)
+        else:
+            fitness_evaluator.evaluate_many(population, snapshots)
+        # Raw per-generation metrics below are reported on the first world only.
         evaluation_snapshot = snapshot
         last_evaluation_snapshot = evaluation_snapshot
         #endregion
@@ -275,13 +378,17 @@ def run_genetic_algorithm(config: GAConfig):
 
         world_reset = 0
         if generations_without_improvement >= convergence_threshold:
-            # Regenerate the world
+            # Regenerate the world.  Stagnation-triggered rotation is this
+            # project's version of the "rotation" instance-sampling strategy
+            # that Yang (2025, thesis Sec. 3.6) calls the default in GPHH; the
+            # thesis devotes Chapter 4 to comparing it with other strategies.
             print(f"Convergence detected after {generations_without_improvement} generations without improvement. Regenerating satellites and jobs...")
-            reset_job_limit = initial_job_limit
-            next_world_path = select_world_path(total_resets + 1)
-            satellites, jobs, current_minute, world_seed = build_world(next_world_path, reset_job_limit)
-            print(f"Loaded world '{next_world_path}' for reset (seed={world_seed}).")
-            snapshot = SimulationSnapshot(current_minute, satellites, jobs)
+            first_next = (total_resets + 1) * worlds_per_eval
+            world_pool = build_snapshots(first_next)
+            satellites, jobs, current_minute, snapshot = world_pool[0]
+            snapshots = [entry[3] for entry in world_pool]
+            print(f"Loaded {len(world_pool)} world(s) starting at "
+                  f"'{select_world_path(first_next)}' for reset.")
             total_resets += 1
             inspect_snapshot(
                 snapshot,
@@ -326,6 +433,8 @@ def run_genetic_algorithm(config: GAConfig):
         if print_every > 0 and ((generation + 1) % print_every == 0 or generation == generations - 1):
             print("SCHEDULE SNAPSHOT " + "-" * 50)
             genetic_algorithm.printSchedule()
+            if hasattr(genetic_algorithm, "structuralDiversity"):
+                print(f"Structural diversity: {genetic_algorithm.structuralDiversity():.2f}")
             print("\n")
         #endregion
 
@@ -399,6 +508,14 @@ if __name__ == "__main__":
         "hoist_rate":           "hoist_rate",
         "convergence_threshold": "convergence_threshold",
         "csv_row_limit":        "csv_row_limit",
+        "tournament_size":      "tournament_size",
+        "initial_max_depth":    "initial_max_depth",
+        "internal_crossover_bias": "internal_crossover_bias",
+        "clone_retries":        "clone_retries",
+        "terminal_weighting":   "terminal_weighting",
+        "track_busy_until":     "track_busy_until",
+        "prune_constant_terminals": "prune_constant_terminals",
+        "worlds_per_eval":      "worlds_per_eval",
         "seed":                 "seed",
         "metrics_dir":          "metrics_dir",
         "metrics_prefix":       "metrics_prefix",

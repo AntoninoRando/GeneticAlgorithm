@@ -19,8 +19,13 @@
 				"ms-python.python",
 				"ms-vscode.cpptools",
 				"ms-vscode.cpptools-extension-pack",
-				"ms-vscode.cmake-tools"
-			]
+				"ms-vscode.cmake-tools",
+				"james-yu.latex-workshop"
+			],
+			"settings": {
+				"latex-workshop.latex.autoBuild.run": "onSave",
+				"latex-workshop.view.pdf.viewer": "tab"
+			}
 		}
 	}
 

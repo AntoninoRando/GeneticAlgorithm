@@ -41,7 +41,18 @@ struct Satellite {
     double latency;
     double bandwidth;
     int completedTasks;
-    int cpuBusyUntil;
+
+    /// @brief  Simulation minute until which the satellite's CPU is already
+    ///         committed.  In the data this is always 0 (no backlog at the
+    ///         snapshot).  When FitnessEvaluator::trackBusyUntil is on, the
+    ///         greedy decoder writes the completion minute of the last job it
+    ///         commits here, which makes the `sat.cpuBusyUntil` terminal a
+    ///         live "when is this satellite free?" feature (the same quantity
+    ///         as the instance available time IAT in Sun et al. 2024, Table 2,
+    ///         and as the buffer load CL in Zhang & Yang 2025, Table 2).
+    ///         double, not int: completion minutes are not guaranteed to be
+    ///         whole numbers, and truncating them would blur the feature.
+    double cpuBusyUntil = 0.0;
     int networkBusyUntil;
     double cpuCapacity;
     double networkCapacity;

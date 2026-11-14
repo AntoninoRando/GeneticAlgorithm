@@ -1,0 +1,170 @@
+# Literature notes
+
+Reading notes for `references.bib`, written 2026-10-21. They cover the six papers already in the bibliography and the references they led to. Every new BibTeX entry was checked against Crossref (DOI, authors, venue, pages) or against the paper itself.
+
+## 1. What was read, and how
+
+This was done in two passes. The first used open-access copies found on the web, because I had not yet opened your Google Drive folder. The second read the Drive folder, which contains all six original papers (including the two I could not get legitimately, the fog paper and the DTGPAM journal article), `GeneitProgrammingSEC.pdf` (which is the MTGPER paper) and your `Appunti` notes.
+
+| Bib key | Paper | Where I read it | Coverage |
+|---|---|---|---|
+| `magliarisi2025orbit` | Magliarisi, Casalicchio, Salvatore (2025), *Orbit-aware task scheduling in SEC* | Open-access web version (CC BY). Springer blocks scripted downloads, so there is no local PDF | **Full text** |
+| `icdcs_sc` | Magliarisi, Casalicchio, *Handling of energy- and time-constrained heterogeneous satellite computing services* | Drive: `IEEE_ICDCS_MCS.pdf`, plus Chapter 6 of `magliarisi2026thesis` | **Abstract, contributions, complexity and success-rate sections of the paper**; the rest via the thesis chapter. The PDF carries no author names |
+| `koza1994gp` | Koza (1994) | Author's website, `papers/koza1994gp.pdf` (a Drive copy also exists) | **Full text** (35 pp.) |
+| `mtgp_multicloud` | Sun et al. (2024) | Wellington repository, `papers/sun2024mtgp.pdf` (the Drive copy is the IEEE version) | **Full text** |
+| `dtgpam` | Yang et al. (2025), journal article | Drive PDF, plus Chapter 3 of `yang2025thesis` | **Method: full, via the thesis chapter.** Journal article: contributions, parameter settings, results discussion and conclusions |
+| `gp_fog` | Xu et al. (2023) | Drive PDF | **Abstract, contributions, method (representation and breeding), parameter and results discussion, conclusion.** Related work, simulator and the further-analysis sections were not read in detail |
+| `zhang2025mtgper` | Zhang, Yang (2025), MTGPER | Drive: `GeneitProgrammingSEC.pdf` | **Full text** (figures and most of the reference list not inspected) |
+| `zhang2018mtgp` | Zhang, Mei, Zhang (2018) | Author's homepage, `papers/zhang2018mtgp.pdf` | **Introduction, goals and conclusions** |
+| `nguyen2017gpsurvey` | Nguyen, Mei, Zhang (2017) | Wellington repository, `papers/nguyen2017gpsurvey.pdf` | **Sections 3.3, 5.2 and the conclusions** |
+| `magliarisi2026thesis` | Magliarisi (2026), PhD thesis, Sapienza | Open access | **Chapters 1 and 6**, abstract and publication list |
+| `yang2025thesis` | Yang (2025), PhD thesis, Wellington | Open access | **Chapter 3** (DTGPAM) |
+
+The open-access PDFs are in `thesis/papers/` and are gitignored, so they are not committed. The Drive PDFs were read through the Drive connector and are not copied into the repository. Your `Appunti` document confirms the same reading plan (MTGPER first, then Koza for GP basics, then the three GP-for-workflow papers) and its description of MTGPER matches the paper.
+
+## 2. Summaries
+
+### Satellite edge computing (SEC) scheduling
+
+**`magliarisi2025orbit`**: *Orbit-aware task scheduling in SEC* (Cluster Computing 28, 2025)
+- **Problem.** Ground-user tasks arrive at a LEO constellation. The scheduler must offload each task to a satellite edge node (SEN) and allocate resources there. The objective is the average response time, subject to deadline, memory and storage constraints (Eqs. 6–9).
+- **Model.** Satellite motion comes from SGP4 and Starlink TLE data. A satellite counts as visible while its elevation is at least 40° (the "listening dome"), so each ground user has a "sunset time". Satellites have tens of neighbours within 659 km, not a four-neighbour grid. Each SEN is an M/M/1 non-preemptive priority queue with two priority classes.
+- **Algorithms.** DTS-TMAX is decentralised: each SEN picks the feasible neighbour with the lowest response time, or propagates the search. OrbitAware additionally requires that the response time be shorter than the SEN's remaining visibility. Access points are chosen among satellites approaching the observer. A dynamic-priority scheme moves tasks between the two queue classes using waiting-time thresholds.
+- **Evaluation.** SimPy discrete-event simulation, 40 satellites, 5 access points, service times of 10–50 s, a 600 s horizon, and a 20/80 high/low priority split. Dynamic priority beats static priority on success rate and mean response time. Fewer than 15% of requests finish after sunset under OrbitAware. DTS-TMAX and OrbitAware behave alike unless servers are overloaded.
+- **Relevance to this thesis.** This is the problem, simulator and workload that `problem.tex` builds on. The paper deliberately uses fast heuristics rather than GA/optimisation, because satellite nodes cannot afford expensive decisions (its Related Work).
+
+**`casalicchio2024dts`**: FMEC 2024. The precursor that introduced DTS-TMAX (cited as [15] in the journal paper). Not read; summarised from how the journal paper and the PhD thesis describe it.
+
+**`icdcs_sc`**, read via `magliarisi2026thesis` Ch. 6
+- **Extension.** It adds heterogeneous requests (generic, CPU-intensive, CPU-and-data-intensive, and data-intensive batch traffic), a per-SEN battery budget (a dynamic-voltage-scaling CPU energy model that grows with the cube of CPU frequency, plus 1 W transmission power), and result routing for the downlink.
+- **Methods.** Distributed filter-and-select heuristics (minTime, OrbitAware, DTS variants) are compared with a weighted ILP and a hierarchical ILP (minimise time, then energy). The paper gives the heuristics O(n log n) per request (sorting n neighbours) against O(n^2.5) for the ILP, and explains why it chose heuristics: it prefers them to deep learning, genetic algorithms or optimisation because it needs a small performance footprint that scales with the constellation.
+- **Results.** At λ = 10 req/s DTS-APopt and OrbitAware reach 76.5% and 75.7% success, against 34.7–37.2% for the two ILPs. The ILPs fail mostly on deadlines (79% of failures for the hierarchical ILP, 90.75% for the weighted one) because solving takes too long. The heuristics fail mostly on energy (about 61%). The ILPs give better load balancing and lower per-node energy, while the heuristics create hotspots around the access points. Heuristic selection costs O(|E|) or O(|E| log |E|). Greedy geometric routing beats B.A.T.M.A.N. on time, and B.A.T.M.A.N. finds shorter paths.
+- **Agreement with the thesis.** Your sentence in `related_work.tex` (heuristics better on response time and success rate, ILP better on balancing and energy) matches this.
+- **Inconsistencies.** The thesis calls the paper "submitted to ICDCS 2025", while a GitHub README cites "IEEE MASCOTS 2026". The thesis also lists two author sets for it. The venue and year are therefore still TODO in the bib.
+
+**`magliarisi2026thesis`**: Sapienza PhD thesis (defended 11 May 2026) that bundles all of the above: the DTS framework, orbit-aware scheduling, the heterogeneous/energy chapter and a hybrid routing protocol. Its publication list also mentions an unpublished journal submission (*Offloading and resource allocation in SEC: long-running tasks performance analysis*, ICCK Journal of Systems Scalability). It is open access and the best single source on the simulator.
+
+**Background cited by Magliarisi, added as context**
+- `wang2023satellite`: vision and challenges of satellite computing.
+- `leyva2023sec`: SEC for Earth observation.
+- `han2020taskscheduling`: task scheduling on high-dynamic edge clusters.
+- `wang2021ga`: genetic-algorithm computation offloading for multi-satellite tasks.
+- `vallado2006spacetrack`: the SGP4 reference.
+
+### Genetic programming for scheduling
+
+**`koza1994gp`** is the founding paper. It frames problem solving as a search over programs, represented as trees of functions and terminals, and states the GP loop: random initial population, fitness evaluation, then reproduction and subtree crossover. Closure (every function must accept any value a terminal or function can return) and sufficiency are the preconditions, which is why protected division and similar operators exist. It also introduces automatically defined functions. Examples use populations of 500–10,000 and 51 generations.
+- **Fit with this thesis.** `background.tex` cites it for the GP loop. Its closure requirement is the reason `method.tex` needs protected operators (an inference from the paper, not a claim the paper makes about this project).
+
+**`nguyen2017gpsurvey`** is the main survey of GP hyper-heuristics for scheduling. Its unified framework has these components: meta-algorithm, component to evolve, representation, evaluation model, search mechanism and post-processing. Section 5.2 says there are two ways to evolve several decision rules at once: a richer representation holding multiple rules with custom operators, or cooperative coevolution of several subpopulations. It also advises against evolving every component, because search space and evaluation cost grow. The paper was read in part. It is the best citation for the choice between one tree and several.
+
+**`zhang2018mtgp`** proposes multi-tree GP (MTGP) for dynamic flexible job shop scheduling, evolving a routing rule and a sequencing rule together. It adds a tree-swapping crossover (sMTGP) and compares against cooperative coevolution (CCGP). MTGP and sMTGP give better performance, smaller rules and shorter training than CCGP. This is the source of the MTGP and sMTGP names used in `related_work.tex`, which currently has no citation for them.
+
+**`xiao2022cccgp`**: cooperative-coevolution GP hyper-heuristic for workflow scheduling. Cited by both Sun and Yang as the alternative to multi-tree. Not read.
+
+### Cloud/fog workflow scheduling with GP
+
+**`yang2025thesis` Ch. 3 / `dtgpam`**: DTGPAM
+- **Individual.** Two trees, a VM selection rule (VMSR) and a task selection rule (TSR), evolved as one individual, for deadline-constrained dynamic workflow scheduling in the cloud.
+- **Adaptive mutation.** Two levels. Tree level: a vector `ts = [p_both, p_vmsr, p_tsr]` is derived from a Beta distribution whose parameter α is adjusted by the 1/5 success rule on the mutation success ratio. Terminal level: terminal-weight vectors for each tree are estimated by maximum likelihood (convex optimisation with water-filling) from the best individuals, and a sampling ratio mixes them with uniform sampling.
+- **Results.** Baselines are JIC-FCFS, HEFT-FCFS, plain DTGP and a frequency-weighted DTGP_f. DTGPAM gets the lowest mean cost in about half of 15 test scenarios and is significantly better mainly under loose deadlines (ξ = 12, 18, 24). Under tight deadlines (ξ = 1, 6) it is **not** significantly better than plain DTGP. It is insensitive to the initial α. Evolved rules are interpretable (VMR and LFT dominate the VM rules).
+- **Journal article vs thesis.** The journal paper (Drive copy) has the same contributions and conclusions. Its GP settings are population 1024, 51 generations, one elite, tournament size 7, initial depth 2–6 and maximum depth 8. It reports the same pattern: significantly better under loose deadlines, not under the tightest ones.
+
+**`gp_fog`**: Xu et al., *GP for dynamic workflow scheduling in fog computing*
+- **Problem.** Workflows released by mobile devices can run on the device, an edge server or the cloud, all with limited resources. The objective is makespan. It proposes a new problem model, a new discrete-event simulator, and two decision points: routing (when a task is ready) and sequencing (when a processor is idle).
+- **Method.** Multi-tree GP with two trees per individual (routing and sequencing). Both trees share one terminal set of ten terminals (queue length, queued work and so on). Initialisation is ramped half-and-half, selection is tournament, and breeding uses reproduction, subtree mutation and the tree-swapping crossover of `zhang2018mtgp`.
+- **Results.** Nine scenarios of different scale (30 or 50 workflows, one to three mobile devices). The abstract claims makespan reductions of up to 50%, and the results text says the hand-designed baselines (HEFT and others) were two to three times worse. The paper counts seven baselines in one place and four in another.
+- **Why it matters here.** It is the closest structural match to the routing and queuing split in SEC, and it is the source of the idea that the same terminals can feed both rules.
+
+**`mtgp_multicloud`**: Sun et al.
+- **Contribution.** Three trees per individual: task selection, cloud selection and instance selection. Rule priorities are minimised, so a lower value means higher precedence. There are 22 terminals in four groups (task, workflow, instance, cloud), the function set is {+, −, ×, protected ÷, max, min}, and the objective is total monetary cost under workflow deadlines.
+- **Parameters.** Population 200, 50 generations, ramped half-and-half with depth 2–7, elitism 5, max depth 8, crossover 0.8, mutation 0.15, reproduction 0.05, tournament size 7, terminal selection rate 10%.
+- **Results.** 30 runs per scenario, Friedman and Wilcoxon tests with Bonferroni correction. The 3-tree version beats the hand-designed baselines (DWS, REMSM, RMWS) on cost in every scenario, and beats the 2-tree variant in every Alibaba-trace scenario. In three of the four 20-workflow (scientific) scenarios, 3-tree and 2-tree are not significantly different. The decision time is under 0.02 s per decision point.
+- **Why it matters here.** It is the clearest evidence that adding a decision tree helps only when the problem structure justifies it (an extra selection level), and that the gain grows with problem size.
+
+**`escott2020gphh`, `yang2021budget`, `yang2022dtgp`, `riley2016terminal`, `topcuoglu2002heft`, `arabnejad2019dynamic`**: earlier single-tree GP for cloud workflows (Escott, Yang 2021), the conference version of DTGPAM (Yang 2022), the terminal-weighting and adaptive-mutation idea that DTGPAM generalises (Riley), the HEFT baseline, and a hand-designed dynamic multi-workflow baseline. Cited by Sun or Yang, not read.
+
+### GP for SEC
+
+**`zhang2025mtgper`**: Zhang and Yang, *MTGPER* (Future Generation Computer Systems 166, 2025), read in full
+- **Problem.** Dynamic task scheduling in SEC. Tasks are randomly generated by ground devices (a non-homogeneous Poisson process), offloaded to a primary satellite and up to four neighbours, and the objective is the **task success rate** (fraction finishing before their deadline). There are two decision points: a routing rule that picks a satellite and a queuing rule that orders the satellite's buffer. Satellites are heterogeneous in speed, load and remaining energy, and a failed task is resubmitted.
+- **Method.** Two trees per individual. Crossover does subtree crossover on one tree and swaps the whole other tree (the sMTGP idea). **Elite recombination** is the new part. The n elites in the Hall of Fame are combined in all n² ways, all n² combinations are evaluated, and the best n replace the Hall of Fame. A **behavioural repetition test** in the first 30 generations mutates individuals that rank servers and tasks identically on sample decisions, to keep the population diverse. Elite recombination then runs in generations 31–51. Your `Appunti` and `related_work.tex` describe this correctly.
+- **Terminals and functions.** Eight terminals: NT (tasks in buffer), CL (computing load), RE (remaining energy), CC (computing capability), AT (arrival time), TS (task size), IDDL and RDDL (initial and remaining deadline). The paper says NT, CL, RE and CC make up the routing rule and AT, TS, IDDL and RDDL the queuing rule; its Table 2 also marks some terminals as shared, and its example evolved routing rule uses IDDL. Functions are +, −, ×, protected ÷, max, min.
+- **Settings.** Population 200, 51 generations, ramped half-and-half with depth 1–3, maximum depth 7, crossover 0.8, mutation 0.15, reproduction 0.05, tournament size 2. Each individual's fitness is the mean over 100 simulation runs. 30 independent runs, tested on 30 unseen instances, in six scenarios ⟨simulation clock, arrival rate⟩.
+- **Results.** Against eight hand-designed heuristics (FCFS, HEFT, EDF, MaxMin, MinMin, WMDC, MinTWK, MaxTWK) MTGPER is better in every scenario, for example 0.9374 against 0.9044 for the best baseline in ⟨100, 2.5⟩ and 0.9145 against 0.8388 in ⟨200, 3.5⟩. Against MTGP and sMTGP it is better in all six scenarios by mean, and significant in five of six. In ⟨200, 2.5⟩ the difference from MTGP is not significant. The gains over the other GP methods are small (mean success rate up by roughly 0.2 to 1.2 percentage points) and it runs slightly longer (mean runtime per run of about 5,500–18,000 s across scenarios, a few percent more than MTGP).
+- **Interpretability.** The paper simplifies one evolved routing rule to roughly "fewest tasks, lowest load, highest capability" and one queuing rule to a mix of task size, remaining deadline and arrival time that combines LCFS, EDF and MinMin ideas.
+- **Differences from this thesis's setting.** Its constellation is a Walker star with four neighbours and a 5° minimum elevation, and it has no satellite-visibility (sunset) constraint. This is exactly what Magliarisi et al. model and criticise, so the two papers do not share a model. The objective is success rate, not response time. It cites Yang's dual-tree paper (`yang2022dtgp`) as the "classical MTGP" and `zhang2018mtgp` as sMTGP.
+
+**`zhang2026mtgpft`**: follow-up that adds a learned choice between task resubmission and replication for fault tolerance (abstract-level only; not read).
+
+## 3. How the papers connect
+
+```mermaid
+flowchart LR
+  subgraph SEC[Satellite edge computing]
+    FMEC[casalicchio2024dts<br/>DTS-TMAX] --> ORB[magliarisi2025orbit<br/>orbit-aware]
+    ORB --> ICD[icdcs_sc<br/>heterogeneous + energy + ILP]
+    FMEC & ORB & ICD --> MTH[magliarisi2026thesis]
+    BG[wang2023satellite, leyva2023sec,<br/>han2020, wang2021ga] --> ORB
+    SGP[vallado2006spacetrack<br/>SGP4] --> ORB
+  end
+  subgraph GP[GP for scheduling]
+    KOZA[koza1994gp] --> HH[burke2013, branke2016,<br/>nguyen2017gpsurvey]
+    HH --> MT[zhang2018mtgp<br/>multi-tree]
+    HH --> CC[xiao2022cccgp<br/>coevolution]
+    MT --> FOG[gp_fog<br/>2 trees: route+sequence]
+    MT --> MC[mtgp_multicloud<br/>3 trees]
+    CC --> DT[yang2022dtgp<br/>dual tree]
+    ESC[escott2020gphh<br/>1 tree] --> DT
+    DT --> DTG[dtgpam<br/>adaptive mutation]
+    RIL[riley2016terminal] --> DTG
+  end
+  FOG & MT --> MTGPER[zhang2025mtgper<br/>GP for SEC]
+  ORB -. simulator / problem .-> THIS((This thesis:<br/>single tree, SEC))
+  MTGPER -. closest prior work .-> THIS
+  DTG -. adaptive mutation idea .-> THIS
+  MC -. 3-tree evidence .-> THIS
+```
+
+Three threads tie the papers together.
+
+1. **A single line of SEC work.** Casalicchio and Magliarisi (FMEC 2024) introduced decentralised scheduling. The Cluster Computing paper adds orbital motion and sunset, and the ICDCS-style paper adds heterogeneity, energy and an ILP comparison. The PhD thesis collects all three. Each step keeps the same decision structure, and every algorithm is a hand-written greedy filter-and-select rule.
+
+2. **A single line of GP work.** Koza's tree GP became GP hyper-heuristics (Burke, Branke, Nguyen). For scheduling with more than one decision, there are two designs: multi-tree (Zhang 2018) and cooperative coevolution (Xiao 2022). Cloud workflow scheduling went from one tree (Escott) to two trees (Yang's DTGP, then DTGPAM; Xu's fog work with routing and sequencing) to three (Sun's multi-cloud work, adding cloud selection). Each added tree corresponds to a new decision point in the problem.
+
+3. **The bridge.** `zhang2025mtgper` is the only paper I found that applies GP to SEC. It evolves routing and queuing rules, so it matches the two-rule structure in `related_work.tex`. It does not use the orbit-aware model: its constellation is a four-neighbour grid with no visibility window, which is the assumption Magliarisi et al. remove. Magliarisi's papers in turn mention GAs but not GP, and name small decision cost as the reason for choosing heuristics. This thesis sits between the two: a GP priority function over (task, satellite) pairs, on top of the Magliarisi simulator and its orbit-aware model.
+
+## 4. What this suggests for the thesis
+
+1. **Justify "single tree" with evidence.** Nguyen §5.2 and Sun's 2D/3D comparison are the strongest citations. Sun found the extra tree gave no significant gain on the smallest scenarios and a clear gain on large ones, so a single tree is defensible for a small first study, and MTGPER is the natural future-work comparison.
+2. **Terminal ideas that already exist** (MTGPER's eight terminals are a ready starting point: queue length, load, remaining energy, capability, size and deadlines). Magliarisi's quantities map directly onto candidate terminals: estimated response time, remaining visibility (sunset), queue waiting times for the two priority classes, residual battery, and transmission time. Sun's list (execution cost, earliest available time, slack time to sub-deadline) is a model for how to name and group them. Whether these match the current terminal registry in `method.tex` is for you to check.
+3. **Hyper-parameters.** The papers use population 200 (Sun, MTGPER) or 1024 (Yang), about 50 generations, crossover 0.8 and mutation 0.15 (Sun, MTGPER), elitism 5 (Sun) or 1 (Yang), and tournament size 7 (Sun, Yang) or 2 (MTGPER). Your `method.tex` uses elitism 2, tournament 5, crossover 0.80 and per-node mutation 0.08, so you sit within the range. That is fine, but a sentence explaining the choices would pre-empt a reviewer.
+4. **Adaptive mutation is a concrete future-work item.** DTGPAM's tree-level adaptation does not apply to one tree, but its terminal weighting does, and Yang's results suggest the benefit appears mainly in easier (loose-deadline) regimes, so it should be tested in more than one load regime.
+5. **Possible `related_work.tex` edits** (not applied, since you asked only for the bibliography):
+   - Replace the `\todo` with `\citep{zhang2025mtgper}`. Your description of elite recombination is accurate (checked against the paper).
+   - Cite `\citep{yang2022dtgp}` for plain MTGP and `\citep{zhang2018mtgp}` for sMTGP, which is how MTGPER itself attributes them.
+   - Cite `\citep{xiao2022cccgp,nguyen2017gpsurvey}` for the contrast with cooperative coevolution.
+   - Add a sentence noting that Magliarisi et al. chose heuristics over optimisation or GA for decision cost (`magliarisi2025orbit`, `icdcs_sc`), which is the gap GP can fill: the cost of evolving the heuristic is paid offline.
+   - Cite `\citep{burke2013hyperheuristics,branke2016automated}` in `background.tex` where it introduces GP as a hyper-heuristic.
+
+## 5. Still open
+
+- **`icdcs_sc` venue and year.** Unconfirmed; the Drive PDF carries no author names or venue. Magliarisi's thesis says "submitted to IEEE ICDCS 2025", while a GitHub README cites "IEEE MASCOTS 2026". `booktitle` and `year` still say TODO in the bib.
+- **Not fully read.** The fog paper's related-work, simulator and further-analysis sections, and its parameter table (which did not extract as text). For DTGPAM, the journal article's experiment tables (I read the matching thesis chapter instead).
+- **Entries cited but not read.** `escott2020gphh`, `yang2021budget`, `yang2022dtgp`, `riley2016terminal`, `xiao2022cccgp`, `topcuoglu2002heft`, `arabnejad2019dynamic`, `han2020taskscheduling`, `wang2021ga`, `leyva2023sec`, `wang2023satellite`, `casalicchio2024dts`, `zhang2026mtgpft`, `zhang2021gpbook`, `koza1992book`, `zhang2024jssurvey`, `he2019hadrt`, `chai2023joint`. Their metadata is verified, and their descriptions come from the papers that cite them.
+- **Drive PDFs are not in the repository.** If you want local copies for offline reference, say so and I can download them into `thesis/papers/` (also gitignored).
+
+## 6. Where the papers show up in the code
+
+The C++ headers in `include/scheduler/` carry a *LITERATURE NOTES* comment at
+the top of each file and short citations at each decision (population and
+operator settings, terminal set, feasibility filters, objectives, several
+worlds per evaluation). Seven opt-in options came out of this reading; the
+ablation that tests them is `thesis/experiments/run_ablation.py` and its
+summary is in the project `readme.md` ("GP options taken from the literature").
+Short version: scoring on several worlds and clone retries removed a
+premature-convergence failure mode (16 of 40 baseline runs ended on an FCFS-like
+rule, 0 and 1 of 40 with the options), while tournament size, initial depth,
+crossover bias, terminal weighting, constant-terminal pruning and a live
+availability terminal made no significant difference on this data.
+

@@ -7,3 +7,6 @@
 *.fls
 *.fdb_latexmk
 *.synctex.gz
+
+# Local copies of papers (not redistributed; see literature_notes.md for sources)
+papers/

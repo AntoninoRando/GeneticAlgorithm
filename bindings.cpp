@@ -117,7 +117,40 @@ seed : int, optional
                py::arg("elitismCount") = 2,
                py::arg("maxDepth")     = 7,
                py::arg("hoistRate")    = 0.05,
-               "Initialize the GP population with parameters")
+               py::arg("tournamentSize") = 5,
+               py::arg("initialMaxDepth") = -1,
+               py::arg("internalCrossoverBias") = 0.0,
+               py::arg("cloneRetries") = 0,
+               py::arg("terminalWeighting") = false,
+               py::arg("excludedTerminals") = std::vector<int>{},
+               R"doc(
+Initialize the GP population with parameters.
+
+The first six parameters are the classic GA settings.  The rest are opt-in
+refinements taken from the GP-for-scheduling literature; their defaults
+reproduce the behaviour of earlier versions exactly.
+
+Parameters
+----------
+tournamentSize : int
+    Candidates per tournament.  Larger = stronger selection pressure.
+    (Sun et al. 2024 and Yang et al. 2025 use 7, Zhang & Yang 2025 use 2.)
+initialMaxDepth : int
+    Maximum depth of the initial trees; ``-1`` means ``maxDepth``.  The papers
+    start below the depth cap so that crossover has room to grow trees.
+internalCrossoverBias : float
+    Probability that a crossover point is an operator node (Koza 1994 uses
+    0.9).  ``0`` = uniform over all nodes.
+cloneRetries : int
+    Re-mutation attempts for an offspring identical to a parent or an elite
+    (structural proxy of the repetition test in Zhang & Yang 2025).  ``0`` off.
+terminalWeighting : bool
+    Adaptive terminal weighting for mutation (Yang et al. 2025): terminal
+    probabilities are the maximum-likelihood fit to the best individuals.
+excludedTerminals : list[int]
+    Terminal registry indices that are never drawn, e.g. the constant
+    terminals returned by :py:meth:`FitnessEvaluator.constant_terminals`.
+               )doc")
            .def("solveNextGeneration", &SchedulerGP::solveNextGeneration,
                 // Pure C++/OpenMP work over the opaque population vector; no
                 // Python objects are touched, so the GIL can be released to let
@@ -144,6 +177,22 @@ Get the current population of individuals (mutable reference).
 Element references into it are only valid until the next
 ``solveNextGeneration()`` call (see the warning there).
                 )doc")
+           .def("structuralDiversity", &SchedulerGP::structuralDiversity,
+                "Fraction of the population that is structurally distinct "
+                "(1.0 = all different, 1/N = all clones).")
+           .def_static("solveTerminalWeights", &SchedulerGP::solveTerminalWeights,
+                py::arg("counts"), py::arg("samplingRatio"),
+                R"doc(
+Maximum-likelihood terminal probabilities p_i for observed terminal counts and
+a sampling ratio r (Yang et al. 2025, yang2025thesis section 3.2.4): the
+solution of max sum x_i ln(r p_i + (1-r)/n) on the simplex, found by water
+filling.  Exposed for testing; example: counts [3, 5, 8], r = 0.5 gives
+[1/24, 7/24, 2/3].
+                )doc")
+           .def_static("terminalSamplingRatio", &SchedulerGP::terminalSamplingRatio,
+                py::arg("generation"),
+                "The 'log rev' sampling-ratio schedule 1 - 1/(1 + 2 ln(g+1)), "
+                "capped at 0.9.")
            .def("topIndividuals", &SchedulerGP::topIndividuals,
                 py::arg("k") = 1,
                 "Copies of the best k individuals, best first (safe to hold "
@@ -273,6 +322,14 @@ registry : list[TerminalDef]
     Terminal registry produced by :py:func:`buildTerminalRegistry`.
              )doc")
 
+        .def_readwrite("trackBusyUntil", &FitnessEvaluator::trackBusyUntil,
+            R"doc(
+If ``True`` the decoder keeps ``Satellite.cpuBusyUntil`` up to date (the
+completion minute of the last job placed on the satellite), turning the
+``sat.cpuBusyUntil`` terminal into a live availability feature.  Default
+``False``: that terminal is then constantly 0.
+            )doc")
+
         // ── Weights ───────────────────────────────────────────────────────
         .def_readwrite("weightJobs", &FitnessEvaluator::weightJobs,
             R"doc(
@@ -320,6 +377,31 @@ Notes
 Fitness values are population-relative: the same tree may receive a
 different score in a different generation if the rest of the population
 has changed.
+             )doc")
+
+        .def("evaluate_many",
+             &FitnessEvaluator::evaluateMany,
+             py::arg("population"),
+             py::arg("snaps"),
+             py::call_guard<py::gil_scoped_release>(),
+             R"doc(
+Score every individual on SEVERAL snapshots and write the pooled result into
+each individual's ``fitness`` field.
+
+Completion ratio, mean response time and energy are pooled over the snapshots
+before the population-relative normalisation, so with one snapshot this equals
+:py:meth:`evaluate`.  Training on several worlds at once follows Yang et al.
+2025 (5 training instances per individual per generation) and Zhang & Yang
+2025 (mean of 100 simulations).
+             )doc")
+
+        .def("constant_terminals",
+             &FitnessEvaluator::constantTerminals,
+             py::arg("snap"),
+             R"doc(
+Registry indices of terminals that take the same value for every (job,
+satellite) pair of *snap* and are not updated by the decoder.  Useful as
+``excludedTerminals`` for :py:meth:`SchedulerGP.initialize`.
              )doc")
 
         // ── Debug helper ──────────────────────────────────────────────────

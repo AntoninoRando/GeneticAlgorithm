@@ -55,6 +55,61 @@ using namespace std;
 //
 //  where every term is normalised to [0, 1] across the current population so
 //  that no single dimension dominates due to scale differences.
+//
+//  LITERATURE NOTES  (keys refer to thesis/references.bib; section numbers are
+//  those of the cited papers, see thesis/literature_notes.md)
+//  -------------------------------------------------------------------------
+//  * Decoder = hyper-heuristic.  The tree is applied by a fixed greedy decoder
+//    that produces the schedule; the schedule's quality is the tree's fitness.
+//    That is the "meta-algorithm of scheduling heuristics" of Nguyen et al.
+//    2017 (nguyen2017gpsurvey §3.2) and the simulator-in-the-loop evaluation of
+//    mtgp_multicloud §4.3, zhang2025mtgper §3.1 and gp_fog §V.  Unlike those,
+//    the decoder here is *batch*: it sees every arrived job at once and picks
+//    the globally best (job, satellite) pair each round, instead of reacting to
+//    one decision point at a time (task arrival / processor idle).
+//
+//  * Hard feasibility filters.  A pair is dropped before its score is read if
+//    the satellite would finish after its sunset (`operationalUntil`) or lacks
+//    the energy.  This follows Magliarisi et al.: sunset as a *hard* constraint
+//    rather than a soft preference (magliarisi2026thesis §6.3.1; the
+//    OrbitAware rule of magliarisi2025orbit §5.3 requires the response time to
+//    be below the residual visibility), and the energy-sufficiency test of
+//    icdcs_sc §III-C.  Filtering is better than letting GP learn the rule:
+//    a tree could otherwise schedule a job that can never be delivered.
+//    NOT enforced: the per-job deadline of magliarisi2025orbit Eq. 7 (jobs have
+//    no deadline field).
+//
+//  * Objectives.  Completion ratio plays the role of the *task success rate*
+//    that zhang2025mtgper (§2.2.3, Eq. 18) and magliarisi2025orbit (§7.1) use as
+//    their main metric, but without a deadline test (see above).  Mean response
+//    time (completion - arrival) is the objective of magliarisi2025orbit
+//    (Eq. 6).  Energy follows the budget model of icdcs_sc §II-E.
+//
+//  * Weighted sum with population-relative normalisation.  The papers
+//    optimise ONE objective (success rate in zhang2025mtgper, monetary cost in
+//    mtgp_multicloud and dtgpam, makespan in gp_fog) and so need no weights.
+//    With seconds and joules mixed, Magliarisi's ILP discussion warns that
+//    arbitrarily weighting non-homogeneous metrics often leads to biased
+//    solutions and offers a lexicographic alternative (primary objective
+//    first, second one within a tolerance; magliarisi2026thesis §6.3.2,
+//    Hierarchical ILP), while icdcs_sc normalises each term by a FIXED bound
+//    (energy by the maximum battery, time by the largest response).  Here the
+//    cost terms are min-max normalised across the current population instead,
+//    which needs no bounds but makes fitness non-stationary: it is only
+//    comparable within one generation of one world (main.py relies on this).
+//    A lexicographic fitness is the natural next step if the weights prove hard
+//    to defend.
+//
+//  * Several worlds per evaluation.  The papers never score an individual on a
+//    single instance: dtgpam §V-A evaluates every individual on 5 randomly
+//    drawn training instances per generation (yang2025thesis §3.3.1),
+//    zhang2025mtgper §4.1 averages 100 simulations per individual, and
+//    mtgp_multicloud §5.2 trains on whole scenario sets.  Averaging removes
+//    the incentive to overfit one world.  evaluateMany() provides it.
+//
+//  * Cost.  Fitness evaluation dominates the run time (mtgp_multicloud §4.4:
+//    O(N * n * R) per generation for N decisions, n candidates, rule size R),
+//    so the score cache and the OpenMP loop below are where speed is won.
 // =============================================================================
 
 
@@ -180,12 +235,18 @@ struct Assignment {
 /// @param  snap        Read-only snapshot of the simulation state.
 /// @param  assignments Output: one record per successfully scheduled job.
 /// @param  satStates   Output: energy and timeline per satellite.
+/// @param  trackBusyUntil  When true, the working satellites' `cpuBusyUntil`
+///         is initialised to the snapshot minute and set to each committed
+///         job's completion minute, so the `sat.cpuBusyUntil` terminal reports
+///         when a satellite becomes free (see types.h).  Off by default
+///         because it changes what an existing terminal means.
 // ─────────────────────────────────────────────────────────────────────────────
 inline void greedyDecode(const ExprNode&               tree,
                           const vector<TerminalDef>&    registry,
                           const SimulationSnapshot&     snap,
                           vector<Assignment>&           assignments,
-                          vector<SatState>&             satStates)
+                          vector<SatState>&             satStates,
+                          bool                          trackBusyUntil = false)
 {
     // ── Working state ─────────────────────────────────────────────────────
     // Each individual decoded in the same generation must see an identical,
@@ -207,6 +268,13 @@ inline void greedyDecode(const ExprNode&               tree,
     const vector<Job>& jobs = snap.jobs;
     thread_local vector<Satellite> sats;
     sats = snap.satellites;
+
+    // Live availability terminal (opt-in).  An idle satellite is "free at the
+    // snapshot minute", exactly like satStates[s].freeAtMinute below, so the
+    // terminal and the decoder agree on the satellite's timeline.
+    if (trackBusyUntil)
+        for (auto& sat : sats)
+            sat.cpuBusyUntil = std::max(sat.cpuBusyUntil, snap.currentMinute);
 
     const int nSat = static_cast<int>(sats.size());
     const int nJob = static_cast<int>(jobs.size());
@@ -330,6 +398,10 @@ inline void greedyDecode(const ExprNode&               tree,
         // Advance the satellite's timeline.
         satStates[bestSat].freeAtMinute = completion;
         sats[bestSat].completedTasks   += 1;
+        // Expose it to the tree.  The column refresh further down re-scores the
+        // satellite, so every tree that reads `sat.cpuBusyUntil` (or
+        // `sat.completedTasks`) sees the new state on the next round.
+        if (trackBusyUntil) sats[bestSat].cpuBusyUntil = completion;
 
         // Deduct energy from the working copy so that subsequent iterations
         // of this decoder run see the reduced budget.  This is the key fix:
@@ -370,6 +442,25 @@ inline void greedyDecode(const ExprNode&               tree,
 /// @param  outMeanResp   Mean response time (minutes) of scheduled jobs.
 /// @param  outEnergy     Total energy consumed across all satellites.
 // ─────────────────────────────────────────────────────────────────────────────
+inline void sumObjectives(const vector<Assignment>& assignments,
+                          const vector<SatState>&   satStates,
+                          const vector<Job>&        jobs,
+                          int&                      outScheduled,
+                          double&                   outTotalResponse,
+                          double&                   outEnergy)
+{
+    outScheduled = static_cast<int>(assignments.size());
+
+    outTotalResponse = 0.0;
+    for (const auto& a : assignments) {
+        double arrival    = static_cast<double>(jobs[a.jobIndex].arrivalTime);
+        outTotalResponse += a.completionMinute - arrival;
+    }
+
+    outEnergy = 0.0;
+    for (const auto& ss : satStates) outEnergy += ss.energySpent;
+}
+
 inline void computeRawObjectives(const vector<Assignment>& assignments,
                                   const vector<SatState>&   satStates,
                                   const vector<Job>&        jobs,
@@ -378,22 +469,15 @@ inline void computeRawObjectives(const vector<Assignment>& assignments,
                                   double&                   outMeanResp,
                                   double&                   outEnergy)
 {
-    const int scheduled = static_cast<int>(assignments.size());
+    int    scheduled = 0;
+    double totalResponse = 0.0;
+    sumObjectives(assignments, satStates, jobs, scheduled, totalResponse, outEnergy);
 
     outCompRatio = (totalJobs > 0)
                     ? static_cast<double>(scheduled) / static_cast<double>(totalJobs)
                     : 0.0;
-
-    double totalResponse = 0.0;
-    for (const auto& a : assignments) {
-        double arrival  = static_cast<double>(jobs[a.jobIndex].arrivalTime);
-        totalResponse  += a.completionMinute - arrival;
-    }
     outMeanResp = (scheduled > 0) ? totalResponse / static_cast<double>(scheduled)
                                   : 0.0;
-
-    outEnergy = 0.0;
-    for (const auto& ss : satStates) outEnergy += ss.energySpent;
 }
 
 } // namespace detail
@@ -454,6 +538,14 @@ public:
     ///         Higher values push the GP to prefer energy-efficient assignments.
     double weightEnergy = 0.15;
 
+    /// @brief  Make `sat.cpuBusyUntil` a live terminal: the decoder writes each
+    ///         committed job's completion minute into the satellite it used.
+    ///         Default false (the terminal is then constantly 0, as before).
+    ///         Gives GP the queue-availability signal that is the most used
+    ///         routing feature in zhang2025mtgper (§5.2.2: NT, CL) and the
+    ///         available-time terminals of mtgp_multicloud (Table 2: AAT, IAT).
+    bool trackBusyUntil = false;
+
 
 
     // ── Constructors ──────────────────────────────────────────────────────
@@ -479,16 +571,131 @@ public:
     void evaluate(vector<GPIndividual>& population,
                   const SimulationSnapshot& snap)
     {
+        evaluatePointers(population, {&snap});
+    }
+
+    /// @brief  Score every individual on SEVERAL worlds at once.
+    ///
+    /// The objectives are pooled over the worlds before they are normalised:
+    ///   - completion ratio = jobs scheduled in all worlds / jobs in all worlds,
+    ///   - mean response    = total response of all scheduled jobs / their count,
+    ///   - energy           = total energy over the worlds.
+    /// With one snapshot this is exactly evaluate().  Degenerate snapshots (no
+    /// jobs or no satellites) are skipped; if all are, every fitness is 0.
+    ///
+    /// Why: see the "Several worlds per evaluation" note at the top of this
+    /// file (dtgpam §V-A trains on 5 instances per generation;
+    /// zhang2025mtgper §4.1 averages 100 simulations).  Pooling, rather than
+    /// averaging per-world ratios, keeps a world with many jobs from being
+    /// down-weighted and keeps the "no job scheduled" case well defined.
+    void evaluateMany(vector<GPIndividual>& population,
+                      const vector<SimulationSnapshot>& snaps)
+    {
+        vector<const SimulationSnapshot*> ptrs;
+        ptrs.reserve(snaps.size());
+        for (const auto& sn : snaps) ptrs.push_back(&sn);
+        evaluatePointers(population, ptrs);
+    }
+
+    /// @brief  Registry indices of terminals whose value is the same for every
+    ///         (job, satellite) pair of `snap` AND that the decoder never
+    ///         updates.  Those terminals carry no information for the tree and
+    ///         can be excluded from the search (SchedulerGP's
+    ///         `excludedTerminals`).
+    ///
+    /// `sat.completedTasks` and `sat.remainingEnergy` are written by the
+    /// decoder, and `sat.cpuBusyUntil` is too when trackBusyUntil is on, so
+    /// they are kept even if constant in the snapshot.
+    vector<int> constantTerminals(const SimulationSnapshot& snap) const {
+        vector<int> out;
+        if (snap.jobs.empty() || snap.satellites.empty()) return out;
+        for (int t = 0; t < static_cast<int>(registry_.size()); ++t) {
+            const string& name = registry_[t].name;
+            if (name == "sat.completedTasks" || name == "sat.remainingEnergy") continue;
+            if (trackBusyUntil && name == "sat.cpuBusyUntil") continue;
+            double lo =  numeric_limits<double>::infinity();
+            double hi = -numeric_limits<double>::infinity();
+            for (const auto& j : snap.jobs)
+                for (const auto& sat : snap.satellites) {
+                    const double v = registry_[t].accessor(j, sat);
+                    lo = min(lo, v);
+                    hi = max(hi, v);
+                }
+            if (hi - lo < 1e-12) out.push_back(t);
+        }
+        return out;
+    }
+
+    /// @brief  Evaluate a *single* individual and return its raw (un-normalised)
+    ///         objectives.  Useful for debugging or logging the best individual
+    ///         after evolution ends.
+    ///
+    /// @param  individual      The GP individual to evaluate.
+    /// @param  snap            Simulation snapshot.
+    /// @param  outCompRatio    Output: fraction of jobs scheduled.
+    /// @param  outMeanResp     Output: mean response time (minutes).
+    /// @param  outEnergy       Output: total energy consumed.
+    void evaluateSingle(const GPIndividual&       individual,
+                        const SimulationSnapshot& snap,
+                        double&                   outCompRatio,
+                        double&                   outMeanResp,
+                        double&                   outEnergy) const
+    {
+        validateSnapshot(snap);
+
+        vector<detail::Assignment> assignments;
+        vector<detail::SatState>   satStates;
+
+        detail::greedyDecode(individual.tree,
+                              registry_,
+                              snap,
+                              assignments,
+                              satStates,
+                              trackBusyUntil);
+
+        detail::computeRawObjectives(assignments,
+                                      satStates,
+                                      snap.jobs,
+                                      static_cast<int>(snap.jobs.size()),
+                                      outCompRatio,
+                                      outMeanResp,
+                                      outEnergy);
+    }
+
+    /// @brief  Return the terminal registry held by this evaluator.
+    const vector<TerminalDef>& registry() const { return registry_; }
+
+
+
+private:
+    /// @brief  Shared implementation of evaluate() and evaluateMany().
+    ///
+    /// Step 1 decodes every individual on every usable snapshot and pools the
+    /// raw objectives; steps 2-3 normalise the cost terms across the
+    /// population and write the fitness (unchanged from the single-world
+    /// version).
+    void evaluatePointers(vector<GPIndividual>& population,
+                          const vector<const SimulationSnapshot*>& snaps)
+    {
         const int n = static_cast<int>(population.size());
         if (n == 0) return;
-        if (snap.jobs.empty() || snap.satellites.empty()) {
-            // Degenerate world: define every fitness as 0 instead of leaving
-            // whatever the previous generation (or uninitialised memory)
-            // held — callers sort and select on these values.
+
+        // Keep only usable worlds.  A degenerate one (no jobs or no
+        // satellites) defines every fitness as 0 when it is the only one,
+        // instead of leaving whatever the previous generation (or
+        // uninitialised memory) held: callers sort and select on these values.
+        vector<const SimulationSnapshot*> use;
+        long long totalJobs = 0;
+        for (const SimulationSnapshot* sn : snaps) {
+            if (sn->jobs.empty() || sn->satellites.empty()) continue;
+            validateSnapshot(*sn);
+            use.push_back(sn);
+            totalJobs += static_cast<long long>(sn->jobs.size());
+        }
+        if (use.empty()) {
             for (auto& ind : population) ind.fitness = 0.0;
             return;
         }
-        validateSnapshot(snap);
 
         // ── Step 1: decode every individual ──────────────────────────────
         vector<double> compRatios(n), meanResps(n), energies(n);
@@ -508,19 +715,33 @@ public:
             vector<detail::Assignment> assignments;
             vector<detail::SatState>   satStates;
 
-            detail::greedyDecode(population[i].tree,
-                                  registry_,
-                                  snap,
-                                  assignments,
-                                  satStates);
+            long long scheduledSum = 0;
+            double    responseSum  = 0.0;
+            double    energySum    = 0.0;
 
-            detail::computeRawObjectives(assignments,
-                                          satStates,
-                                          snap.jobs,
-                                          static_cast<int>(snap.jobs.size()),
-                                          compRatios[i],
-                                          meanResps[i],
-                                          energies[i]);
+            for (const SimulationSnapshot* sn : use) {
+                detail::greedyDecode(population[i].tree,
+                                      registry_,
+                                      *sn,
+                                      assignments,
+                                      satStates,
+                                      trackBusyUntil);
+
+                int    scheduled = 0;
+                double response  = 0.0;
+                double energy    = 0.0;
+                detail::sumObjectives(assignments, satStates, sn->jobs,
+                                      scheduled, response, energy);
+                scheduledSum += scheduled;
+                responseSum  += response;
+                energySum    += energy;
+            }
+
+            compRatios[i] = static_cast<double>(scheduledSum) / static_cast<double>(totalJobs);
+            meanResps[i]  = (scheduledSum > 0)
+                                ? responseSum / static_cast<double>(scheduledSum)
+                                : 0.0;
+            energies[i]   = energySum;
         }
 
         // ── Step 2: normalise penalty objectives only ─────────────────────────
@@ -575,47 +796,6 @@ public:
         }
     }
 
-    /// @brief  Evaluate a *single* individual and return its raw (un-normalised)
-    ///         objectives.  Useful for debugging or logging the best individual
-    ///         after evolution ends.
-    ///
-    /// @param  individual      The GP individual to evaluate.
-    /// @param  snap            Simulation snapshot.
-    /// @param  outCompRatio    Output: fraction of jobs scheduled.
-    /// @param  outMeanResp     Output: mean response time (minutes).
-    /// @param  outEnergy       Output: total energy consumed.
-    void evaluateSingle(const GPIndividual&       individual,
-                        const SimulationSnapshot& snap,
-                        double&                   outCompRatio,
-                        double&                   outMeanResp,
-                        double&                   outEnergy) const
-    {
-        validateSnapshot(snap);
-
-        vector<detail::Assignment> assignments;
-        vector<detail::SatState>   satStates;
-
-        detail::greedyDecode(individual.tree,
-                              registry_,
-                              snap,
-                              assignments,
-                              satStates);
-
-        detail::computeRawObjectives(assignments,
-                                      satStates,
-                                      snap.jobs,
-                                      static_cast<int>(snap.jobs.size()),
-                                      outCompRatio,
-                                      outMeanResp,
-                                      outEnergy);
-    }
-
-    /// @brief  Return the terminal registry held by this evaluator.
-    const vector<TerminalDef>& registry() const { return registry_; }
-
-
-
-private:
     /// @brief  Rejects malformed snapshots up front.  In particular a
     ///         non-empty energyPerMinute shorter than the satellite list used
     ///         to be read out of bounds inside the decoder (undefined

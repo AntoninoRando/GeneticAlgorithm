@@ -34,6 +34,42 @@
     In these cases, "priority", "activeTasks", "RemainingEnergy", and 
     "dueMinute" would be terminals in the expression tree, and the tree would 
     combine them using operators like +, -, *, /, etc.
+
+    LITERATURE NOTES  (keys refer to thesis/references.bib; section numbers are
+    those of the cited papers, see thesis/literature_notes.md)
+    ----------------------------------------------------------------------
+    * A tree is a *priority function*, not a schedule.  GP evolves a heuristic
+      that a fixed decoder then applies, which is what makes it a
+      hyper-heuristic (Sun et al. 2024, mtgp_multicloud, §1: "GPHH outputs a
+      heuristic rather than a solution"; Nguyen et al. 2017, nguyen2017gpsurvey,
+      §3.2 "meta-algorithm of scheduling heuristics").  The decision cost at
+      run time is one tree evaluation per candidate: mtgp_multicloud §5.3
+      reports under 0.02 s per decision point.  That cost profile is the
+      reason GP is attractive next to the ILP of Magliarisi & Casalicchio
+      (icdcs_sc, §III-D: O(n log n) heuristics vs O(n^2.5) ILP; the ILP loses
+      on success rate because it exceeds deadlines, §V-C) and next to GA/DRL
+      solvers, which that paper rejects for their decision footprint (§I-B).
+
+    * Sign convention.  Here a HIGHER score means a better (job, satellite)
+      pair.  mtgp_multicloud (§4.2, Fig. 4) and zhang2025mtgper (§3.2.1, Table 1)
+      use the opposite one, "the smaller the priority value, the higher the
+      precedence".  The
+      two are equivalent under negation; only the reading of evolved
+      expressions in the thesis differs.
+
+    * Single tree.  One tree scores (job, satellite) pairs, so the decoder's
+      argmax answers "which job next" and "which satellite" with the same
+      function.  The papers split these into separate rules: routing +
+      queuing (zhang2025mtgper §2.2, gp_fog §VI-A, zhang2018mtgp §3) or task +
+      cloud + instance selection (mtgp_multicloud §4.1).  Nguyen et al.
+      (nguyen2017gpsurvey §5.2) name the two ways to evolve several rules at
+      once (a multi-rule individual with custom operators, or cooperative
+      coevolution) and warn that each added rule enlarges the search space.
+      mtgp_multicloud §5.3-5.4 shows the extra tree paid off only on larger
+      scenarios (no significant gain in 3 of its 4 small scenarios, Table 7),
+      which is the argument for starting with one tree.
+
+    * Closure and protected operators: see tree_builder.h.
 */
 
 
@@ -92,6 +128,11 @@ struct ExprNode {
                 return result;
             }
             case NodeType::DIV: {
+                // Protected division.  The papers return 1 on a zero
+                // denominator (mtgp_multicloud §4.2, zhang2025mtgper §3.2.2);
+                // this project returns 0 (see tree_builder.h for why it was
+                // kept).  The simplifier's exactness argument below relies on
+                // this guard, so changing it means revisiting simplifyInPlace().
                 double denom = children[1].eval(job, sat, registry);
                 double result = (abs(denom) < 1e-9) ? 0.0 : children[0].eval(job, sat, registry) / denom;
                 return result;

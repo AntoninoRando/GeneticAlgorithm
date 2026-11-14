@@ -1,0 +1,19 @@
+{
+    "generations":          5000,
+    "population_size":      100,
+    "max_depth":            4,
+    "hoist_rate":           0.05,
+    "convergence_threshold": 10,
+    "csv_row_limit":        500,
+    "clone_retries":        3,
+    "worlds_per_eval":      3,
+    "metrics_dir":          "metrics",
+    "metrics_prefix":       "",
+    "metrics_flush_every":  1,
+    "collect_metrics":      false,
+    "inspect_snapshots":    false,
+    "save_snapshots":       false,
+    "snapshots_dir":        "snapshots",
+    "snapshots_prefix":     "",
+    "print_every":          1000
+}

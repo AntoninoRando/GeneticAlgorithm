@@ -1,3 +1,7 @@
+% =============================================================================
+% Core references (original six)
+% =============================================================================
+
 @article{magliarisi2025orbit,
   author  = {Magliarisi, Danilo and Casalicchio, Emiliano and Salvatore, Vincenzo},
   title   = {Orbit-aware task scheduling in satellite edge computing},
@@ -8,12 +12,18 @@
   doi     = {10.1007/s10586-025-05663-9}
 }
 
+% Authors come from the publication list of Magliarisi's PhD thesis
+% (magliarisi2026thesis), which says "submitted to IEEE ICDCS 2025". His own
+% reference list there also adds V. Salvatore as a third author and uses the title
+% "Handling heterogeneous satellite computing services with energy and QoS
+% constraints". A third-party GitHub README cites "IEEE MASCOTS 2026" instead.
+% Publication status is unverified; the PDF in Drive has no author/venue metadata.
 @inproceedings{icdcs_sc,
   title     = {Handling of Energy- and Time-constrained Heterogeneous Satellite Computing Services},
-  author    = {{TODO: authors}},
+  author    = {Magliarisi, Danilo and Casalicchio, Emiliano},
   booktitle = {TODO: confirm venue (file name: IEEE\_ICDCS\_MCS)},
   year      = {TODO},
-  note      = {The PDF in Drive has no author or venue metadata}
+  note      = {Unpublished at the time of writing; venue to be confirmed}
 }
 
 @article{koza1994gp,
@@ -21,8 +31,10 @@
   title   = {Genetic programming as a means for programming computers by natural selection},
   journal = {Statistics and Computing},
   volume  = {4},
+  number  = {2},
   pages   = {87--112},
-  year    = {1994}
+  year    = {1994},
+  doi     = {10.1007/BF00175355}
 }
 
 @article{dtgpam,
@@ -56,4 +68,303 @@
   pages   = {2687--2703},
   year    = {2024},
   doi     = {10.1109/TSC.2024.3394691}
+}
+
+% =============================================================================
+% Satellite edge computing: the Magliarisi--Casalicchio line of work
+% (found by reading magliarisi2025orbit and the author's PhD thesis)
+% =============================================================================
+
+% Introduces DTS-TMAX, the decentralised scheduler extended in magliarisi2025orbit.
+@inproceedings{casalicchio2024dts,
+  author    = {Casalicchio, Emiliano and Magliarisi, Danilo},
+  title     = {Decentralized Task Scheduling in Satellite Edge Computing},
+  booktitle = {2024 9th International Conference on Fog and Mobile Edge Computing (FMEC)},
+  pages     = {154--161},
+  publisher = {IEEE},
+  year      = {2024},
+  doi       = {10.1109/FMEC62297.2024.10710288}
+}
+
+% Open access. Chapters 5 and 6 correspond to magliarisi2025orbit and icdcs_sc.
+@phdthesis{magliarisi2026thesis,
+  author  = {Magliarisi, Danilo},
+  title   = {Decentralized and Orbit-Aware Scheduling for Computational Tasks in Satellite Edge Computing},
+  school  = {Sapienza University of Rome},
+  type    = {PhD thesis},
+  year    = {2026},
+  url     = {https://hdl.handle.net/20.500.14242/366216}
+}
+
+@article{wang2023satellite,
+  author  = {Wang, Shangguang and Li, Qing},
+  title   = {Satellite Computing: Vision and Challenges},
+  journal = {IEEE Internet of Things Journal},
+  volume  = {10},
+  number  = {24},
+  pages   = {22514--22529},
+  year    = {2023},
+  doi     = {10.1109/JIOT.2023.3303346}
+}
+
+@article{leyva2023sec,
+  author  = {Leyva-Mayorga, Israel and Martinez-Gost, Marc and Moretti, Marco and P{\'e}rez-Neira, Ana and V{\'a}zquez, Miguel {\'A}ngel and Popovski, Petar and Soret, Beatriz},
+  title   = {Satellite Edge Computing for Real-Time and Very-High Resolution Earth Observation},
+  journal = {IEEE Transactions on Communications},
+  volume  = {71},
+  number  = {10},
+  pages   = {6180--6194},
+  year    = {2023},
+  doi     = {10.1109/TCOMM.2023.3296584}
+}
+
+@inproceedings{han2020taskscheduling,
+  author    = {Han, Jiarong and Wang, Houpeng and Wu, Shaojun and Wei, Junyong and Yan, Lei},
+  title     = {Task Scheduling of High Dynamic Edge Cluster in Satellite Edge Computing},
+  booktitle = {2020 IEEE World Congress on Services (SERVICES)},
+  pages     = {287--293},
+  publisher = {IEEE},
+  year      = {2020},
+  doi       = {10.1109/SERVICES48979.2020.00063}
+}
+
+@inproceedings{wang2021ga,
+  author    = {Wang, Houpeng and Han, Jiarong and Cao, Suzhi and Zhang, Xiaobo},
+  title     = {Computation Offloading Strategy of Multi-satellite Cooperative Tasks Based on Genetic Algorithm in Satellite Edge Computing},
+  booktitle = {2021 International Conference on Space-Air-Ground Computing (SAGC)},
+  pages     = {22--28},
+  publisher = {IEEE},
+  year      = {2021},
+  doi       = {10.1109/SAGC52752.2021.00011}
+}
+
+% The SGP4 orbit propagator used by magliarisi2025orbit.
+@inproceedings{vallado2006spacetrack,
+  author    = {Vallado, David and Crawford, Paul and Hujsak, Richard and Kelso, T. S.},
+  title     = {Revisiting {Spacetrack Report \#3}},
+  booktitle = {AIAA/AAS Astrodynamics Specialist Conference and Exhibit},
+  publisher = {American Institute of Aeronautics and Astronautics},
+  year      = {2006},
+  doi       = {10.2514/6.2006-6753}
+}
+
+% =============================================================================
+% GP-based scheduling for satellite edge computing
+% =============================================================================
+
+@article{zhang2025mtgper,
+  author  = {Zhang, Changzhen and Yang, Jun},
+  title   = {Multi-Tree Genetic Programming with Elite Recombination for dynamic task scheduling of satellite edge computing},
+  journal = {Future Generation Computer Systems},
+  volume  = {166},
+  pages   = {107700},
+  year    = {2025},
+  doi     = {10.1016/j.future.2024.107700}
+}
+
+@article{zhang2026mtgpft,
+  author  = {Zhang, Changzhen and Yang, Jun},
+  title   = {Multi-tree genetic programming for adaptive dynamic fault-tolerant task scheduling of satellite edge computing},
+  journal = {Future Generation Computer Systems},
+  volume  = {175},
+  pages   = {108099},
+  year    = {2026},
+  doi     = {10.1016/j.future.2025.108099}
+}
+
+% =============================================================================
+% Genetic programming and hyper-heuristics for scheduling
+% =============================================================================
+
+@book{koza1992book,
+  author    = {Koza, John R.},
+  title     = {Genetic Programming: On the Programming of Computers by Means of Natural Selection},
+  publisher = {MIT Press},
+  address   = {Cambridge, MA},
+  year      = {1992},
+  isbn      = {978-0-262-11170-6}
+}
+
+@article{burke2013hyperheuristics,
+  author  = {Burke, Edmund K. and Gendreau, Michel and Hyde, Matthew and Kendall, Graham and Ochoa, Gabriela and {\"O}zcan, Ender and Qu, Rong},
+  title   = {Hyper-heuristics: a survey of the state of the art},
+  journal = {Journal of the Operational Research Society},
+  volume  = {64},
+  number  = {12},
+  pages   = {1695--1724},
+  year    = {2013},
+  doi     = {10.1057/jors.2013.71}
+}
+
+@article{branke2016automated,
+  author  = {Branke, J{\"u}rgen and Nguyen, Su and Pickardt, Christoph W. and Zhang, Mengjie},
+  title   = {Automated Design of Production Scheduling Heuristics: A Review},
+  journal = {IEEE Transactions on Evolutionary Computation},
+  volume  = {20},
+  number  = {1},
+  pages   = {110--124},
+  year    = {2016},
+  doi     = {10.1109/TEVC.2015.2429314}
+}
+
+@article{nguyen2017gpsurvey,
+  author  = {Nguyen, Su and Mei, Yi and Zhang, Mengjie},
+  title   = {Genetic programming for production scheduling: a survey with a unified framework},
+  journal = {Complex \& Intelligent Systems},
+  volume  = {3},
+  number  = {1},
+  pages   = {41--66},
+  year    = {2017},
+  doi     = {10.1007/s40747-017-0036-x}
+}
+
+@book{zhang2021gpbook,
+  author    = {Zhang, Fangfang and Nguyen, Su and Mei, Yi and Zhang, Mengjie},
+  title     = {Genetic Programming for Production Scheduling},
+  series    = {Machine Learning: Foundations, Methodologies, and Applications},
+  publisher = {Springer Singapore},
+  year      = {2021},
+  doi       = {10.1007/978-981-16-4859-5}
+}
+
+% --- Multiple decision rules: multi-tree vs cooperative coevolution ---
+
+% Origin of the MTGP and tree-swapping-crossover (sMTGP) variants described in the Related Work chapter.
+@inproceedings{zhang2018mtgp,
+  author    = {Zhang, Fangfang and Mei, Yi and Zhang, Mengjie},
+  title     = {Genetic Programming with Multi-tree Representation for Dynamic Flexible Job Shop Scheduling},
+  booktitle = {AI 2018: Advances in Artificial Intelligence (Australasian Joint Conference on Artificial Intelligence)},
+  series    = {Lecture Notes in Computer Science},
+  volume    = {11320},
+  pages     = {472--484},
+  publisher = {Springer},
+  year      = {2018},
+  doi       = {10.1007/978-3-030-03991-2_43}
+}
+
+@article{xiao2022cccgp,
+  author  = {Xiao, Qin-zhe and Zhong, Jinghui and Feng, Liang and Luo, Linbo and Lv, Jianming},
+  title   = {A Cooperative Coevolution Hyper-Heuristic Framework for Workflow Scheduling Problem},
+  journal = {IEEE Transactions on Services Computing},
+  volume  = {15},
+  number  = {1},
+  pages   = {150--163},
+  year    = {2022},
+  doi     = {10.1109/TSC.2019.2923912}
+}
+
+% --- Dynamic workflow scheduling in the cloud (DTGPAM lineage) ---
+
+@inproceedings{escott2020gphh,
+  author    = {Escott, Kirita-Rose and Ma, Hui and Chen, Gang},
+  title     = {Genetic Programming Based Hyper Heuristic Approach for Dynamic Workflow Scheduling in the Cloud},
+  booktitle = {Database and Expert Systems Applications (DEXA)},
+  series    = {Lecture Notes in Computer Science},
+  volume    = {12392},
+  pages     = {76--90},
+  publisher = {Springer},
+  year      = {2020},
+  doi       = {10.1007/978-3-030-59051-2_6}
+}
+
+@inproceedings{yang2021budget,
+  author    = {Yang, Yifan and Chen, Gang and Ma, Hui and Zhang, Mengjie and Huang, Victoria},
+  title     = {Budget and {SLA} Aware Dynamic Workflow Scheduling in Cloud Computing with Heterogeneous Resources},
+  booktitle = {2021 IEEE Congress on Evolutionary Computation (CEC)},
+  pages     = {2141--2148},
+  publisher = {IEEE},
+  year      = {2021},
+  doi       = {10.1109/CEC45853.2021.9504709}
+}
+
+% Conference version of dtgpam.
+@inproceedings{yang2022dtgp,
+  author    = {Yang, Yifan and Chen, Gang and Ma, Hui and Zhang, Mengjie},
+  title     = {Dual-Tree Genetic Programming for Deadline-Constrained Dynamic Workflow Scheduling in Cloud},
+  booktitle = {Service-Oriented Computing (ICSOC 2022)},
+  series    = {Lecture Notes in Computer Science},
+  pages     = {433--448},
+  publisher = {Springer},
+  year      = {2022},
+  doi       = {10.1007/978-3-031-20984-0_31}
+}
+
+% Open access. Chapter 3 is the full version of dtgpam.
+@phdthesis{yang2025thesis,
+  author  = {Yang, Yifan},
+  title   = {Learning Approaches to Dynamic Workflow Scheduling based on Genetic Programming and Deep Reinforcement Learning},
+  school  = {Victoria University of Wellington},
+  type    = {PhD thesis},
+  year    = {2025},
+  doi     = {10.26686/wgtn.29134007}
+}
+
+@inproceedings{riley2016terminal,
+  author    = {Riley, Michael and Mei, Yi and Zhang, Mengjie},
+  title     = {Improving job shop dispatching rules via terminal weighting and adaptive mutation in genetic programming},
+  booktitle = {2016 IEEE Congress on Evolutionary Computation (CEC)},
+  pages     = {3362--3369},
+  publisher = {IEEE},
+  year      = {2016},
+  doi       = {10.1109/CEC.2016.7744215}
+}
+
+@article{topcuoglu2002heft,
+  author  = {Topcuoglu, Haluk and Hariri, Salim and Wu, Min-You},
+  title   = {Performance-effective and low-complexity task scheduling for heterogeneous computing},
+  journal = {IEEE Transactions on Parallel and Distributed Systems},
+  volume  = {13},
+  number  = {3},
+  pages   = {260--274},
+  year    = {2002},
+  doi     = {10.1109/71.993206}
+}
+
+@article{arabnejad2019dynamic,
+  author  = {Arabnejad, Vahid and Bubendorfer, Kris and Ng, Bryan},
+  title   = {Dynamic multi-workflow scheduling: A deadline and cost-aware approach for commercial clouds},
+  journal = {Future Generation Computer Systems},
+  volume  = {100},
+  pages   = {98--108},
+  year    = {2019},
+  doi     = {10.1016/j.future.2019.04.029}
+}
+
+% =============================================================================
+% Added after reading Zhang & Yang (2025): the survey it cites for GP in
+% scheduling and two manual SEC scheduling heuristics it uses as baselines
+% =============================================================================
+
+@article{zhang2024jssurvey,
+  author  = {Zhang, Fangfang and Mei, Yi and Nguyen, Su and Zhang, Mengjie},
+  title   = {Survey on Genetic Programming and Machine Learning Techniques for Heuristic Design in Job Shop Scheduling},
+  journal = {IEEE Transactions on Evolutionary Computation},
+  volume  = {28},
+  number  = {1},
+  pages   = {147--167},
+  year    = {2024},
+  doi     = {10.1109/TEVC.2023.3255246}
+}
+
+% HADRT: density-of-residual-tasks heuristic for scheduling Earth-observation satellites
+@article{he2019hadrt,
+  author  = {He, Yongming and Chen, Yingwu and Lu, Jimin and Chen, Cheng and Wu, Guohua},
+  title   = {Scheduling multiple agile earth observation satellites with an edge computing framework and a constructive heuristic algorithm},
+  journal = {Journal of Systems Architecture},
+  volume  = {95},
+  pages   = {55--66},
+  year    = {2019},
+  doi     = {10.1016/j.sysarc.2019.03.005}
+}
+
+% WMDC: weighted mean of delay and energy consumption as the task priority
+@article{chai2023joint,
+  author  = {Chai, Furong and Zhang, Qi and Yao, Haipeng and Xin, Xiangjun and Gao, Ran and Guizani, Mohsen},
+  title   = {Joint Multi-Task Offloading and Resource Allocation for Mobile Edge Computing Systems in Satellite {IoT}},
+  journal = {IEEE Transactions on Vehicular Technology},
+  volume  = {72},
+  number  = {6},
+  pages   = {7783--7795},
+  year    = {2023},
+  doi     = {10.1109/TVT.2023.3238771}
 }
