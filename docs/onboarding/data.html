@@ -101,7 +101,10 @@
   <li>Columns listed in <code>_IGNORED_CSV_COLUMNS</code> (task ID, status, start/end time, server name…) are deliberately <strong>not</strong> used as job features. Most of them are <em>outcomes</em> of the simulator's own scheduler and would leak the answer.</li>
 </ul>
 
-<p class="updated">Last checked against the code on 2026-11-14.</p>
+<h2 id="demo">No data yet? Demo mode</h2>
+<p><a href="../../data_processing/demo_data.py"><code>data_processing/demo_data.py</code></a> writes a <strong>synthetic</strong> log with the same columns, <code>data/demo/trace.csv</code> (about 600 tasks, 60 minutes, 12 made-up satellites, Poisson arrivals at 10 per minute), and runs the same splitter on it to get 6 worlds in <code>data/demo/worlds/</code>. <code>main.py --demo</code> trains on those. Steps 2 to 4 above are then exactly the same. The generator is a toy that is not fitted to the real log, so its results must never be reported or compared. Details on <a href="demo.html#demo-mode">giving a demo</a>.</p>
+
+<p class="updated">Last checked against the code on 2026-11-19.</p>
 </main>
 </div>
 </body>

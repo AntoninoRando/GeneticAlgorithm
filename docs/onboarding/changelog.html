@@ -19,6 +19,17 @@
 <h1>Changelog</h1>
 <p class="lede">One dated entry per change to this guide, newest first. Say which pages changed and which code change made them necessary.</p>
 
+<h2>2026-11-19: demo mode and a page on giving a demo</h2>
+<ul>
+  <li><strong>Code change:</strong> new <code>data_processing/demo_data.py</code>, which writes a synthetic task log with the real columns and splits it with the real splitter into <code>data/demo/worlds/</code>; a <code>--demo</code> flag and <code>demo</code> key in <code>main.py</code>; <code>runConfigurations/demo.json</code> (small seeded run, metrics on); new <code>tests/test_demo_data.py</code>. Without <code>--demo</code> nothing changes. No algorithm change: the GP, decoder and fitness are untouched, so no new references.</li>
+  <li><strong>Giving a demo</strong> (new page, in "Start here"): what demo mode does and why its numbers mean nothing, how to prepare, a 30-minute presenter's script through the guide and a live run, and the questions an audience usually asks.</li>
+  <li><strong>Day one:</strong> demo mode in the "No worlds?" box, in the configuration examples and in the flag table; the new test file. Corrected "both shipped configuration files turn metrics off" (<code>demo.json</code> turns them on).</li>
+  <li><strong>Data pipeline:</strong> new section "No data yet? Demo mode".</li>
+  <li><strong>Architecture:</strong> rows for <code>demo_data.py</code> and the new test file; <code>data/demo/</code> in "not in git".</li>
+  <li><strong>Glossary:</strong> two terms (demo mode, Poisson process).</li>
+  <li><strong>Welcome:</strong> a pointer to the new page; the footer now names the latest commit it was checked against (it still said <code>22e4606</code>).</li>
+</ul>
+
 <h2>2026-11-14: depth-aware crossover and mutation (opt-in)</h2>
 <ul>
   <li><strong>Code change:</strong> two options of <code>SchedulerGP.initialize()</code>, <code>depthAwareCrossover</code> and <code>depthAwareMutation</code> (<code>tree_operators.h</code>, <code>scheduler_gp.h</code>, <code>bindings.cpp</code>), the flags <code>--depth-aware-crossover</code> and <code>--depth-aware-mutation</code> in <code>main.py</code>, four configurations in <code>thesis/experiments/run_ablation.py</code>, and a <code>DepthAwareOperators</code> test class. With them the operators never build a tree above the depth cap, instead of building one and returning a copy of the parent. The default operators are unchanged.</li>

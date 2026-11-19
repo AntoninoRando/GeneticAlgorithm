@@ -1,0 +1,15 @@
+{
+    "demo":                  true,
+    "seed":                  1,
+    "generations":           60,
+    "population_size":       60,
+    "max_depth":             4,
+    "hoist_rate":            0.05,
+    "convergence_threshold": 10,
+    "csv_row_limit":         0,
+    "print_every":           20,
+    "collect_metrics":       true,
+    "metrics_prefix":        "demo",
+    "inspect_snapshots":     false,
+    "save_snapshots":        false
+}

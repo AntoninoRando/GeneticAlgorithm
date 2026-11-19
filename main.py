@@ -48,6 +48,14 @@ class GAConfig(TypedDict):
     snapshots_prefix: str
     # Miscellaneous
     print_every: int
+    # Synthetic demo data instead of data/worlds (data_processing/demo_data.py).
+    # For demonstrations only: the numbers it produces mean nothing.
+    demo: bool
+
+
+# Where --demo writes its synthetic trace and worlds.  A module constant so the
+# tests can point it at a temporary directory.
+DEMO_DIR = "data/demo"
 
 
 def default_config() -> GAConfig:
@@ -80,6 +88,7 @@ def default_config() -> GAConfig:
         snapshots_dir="snapshots",
         snapshots_prefix="",
         print_every=50,
+        demo=False,
     )
 
 
@@ -198,6 +207,11 @@ parser.add_argument("--snapshots-prefix", type=str,
 parser.add_argument("--no-start-prompt", action="store_true",
                     help="Start immediately without waiting for Enter.")
 parser.add_argument("--print-every", type=int, help="Print progress every N generations")
+parser.add_argument("--demo", action=argparse.BooleanOptionalAction,
+                    help="Train on SYNTHETIC demo worlds written to data/demo/ instead of "
+                         "data/worlds/, so the program runs without the real simulation log. "
+                         "For demonstrations only: the results mean nothing "
+                         "(see data_processing/demo_data.py). './run demo' uses it.")
 #endregion
 
 
@@ -300,8 +314,15 @@ def run_genetic_algorithm(config: GAConfig):
     # times already normalized relatively (see data_processing.csv_preprocessing).
     # Each GA "world reset" advances to the next world so the population faces a
     # genuinely different scenario rather than a re-sample of a single CSV.
-    world_paths = [str(path) for path in load_world_paths("data/worlds")]
-    if world_paths:
+    if config["demo"]:
+        from data_processing.demo_data import prepare_demo_worlds
+        world_paths = [str(path) for path in prepare_demo_worlds(DEMO_DIR)]
+        print("=" * 72)
+        print(f"DEMO MODE: {len(world_paths)} SYNTHETIC world(s) written to {DEMO_DIR}/.")
+        print("The pipeline is the real one, the data is a toy: do not report or")
+        print("compare these numbers (see data_processing/demo_data.py).")
+        print("=" * 72)
+    elif world_paths := [str(path) for path in load_world_paths("data/worlds")]:
         print(f"Loaded {len(world_paths)} pre-processed world(s) from data/worlds/.")
     else:
         world_paths = ["data/example.csv"]
@@ -569,6 +590,9 @@ def run_genetic_algorithm(config: GAConfig):
     best = max(genetic_algorithm.getPopulation(), key=lambda ind: ind.fitness)
     ratio, resp, energy = fitness_evaluator.evaluate_single(best, last_evaluation_snapshot)
     print(f"Jobs scheduled: {ratio:.0%}  |  Mean response: {resp:.1f} min  |  Energy: {energy:.1f} Wmin")
+    if config["demo"]:
+        print("(DEMO MODE: synthetic data. These numbers show that the pipeline works, "
+              "nothing more.)")
     inspect_snapshot(
         last_evaluation_snapshot,
         generation=generations,

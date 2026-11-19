@@ -82,12 +82,14 @@
 <tr><th>File</th><th>Role</th></tr>
 <tr><td><a href="../../main.py"><code>main.py</code></a></td><td>CLI and configuration layering (<code>resolve_config</code>), world loading, the generation loop, convergence-triggered world switching, metrics and logs.</td></tr>
 <tr><td><a href="../../data_processing/data_factory.py"><code>data_processing/data_factory.py</code></a></td><td>Builds <code>Job</code> and <code>Satellite</code> objects from a world CSV (<code>create_jobs_from_csv</code>, <code>create_satellites_from_csv</code>), plus dummy random generators.</td></tr>
+<tr><td><a href="../../data_processing/demo_data.py"><code>data_processing/demo_data.py</code></a></td><td>Writes a synthetic task log with the real columns and splits it into worlds in <code>data/demo/</code>, for <code>main.py --demo</code>. Demonstrations only: its numbers mean nothing.</td></tr>
 <tr><td><a href="../../data_processing/csv_preprocessing/world_splitter.py"><code>…/csv_preprocessing/world_splitter.py</code></a></td><td>One-off preprocessing: splits the raw log into 10-minute worlds with normalised arrival times.</td></tr>
 <tr><td><a href="../../utils.py"><code>utils.py</code></a></td><td>CSV loading, locale-aware number parsing (<code>"2,17E+10"</code>), and linear <code>_rescale</code>.</td></tr>
 <tr><td><a href="../../metrics_tracker.py"><code>metrics_tracker.py</code></a></td><td><code>GenerationMetrics</code> dataclass and <code>MetricsCollector</code> (CSV, NPZ, PNG).</td></tr>
 <tr><td><a href="../../snapshot_inspector.py"><code>snapshot_inspector.py</code></a>, <a href="../../snapshot_timeline_plot.py"><code>snapshot_timeline_plot.py</code></a></td><td>Print and save snapshots as JSON; plot a snapshot's timeline.</td></tr>
 <tr><td><a href="../../tests/test_paper_features.py"><code>tests/test_paper_features.py</code></a></td><td>Deterministic unittest checks of the literature features.</td></tr>
 <tr><td><a href="../../tests/test_config.py"><code>tests/test_config.py</code></a></td><td>Checks the configuration layering of <code>main.py</code> (defaults, JSON file, typed flags).</td></tr>
+<tr><td><a href="../../tests/test_demo_data.py"><code>tests/test_demo_data.py</code></a></td><td>Checks demo mode: the synthetic log, its worlds, and <code>main.py --demo</code> end to end.</td></tr>
 <tr><td><code>thesis/experiments/</code></td><td><code>run_experiments.py</code> (main study and baselines), <code>run_ablation.py</code> (options vs baseline), <code>make_report.py</code> (LaTeX tables and plots).</td></tr>
 </table></div>
 
@@ -104,7 +106,7 @@
 <h3>What is deliberately not in git</h3>
 <ul>
   <li><strong>The compiled module</strong> (<code>scheduler*.so</code>) and <code>build/</code>: built per machine, stale after any C++ change.</li>
-  <li><strong>The data</strong> (<code>data/</code>): see <a href="running.html#data">Day one, step 2</a>.</li>
+  <li><strong>The data</strong> (<code>data/</code>): see <a href="running.html#data">Day one, step 2</a>. The synthetic demo data in <code>data/demo/</code> is regenerated on every <code>--demo</code> run, so it is not committed either.</li>
   <li><strong>Run outputs</strong> (<code>metrics/</code>, <code>snapshots/</code>).</li>
   <li><strong>Generated documentation</strong> (<code>docs/build</code>, except the linked PDF) and the papers in <code>thesis/papers/</code>.</li>
 </ul>
@@ -129,7 +131,7 @@
   <li><strong>Python references into the population go stale.</strong> <code>getPopulation()</code> returns a live view of the C++ vector. After <code>solveNextGeneration()</code> that vector is replaced, so an individual you saved from before the call points to freed memory. Call <code>getPopulation()</code> again after each generation, as <code>main.py</code> does.</li>
 </ul>
 
-<p class="updated">Last checked against the code on 2026-11-14.</p>
+<p class="updated">Last checked against the code on 2026-11-19.</p>
 </main>
 </div>
 </body>

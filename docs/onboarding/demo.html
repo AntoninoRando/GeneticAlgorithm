@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Giving a Demo</title>
+<link rel="stylesheet" href="assets/style.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css">
+<script defer src="assets/site.js"></script>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.js"></script>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/contrib/auto-render.min.js" onload="onboardingRenderMath()"></script>
+</head>
+<body>
+<div class="layout">
+<aside class="sidebar" id="sidebar"></aside>
+<main class="content">
+
+<div class="eyebrow">Start here</div>
+<h1>Giving a demo</h1>
+<p class="lede">How to show the whole project to someone, live, in about 30 minutes, even on a machine that does not have the real simulation data.</p>
+
+<div class="toc"><strong>On this page</strong>
+<ol>
+  <li><a href="#demo-mode">Demo mode: running without the data</a></li>
+  <li><a href="#prepare">Prepare (10 minutes, the day before)</a></li>
+  <li><a href="#script">The script</a></li>
+  <li><a href="#questions">Questions you will get</a></li>
+</ol></div>
+
+<h2 id="demo-mode">1. Demo mode: running without the data</h2>
+<p>The real input, <code>data/example.csv</code>, is not in git (<a href="data.html">data pipeline</a>). Without it <code>main.py</code> has nothing to train on. <strong>Demo mode</strong> fixes that for demonstrations:</p>
+<pre>./run demo --no-start-prompt          # same as: python3 main.py -c demo --no-start-prompt</pre>
+<p>It does three things:</p>
+<ol>
+  <li><a href="../../data_processing/demo_data.py"><code>data_processing/demo_data.py</code></a> writes a <strong>synthetic</strong> task log, <code>data/demo/trace.csv</code>, with the same columns as the real one: about 600 tasks over 60 minutes on 12 made-up satellites (<code>DEMO-SAT-01</code> … <code>12</code>).</li>
+  <li>The <em>real</em> splitter cuts it into 6 ten-minute worlds in <code>data/demo/worlds/</code>.</li>
+  <li><code>main.py</code> trains on those worlds instead of <code>data/worlds/</code>. Everything from here on is the normal code path: data factory, C++ decoder, fitness, breeding.</li>
+</ol>
+<p>The configuration <a href="../../runConfigurations/demo.json"><code>runConfigurations/demo.json</code></a> asks for a small, seeded run (population 60, depth 4, 60 generations, seed 1), which takes under a second on a laptop. It writes the metrics plot to <code>metrics/demo_metrics.png</code>. Any flag still works on top of it, for example <code>./run demo --generations 300</code>.</p>
+
+<details>
+<summary>How the synthetic log is generated</summary>
+<ul>
+  <li>Each satellite gets a fixed speed, link quality, starting energy, energy drain and typical queue length, drawn once.</li>
+  <li>Arrivals form a <em>Poisson process</em> of 10 tasks per minute, which means the gaps between arrivals are exponentially distributed and independent. A 10-minute world then holds about 100 tasks, like a real one.</li>
+  <li>Each task gets a type, an amount of work and an image size. Execution time = work ÷ speed of the server, transfer time = image size ÷ link quality. The server is drawn at random, so the log does not contain a good schedule to copy.</li>
+  <li>The seed of the data is fixed (<code>DEMO_SEED = 2026</code>), so every machine gets the same demo worlds. <code>--seed</code> only changes the evolution.</li>
+</ul>
+</details>
+
+<div class="callout warn"><span class="callout-title">Demo numbers mean nothing</span>
+<p>The generator is a toy. It is not fitted to the real log and does not model orbits. Its only job is to give every column some variation, and one real pattern (faster servers finish sooner) for the GP to find. Never report, plot or compare results from demo mode, and never choose a parameter with it. The program prints a <code>DEMO MODE</code> banner at the start and a reminder at the end, and the files live in <code>data/demo/</code>, apart from <code>data/worlds/</code>. Show the thesis numbers on the <a href="results.html">results page</a> instead.</p></div>
+
+<h2 id="prepare">2. Prepare (10 minutes, the day before)</h2>
+<ol>
+  <li><strong>Get a Linux environment.</strong> On Windows or macOS, open the repository in VS Code and choose <strong>Reopen in Container</strong> (Docker must be running). The first start builds the module, see <a href="running.html#env">day one</a>.</li>
+  <li><strong>Check it works.</strong> In the container terminal:
+<pre>python3 -c "import scheduler; print(scheduler.build_type, scheduler.optimized)"   # RelWithDebInfo True
+python3 -m unittest discover -s tests
+./run demo --no-start-prompt</pre>
+  The tests should end in <code>OK</code>; without the real data, 13 of them are <em>skipped</em>, which is expected.</li>
+  <li><strong>Open the guide offline-safe.</strong> Open <code>docs/onboarding/index.html</code> in a browser (double-click it; no server needed). The formulas are drawn by KaTeX from a CDN: with no internet they appear as raw LaTeX, so check the room's network, or open each page once beforehand.</li>
+  <li><strong>Have the thesis ready.</strong> <code>thesis/main.pdf</code> has the formal version of everything.</li>
+  <li><strong>If you do have the real data</strong>, put it in <code>data/example.csv</code> and run the splitter (<a href="running.html#data">day one, step 2</a>). Then you can also show a real run, without <code>demo</code>.</li>
+</ol>
+
+<h2 id="script">3. The script</h2>
+<p>Timings are a suggestion. Each step says what to open and what to say.</p>
+<div class="table-wrap"><table>
+<tr><th>Min</th><th>Show</th><th>Say</th></tr>
+<tr><td>0–3</td><td><a href="index.html">Welcome</a>, the loop diagram</td><td>Satellites carry small computers; someone must decide which one runs which job. We do not write that rule by hand: we evolve it. The output is a formula a satellite can evaluate in microseconds.</td></tr>
+<tr><td>3–7</td><td><a href="problem.html">The problem</a></td><td>Jobs, satellites, the hard constraints (sunset, battery) and the three objectives: complete many jobs, finish them fast, use little energy.</td></tr>
+<tr><td>7–11</td><td><a href="gp-basics.html">GP from zero</a></td><td>A formula is a tree. A population of trees, scored, selected, crossed over and mutated, generation after generation.</td></tr>
+<tr><td>11–15</td><td><a href="decoder.html#playground">Decoder playground</a></td><td>Pick a preset formula, press <em>Step</em> a few times: this is how one formula turns into a schedule. Then change the formula and run it to the end to show the score change.</td></tr>
+<tr><td>15–20</td><td>Terminal: <code>./run demo --no-start-prompt</code></td><td>The real program on synthetic data (say so). Point at: the demo banner; <em>New best fitness</em> lines; <em>Convergence detected … Regenerating</em>, the switch to the next world when progress stops; the best tree printed every 20 generations; the final line with jobs scheduled, mean response and energy.</td></tr>
+<tr><td>20–22</td><td><code>metrics/demo_metrics.png</code></td><td>Four panels per generation: best and mean fitness, then the best tree's completion ratio, response time and energy. The dashed vertical lines are world switches. Fitness is relative to the current population and world, so it is not expected to rise smoothly (<a href="quirks.html">known quirks</a>).</td></tr>
+<tr><td>22–24</td><td><a href="architecture.html">Architecture</a>, then <code>python3 -m unittest discover -s tests -v</code></td><td>C++ core for speed, Python for the loop and the data, pybind11 in between. The unit tests check each feature against an independent computation and run on every push in CI.</td></tr>
+<tr><td>24–28</td><td><a href="results.html">Results</a></td><td>The real experiments: evolved rules cut mean response time by about 18% against the best baseline, but do not complete more jobs, and why (the fitness weighting). In the ablation, scoring on 3 worlds at once (<code>--worlds-per-eval 3</code>) is the only option whose gain held on fresh seeds; clone retries helped on the first 20 seeds but not on the next 20. Four newer options are implemented but <em>not measured yet</em>: say so.</td></tr>
+<tr><td>28–30</td><td><a href="theory.html#map">Theory map</a></td><td>Every design choice, the paper behind it, and how well it is supported.</td></tr>
+</table></div>
+
+<div class="callout ok"><span class="callout-title">Tips</span>
+<ul>
+  <li>Show the reproducibility: run <code>./run demo --no-start-prompt</code> twice and point out that the last line is identical. Then add <code>--seed 2</code> and it changes.</li>
+  <li>To show a world switch more often, add <code>--convergence-threshold 5</code>.</li>
+  <li>To show snapshot inspection, add <code>--inspect-snapshots</code>: it prints the jobs and satellites of each world.</li>
+  <li>If <code>metrics/demo_metrics.png</code> is not created, numpy or matplotlib is missing (outside the container): add <code>--disable-metrics</code> and skip that step.</li>
+</ul></div>
+
+<h2 id="questions">4. Questions you will get</h2>
+<dl>
+  <dt>Why not use an exact solver or a hand-made rule?</dt>
+  <dd>Even its simplest special case is NP-hard (<a href="problem.html">the problem</a>, "Why not solve it exactly?"), and a satellite must decide in microseconds (<a href="theory.html#gphh">theory §1</a>). A hand-made rule is one guess; GP searches the space of rules. The hand-made rules are in the results table as baselines.</dd>
+  <dt>Is the demo data real?</dt>
+  <dd>No. It is synthetic, to show the pipeline without the simulator's log. The real numbers are on the results page and in the thesis.</dd>
+  <dt>Why is only about a quarter of the jobs completed?</dt>
+  <dd>Battery energy is the binding constraint: each satellite can afford only one or two jobs (<a href="data.html">data pipeline</a>, "Energy is the binding constraint"). The demo data is set up the same way on purpose.</dd>
+  <dt>How do you know a change is an improvement?</dt>
+  <dd>Several seeds, a train/test split of worlds and a Mann–Whitney test; never a single run (<a href="theory.html#nfl">theory §8</a>).</dd>
+</dl>
+
+<p class="updated">Last checked against the code on 2026-11-19.</p>
+</main>
+</div>
+</body>
+</html>

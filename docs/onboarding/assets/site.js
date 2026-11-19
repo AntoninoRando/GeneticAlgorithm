@@ -10,7 +10,8 @@
   var NAV = [
     { group: "Start here", items: [
       { href: "index.html",         title: "Welcome" },
-      { href: "running.html",       title: "Day one: build & run" }
+      { href: "running.html",       title: "Day one: build & run" },
+      { href: "demo.html",          title: "Giving a demo" }
     ]},
     { group: "Concepts", items: [
       { href: "problem.html",       title: "The scheduling problem" },

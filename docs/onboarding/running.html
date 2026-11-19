@@ -49,7 +49,8 @@
     --csv data/example.csv --output-dir data/worlds --window-minutes 10</pre>
 <p>You now have <code>data/worlds/world_000.csv</code> … <code>world_029.csv</code> and a <code>manifest.json</code>. The <a href="data.html">data pipeline page</a> explains what the splitter does and why.</p>
 <div class="callout"><span class="callout-title">No worlds?</span>
-<p><code>main.py</code> falls back to <code>data/example.csv</code> if <code>data/worlds/</code> is empty, and prints a reminder to run the splitter. If <code>data/example.csv</code> is missing too, it stops with a message that tells you where to put the file. The unit tests that need <code>data/worlds</code> are skipped.</p></div>
+<p><code>main.py</code> falls back to <code>data/example.csv</code> if <code>data/worlds/</code> is empty, and prints a reminder to run the splitter. If <code>data/example.csv</code> is missing too, it stops with a message that tells you where to put the file. The unit tests that need <code>data/worlds</code> are skipped.</p>
+<p>To try the program before the data arrives, use <strong>demo mode</strong>: <code>./run demo --no-start-prompt</code> trains on synthetic worlds written to <code>data/demo/</code>. It runs the real pipeline, but its numbers mean nothing. See <a href="demo.html">giving a demo</a>.</p></div>
 
 <h2 id="build">3. Build the <code>scheduler</code> module</h2>
 <p>From the repository root:</p>
@@ -109,7 +110,8 @@ cmake --build build --target scheduler</pre>
   <li>the command-line flags <strong>you typed</strong>. A typed flag always wins, even if its value equals the built-in default: <code>-c default --generations 200</code> runs 200 generations, not the file's 5000.</li>
 </ol>
 <pre>python3 main.py -c robust --no-start-prompt          <span class="c"># 5000 gens, depth 4, clone retries + 3 worlds</span>
-./run default --generations 10                       <span class="c"># ./run NAME is short for: python3 main.py -c NAME</span></pre>
+./run default --generations 10                       <span class="c"># ./run NAME is short for: python3 main.py -c NAME</span>
+./run demo --no-start-prompt                         <span class="c"># synthetic data, under a second: see giving a demo</span></pre>
 <h3>The flags you will use most</h3>
 <div class="table-wrap"><table>
 <tr><th>Flag</th><th>Default</th><th>Meaning</th></tr>
@@ -126,7 +128,8 @@ cmake --build build --target scheduler</pre>
 <tr><td><code>--depth-aware-crossover</code>, <code>--depth-aware-mutation</code></td><td class="num">off</td><td>Operators that never produce a tree above <code>--max-depth</code>, instead of producing one and falling back to a copy of the parent. Not yet measured (see <a href="evolution.html#depth-aware-crossover">one generation</a>).</td></tr>
 <tr><td><code>--earliest-free-tie-break</code></td><td class="num">off</td><td>Decoder tie-break: equally scored pairs go to the satellite that is free earliest, not the lowest index. Not yet measured (see <a href="decoder.html#ties">decoder &amp; fitness</a>).</td></tr>
 <tr><td><code>--fixed-bounds</code></td><td class="num">off</td><td>Fixed-bound fitness: costs divided by per-world bounds, unscheduled jobs penalised. Makes fitness comparable across generations. Not yet measured (see <a href="decoder.html#fixed-bounds">decoder &amp; fitness</a>).</td></tr>
-<tr><td><code>--disable-metrics</code>, <code>--enable-metrics</code></td><td></td><td>Skip or force the CSV/NPZ/PNG metrics. Both shipped configuration files turn metrics off; <code>--enable-metrics</code> turns them back on.</td></tr>
+<tr><td><code>--disable-metrics</code>, <code>--enable-metrics</code></td><td></td><td>Skip or force the CSV/NPZ/PNG metrics. <code>default.json</code> and <code>robust.json</code> turn metrics off; <code>--enable-metrics</code> turns them back on.</td></tr>
+<tr><td><code>--demo</code></td><td>off</td><td>Train on synthetic worlds in <code>data/demo/</code> instead of <code>data/worlds/</code>, so the program runs without the real data. For demonstrations only (see <a href="demo.html">giving a demo</a>). <code>runConfigurations/demo.json</code> turns it on with a small seeded run.</td></tr>
 <tr><td><code>--no-&lt;option&gt;</code></td><td></td><td>Every on/off option has a negative form (<code>--no-fixed-bounds</code>, <code>--no-terminal-weighting</code>, …) to switch off something a configuration file switched on.</td></tr>
 </table></div>
 <p>Other literature options (<code>--initial-max-depth</code>, <code>--internal-crossover-bias</code>, <code>--terminal-weighting</code>, <code>--track-busy-until</code>, <code>--prune-constant-terminals</code>) are explained on the <a href="evolution.html">generation page</a>. Run <code>python3 main.py --help</code> for the full list.</p>
@@ -147,6 +150,7 @@ cmake --build build --target scheduler</pre>
 <pre>python3 -m unittest discover -s tests -v</pre>
 <p><a href="../../tests/test_paper_features.py"><code>tests/test_paper_features.py</code></a> checks the literature features against independent computations: the terminal-weight solver against the worked example in Yang's thesis, multi-world pooling, the busy-until terminal, seeded reproducibility, depth caps, excluded terminals, clone retries, tournament pressure and the fixed-bound fitness. Run it after every C++ change, together with a short seeded run.</p>
 <p><a href="../../tests/test_config.py"><code>tests/test_config.py</code></a> checks the three configuration layers of step 5 (defaults, file, typed flags) through <code>main.resolve_config()</code>.</p>
+<p><a href="../../tests/test_demo_data.py"><code>tests/test_demo_data.py</code></a> checks demo mode: the synthetic log is reproducible and has the real columns, the splitter and the data factory read it, and <code>main.py --demo</code> runs end to end with the same result for the same seed. It writes to a temporary folder and needs no data.</p>
 <p>Tests that read <code>data/worlds</code> are reported as <em>skipped</em> when the data is missing; the others build small worlds in code. <strong>Continuous integration</strong> (CI, a service that runs checks automatically) does the same on GitHub: <a href="../../.github/workflows/ci.yml"><code>.github/workflows/ci.yml</code></a> builds the module and runs this command on every push and pull request. It has no data, so it runs only the tests that need none.</p>
 
 <h2 id="experiments">8. Re-run the thesis experiments</h2>
@@ -167,7 +171,7 @@ python3 thesis/experiments/run_ablation.py --seeds 20</pre>
   <li>To inspect every variable and step line by line, build <code>Debug</code>: <code>scripts/build-debug.sh</code>, or <code>scripts/debug_cpp.sh</code>, which also starts gdb. Use a small run (<code>--generations 5 --population 20</code>), because it is slow. Rebuild with <code>scripts/build.sh</code> when you are done.</li>
 </ul>
 
-<p class="updated">Last checked against the code on 2026-11-14.</p>
+<p class="updated">Last checked against the code on 2026-11-19.</p>
 </main>
 </div>
 </body>

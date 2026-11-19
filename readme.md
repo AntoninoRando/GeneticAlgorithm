@@ -130,6 +130,14 @@ python3 -m data_processing.csv_preprocessing.world_splitter
 
 This writes `data/worlds/world_000.csv`, ... and `data/worlds/manifest.json` (details in `data_processing/DATA_PIPELINE.md`). Without the data `main.py` stops with a message that repeats these steps.
 
+**No data yet?** Demo mode trains on a synthetic log with the same columns, written to `data/demo/` by `data_processing/demo_data.py` and split by the same splitter:
+
+```shell
+./run demo --no-start-prompt          # = python3 main.py -c demo --no-start-prompt
+```
+
+It goes through the real pipeline, so it is good for showing or trying the program, but the data is a toy: never report or compare its numbers. A presenter's script is in the onboarding guide (`docs/onboarding/demo.html`).
+
 ### Line endings
 
 `.gitattributes` keeps shell scripts (`*.sh`, `run`) in LF on every platform, so a Windows checkout still works inside the Linux dev container. If a script fails with `bash\r: No such file or directory`, your copy predates that file: run `git add --renormalize . && git checkout -- run scripts .devcontainer`.
