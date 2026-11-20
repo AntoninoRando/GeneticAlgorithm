@@ -165,25 +165,71 @@ def download_orbits(dest: str, url: str = CELESTRAK_STARLINK_URL,
                     timeout: float = 600.0) -> Path:
     """Download the current Starlink elements from CelesTrak to ``dest``.
 
-    The request carries no personal data.  The file is written only if the
-    answer looks like an OMM CSV file, so a rate-limit message never replaces
-    a good file.  CelesTrak allows one download per data update (2 hours).
+    The request carries no personal data.  ``dest`` is written only when the
+    whole file arrived, so neither a refusal nor a broken transfer ever
+    replaces a good file.
+
+    CelesTrak allows ONE download per data update (every 2 hours), counted per
+    public IP address, and it counts a transfer that was cut off.  A refusal
+    is HTTP 403 with a text that names the time of the last download; that
+    text is shown.  If the transfer breaks, the complete records received so
+    far are saved next to ``dest`` as ``<name>_incomplete.csv``: usable with
+    ``--orbits``, but only part of the constellation.
     """
+    import urllib.error
+
+    path = Path(dest)
+    others = sorted(p.name for p in path.parent.glob("*.csv")) if path.parent.is_dir() else []
+    fallback = ("\nOrbit files already in " + str(path.parent) + ": " + ", ".join(others)
+                + "\nUse one with:  --orbits " + str(path.parent / others[0])) if others else ""
+
     request = urllib.request.Request(url, headers={"User-Agent": "sec-trace-generator/1.0"})
+    chunks, broken = [], None
     try:
         with urllib.request.urlopen(request, timeout=timeout) as response:
-            body = response.read()
-    except Exception as exc:
+            while True:
+                chunk = response.read(65536)
+                if not chunk:
+                    break
+                chunks.append(chunk)
+    except urllib.error.HTTPError as exc:
+        reason = exc.read(600).decode("utf-8", "replace").strip()
         raise SystemExit(
-            f"Could not download orbital elements from {url}: {exc}\n"
-            "CelesTrak allows one download per data update (every 2 hours). "
-            "Wait, or download the file in a browser and pass it with --orbits."
+            f"CelesTrak refused the download (HTTP {exc.code}). Its answer:\n"
+            + "\n".join("    " + line for line in reason.splitlines())
+            + "\nCelesTrak allows one download per data update (every 2 hours) for each "
+              "public IP address,\nand a download that was cut off counts. Try again after "
+              "the next update: two hours\nafter the time above at the latest." + fallback
         ) from exc
-    if b"OBJECT_NAME" not in body[:200]:
+    except Exception as exc:                 # connection lost, timeout, DNS, ...
+        broken = exc
+    body = b"".join(chunks)
+
+    if broken is None and b"OBJECT_NAME" not in body[:200]:
         raise SystemExit(
             "CelesTrak did not return orbital elements. Its answer was:\n"
-            + body[:300].decode("utf-8", "replace"))
-    path = Path(dest)
+            + body[:300].decode("utf-8", "replace") + fallback)
+
+    # Keep only complete records: every line must have as many fields as the header.
+    lines = body.split(b"\n")
+    fields = lines[0].count(b",") if lines else 0
+    complete = broken is None and body.endswith(b"\n") and lines[-2].count(b",") == fields
+    if not complete:
+        good = [line for line in lines[:-1] if line.count(b",") == fields]
+        detail = f": {broken}" if broken is not None else " (the file ends in the middle of a record)"
+        if b"OBJECT_NAME" in body[:200] and len(good) > 1:
+            partial = path.with_name(path.stem + "_incomplete.csv")
+            path.parent.mkdir(parents=True, exist_ok=True)
+            partial.write_bytes(b"\n".join(good) + b"\n")
+            raise SystemExit(
+                f"The download from CelesTrak broke off{detail}.\n"
+                f"Saved the {len(good) - 1} complete records that arrived to {partial}.\n"
+                "That is only PART of the constellation. You can use it with\n"
+                f"    --orbits {partial}\n"
+                "and say so wherever you report results, or try --download again after "
+                "CelesTrak's next data update (within 2 hours).")
+        raise SystemExit(f"Could not download orbital elements from {url}{detail}." + fallback)
+
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_suffix(path.suffix + ".part")
     tmp.write_bytes(body)

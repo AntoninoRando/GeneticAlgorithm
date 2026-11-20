@@ -153,7 +153,7 @@ This writes `data/realistic/trace.csv`, `data/realistic/worlds/` (150 worlds fro
 Three things to know:
 
 - It is **generated data, not the original log**. Say so wherever you use it, and never mix its results with results on `data/worlds/`.
-- CelesTrak allows one download every two hours. Keep the orbit file: the same file, seed and options give the same trace byte for byte, and `report.json` records the file's SHA-256.
+- CelesTrak allows one download per data update (every two hours) for each public IP address, and a download that was cut off counts. If it answers 403, the generator prints the time of the last download: wait for the next update and run the command once. Keep the orbit file: the same file, seed and options give the same trace byte for byte, and `report.json` records the file's SHA-256.
 - `--walker` uses an idealised constellation instead of a file, for trying the program offline. It is not Starlink: never report its numbers.
 
 The model, its sources and its limits are in the onboarding guide (`docs/onboarding/realistic-data.html`). The original simulator is public as well (`https://github.com/DMagliarisi/COSMOS`, no licence file): running it is the way to get a log in the original format from the original code.

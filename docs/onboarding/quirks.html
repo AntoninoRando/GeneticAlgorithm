@@ -28,6 +28,8 @@
 <h3 id="energy">Energy is the binding constraint</h3>
 <p>Satellite budgets are 14–26 units (<code>_rescale(…, 70, 130) * 0.2</code> in <code>data_factory.py</code>), the energy rate is 1 per minute, and job durations are 6–38 minutes. Each satellite can run one or two jobs; the 300–600-minute sunset almost never matters. That caps \(C\) at about 0.2–0.27 for every method and compresses the differences between rules. If you change the energy model, expect every number in the thesis to move.</p>
 
+<p>The ceiling can be computed: the \(k\) shortest jobs must fit in the total energy of the world. On the generated worlds no rule can exceed \(C = 0.28\), and shortest job first reaches 0.27 (<a href="realistic-data.html#ceiling">Realistic data</a>; <code>run_experiments.py --baselines-only</code> prints it for any set of worlds).</p>
+
 <h3 id="first-fit">Job-only rules pile onto the first satellite</h3>
 <p>The decoder breaks score ties by index. A rule that reads no satellite terminal (93 of the 280 final rules of the main study are the single terminal <code>job.arrivalTime</code>, and the FCFS and shortest-job-first baselines are job-only too) therefore fills satellite 0, then satellite 1, and so on, while later satellites are idle. Which satellite is "first" is just the order of the input file. <strong>Opt-in fix:</strong> <code>--earliest-free-tie-break</code> sends ties to the satellite that is free earliest (<a href="decoder.html#ties">decoder</a>, <a href="theory.html#ties">theory</a>). It is off by default and not yet measured, and under tight batteries it can schedule fewer jobs, so this quirk still describes every number in the thesis.</p>
 

@@ -73,6 +73,50 @@ def mean_metrics(fe, ind, snaps):
     return [st.fmean(x[k] for x in r) for k in range(3)]       # C, R, E
 
 
+def completion_ceiling(snaps):
+    """Bounds on the completion ratio C that ANY rule can reach, from energy alone.
+
+    The decoder accepts job j on satellite s only if rate_s * d_j is at most the
+    remaining energy E_s (d_j = executionTime + transferTime), and then deducts
+    it.  With the default rate of 1, a schedule is therefore a packing of job
+    durations into satellite batteries.  Per world:
+
+      upper     the largest k such that the k shortest jobs fit in the TOTAL
+                energy sum_s E_s (a relaxation: batteries pooled), capped by
+                sum_s floor(E_s / d_min).  No schedule completes more jobs.
+      feasible  the number of jobs placed by first-fit, shortest job first: a
+                real packing, so at least this many can be completed.
+
+    Both ignore the sunset constraint, which makes "upper" still valid and
+    "feasible" exact only when no sunset binds (true for worlds built by
+    data_factory: the window is 300+ and jobs last at most 38).  Returns the
+    two means over the worlds.
+    """
+    upper, feasible = [], []
+    for s in snaps:
+        d = sorted(j.executionTime + j.transferTime for j in s.jobs)
+        caps = [sat.remainingEnergy for sat in s.satellites]
+        if not d or not caps:
+            continue
+        total, k, acc = sum(caps), 0, 0.0
+        for x in d:
+            if acc + x > total:
+                break
+            acc += x
+            k += 1
+        k = min(k, sum(int(c // d[0]) for c in caps))
+        left, done = list(caps), 0
+        for x in d:
+            for i, c in enumerate(left):
+                if x <= c:
+                    left[i] = c - x
+                    done += 1
+                    break
+        upper.append(k / len(d))
+        feasible.append(done / len(d))
+    return st.fmean(upper), st.fmean(feasible)
+
+
 def train(seed, pop, depth, gens, hoist, w, switch, train_s, test_s, ckpt=50):
     ga = SchedulerGP([], [], seed=seed)
     ga.initialize(populationSize=pop, maxDepth=depth, hoistRate=hoist)
@@ -139,6 +183,9 @@ def main():
         print(f"{'baseline':26s} {'C':>7s} {'R':>8s} {'E':>8s}")
         for name, (c, r, e) in base.items():
             print(f"{name:26s} {c:7.3f} {r:8.2f} {e:8.1f}")
+        upper, feasible = completion_ceiling(test_s)
+        print(f"\nEnergy ceiling on C for any rule (see completion_ceiling): at most {upper:.3f}; "
+              f"{feasible:.3f} is reached by packing the shortest jobs first.")
         return
     res = dict(baselines=base, defaults={k: (list(v) if isinstance(v, tuple) else v) for k, v in DEF.items()},
                n_train=len(train_s), n_test=len(test_s),

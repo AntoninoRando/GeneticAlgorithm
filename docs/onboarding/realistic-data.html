@@ -53,9 +53,15 @@ python3 -m data_processing.realistic_trace               <span class="c"># later
   <li><code>visibility.csv</code>: for every topology update and satellite, its elevation, the time left before it sets, and whether it is an access point. Nothing reads it yet (<a href="#limits">limits</a>).</li>
   <li><code>report.json</code>: the settings, the orbit file's name, SHA-256 and epoch, the statistics of every run and the comparison with the thesis. Keep it with any result you report.</li>
 </ul>
-<p>Any worlds directory works with <code>python3 main.py --worlds-dir DIR</code>. The experiment scripts take the same flag: <code>python3 thesis/experiments/run_ablation.py --worlds-dir data/realistic/worlds</code> trains on worlds 0 to 19 and tests on all the others.</p>
+<p>Generated worlds are used only when you ask for them: <code>./run realistic</code>, or <code>--worlds-dir data/realistic/worlds</code> added to any <code>main.py</code> command. Without the flag <code>main.py</code> looks for the original data, and if that is missing it stops with a message that names the generated worlds. Any worlds directory works with <code>python3 main.py --worlds-dir DIR</code>. The experiment scripts take the same flag: <code>python3 thesis/experiments/run_ablation.py --worlds-dir data/realistic/worlds</code> trains on worlds 0 to 19 and tests on all the others.</p>
 <div class="callout"><span class="callout-title">Keep the orbit file</span>
 <p>CelesTrak refreshes its data every two hours and refuses a second download inside that period. More importantly, a new file gives a new trace. Download once, keep <code>data/orbits/starlink.csv</code>, and quote its SHA-256 from <code>report.json</code>.</p></div>
+<h3 id="download-fails">If the download fails</h3>
+<ul>
+  <li><strong>"CelesTrak refused the download (HTTP 403)".</strong> The message repeats CelesTrak's answer, which names the time of the last download. The limit is one download per data update for each public IP address, so a dev container, WSL and Windows on the same machine share it, and so does everyone behind the same router. A download that was cut off counts too. Wait for the next update, at most two hours after the time shown, and run the command once.</li>
+  <li><strong>"The download broke off".</strong> The complete records that arrived are saved as <code>data/orbits/starlink_incomplete.csv</code>, never as <code>starlink.csv</code>. You can generate from them with <code>--orbits</code>, but it is only part of the constellation: fewer satellites in the dome, fewer servers per world. Say so with any result.</li>
+  <li><strong>In the meantime</strong> use an orbit file you already have (<code>--orbits FILE</code>; the message lists the files in <code>data/orbits/</code>), or the worlds already in <code>data/realistic/</code>.</li>
+</ul>
 
 <h2 id="pipeline">How it works</h2>
 <figure>
@@ -216,6 +222,36 @@ python3 -m data_processing.realistic_trace               <span class="c"># later
 
 <p>What is <em>not</em> checked, because the thesis gives only plots: response times, energy per satellite, hop counts, success at other rates and budgets. The thesis reports that load concentrates on the top 3–4 nodes; here the top 4 take 19% of the work, so the generated load is probably more evenly spread than the original.</p>
 
+<h2 id="first-experiment">What to expect when you train on it</h2>
+<h3 id="ceiling">Only about a quarter of the jobs can be scheduled</h3>
+<p>A first run prints something like "Jobs scheduled: 21%". That is not a failure of the formula or of the data. The <a href="data.html">loader</a> gives every satellite a battery of 14 to 26 units (18.7 on average), a job costs its duration in energy, and the median job lasts 8. One satellite therefore pays for two or three jobs, and a world has about 10 satellites for 96 jobs. This is the <a href="quirks.html#energy">energy quirk</a>, and the original worlds behave the same way.</p>
+<p>The limit can be computed. A schedule is a packing of job durations \(d_j\) into batteries \(E_s\), so for any rule the number of scheduled jobs \(k\) satisfies</p>
+$$\sum_{j \in \text{the } k \text{ shortest jobs}} d_j \;\le\; \sum_s E_s .$$
+<p>On the 130 generated test worlds this gives \(C \le 0.280\) for <em>any</em> rule, and packing the shortest jobs first reaches 0.272. <code>run_experiments.py --baselines-only</code> prints both numbers (<code>completion_ceiling</code>). Judge a formula against 0.27, not against 1.</p>
+<p>A run also finishes in a second or two. One formula is scored on one world in about 25 microseconds, because a world is small and the evaluator is parallel C++.</p>
+
+<h3 id="ablation">A first comparison of the existing options</h3>
+<p>Four configurations of <code>run_ablation.py</code>, 10 seeds each, trained on generated worlds 0 to 19 and scored on the other 130 (2026-11-20; results in <code>thesis/experiments/results_ablation_realistic/</code>):</p>
+<pre>python3 thesis/experiments/run_ablation.py --worlds-dir data/realistic/worlds --seeds 10 \
+    --configs baseline,fixed,clones+worlds3,fixed+clones+worlds3 \
+    --out thesis/experiments/results_ablation_realistic</pre>
+<div class="table-wrap"><table>
+<tr><th>Configuration</th><th>\(C\) mean (min–max)</th><th>\(R\)</th><th>\(\mathcal{E}\)</th><th>\(p\) for \(C\) vs default</th></tr>
+<tr><td>Default fitness</td><td class="num">0.256 (0.248–0.264)</td><td class="num">14.37</td><td class="num">166.0</td><td></td></tr>
+<tr><td><code>fixed</code> (<code>--fixed-bounds</code>)</td><td class="num"><strong>0.271</strong> (0.269–0.273)</td><td class="num">15.76</td><td class="num">162.3</td><td class="num">0.0002</td></tr>
+<tr><td><code>clones+worlds3</code></td><td class="num">0.257 (0.219–0.271)</td><td class="num">15.00</td><td class="num">164.5</td><td class="num">0.21</td></tr>
+<tr><td><code>fixed+clones+worlds3</code></td><td class="num"><strong>0.272</strong> (0.271–0.272)</td><td class="num">15.86</td><td class="num">162.1</td><td class="num">0.0002</td></tr>
+<tr><td>Shortest job first (baseline)</td><td class="num">0.272</td><td class="num">17.29</td><td class="num">161.9</td><td></td></tr>
+<tr><td>Ceiling for any rule</td><td class="num">0.272 reached, 0.280 bound</td><td></td><td></td><td></td></tr>
+</table></div>
+<ul>
+  <li><strong>The fixed-bound fitness reaches the ceiling.</strong> Every one of its 10 runs schedules more jobs than every default run (the two samples do not overlap; Mann–Whitney U, \(p = 0.0002\), below 0.001 after a Bonferroni correction for three comparisons). The gain is 0.015 in \(C\), about 6%, which is all the room there is.</li>
+  <li><strong>It pays for this in response time</strong>, 15.8 against 14.4, again in every pair of runs. \(R\) is averaged over the scheduled jobs only, so scheduling more of them raises it. Against shortest job first, which schedules the same number of jobs, its mean \(R\) is 9% lower (15.8 against 17.3).</li>
+  <li><strong>Clone retries with three worlds per evaluation</strong> show no reliable effect on \(C\) here (\(p = 0.21\)).</li>
+</ul>
+<div class="callout warn"><span class="callout-title">How far this goes</span>
+<p>This is generated data from half the constellation, one data seed, and 10 GP seeds. The \(p\)-values use the normal approximation of the script. It says nothing about the original worlds, where the same comparison has still not been run (<a href="results.html">experiments</a>). Repeat it on a complete orbit file and with a second data seed before relying on it.</p></div>
+
 <h2 id="sources">Where every number comes from</h2>
 <p>All defaults are in <a href="../../data_processing/realistic_trace/scenario.py"><code>scenario.py</code></a>, one field each, with its source in a comment. Three sources:</p>
 <ul>
@@ -275,7 +311,7 @@ python3 -m data_processing.realistic_trace               <span class="c"># later
   <li>Name the data: "traces generated with a re-implementation of the simulator of [thesis], on Starlink orbital elements of [date] from CelesTrak, seed 2026". Give the orbit file's SHA-256 and the fitted \(C\).</li>
   <li>The splitter orders worlds by time, so worlds 0–19 are the first 200 seconds of run 0 and the test set is everything after. With 5 runs that means 20 training worlds and 130 test worlds, 120 of them from four runs the GP never saw: a stricter test than the original 20/10 split. Training on worlds from several runs needs a change to <code>N_TRAIN</code> in <code>run_experiments.py</code>.</li>
   <li>Repeat every experiment with several GP seeds and test with the Mann–Whitney U test, as on the <a href="results.html">experiments page</a>. A generator also lets you vary the <em>data</em> seed: do it, and report both.</li>
-  <li>No result obtained on generated data exists yet. Nothing in the thesis may be replaced by one silently.</li>
+  <li>The only results on generated data so far are the <a href="#ablation">first comparison above</a>. They are not in the thesis, and nothing in the thesis may be replaced by a result on generated data silently.</li>
 </ul>
 
 <h2 id="change">Where to change things</h2>

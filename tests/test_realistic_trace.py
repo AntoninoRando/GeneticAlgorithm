@@ -135,6 +135,97 @@ class OrbitFiles(unittest.TestCase):
             orbits.load_orbits(str(path))
 
 
+class _FakeResponse:
+    """Stands in for the object urllib.request.urlopen returns: hands out the
+    given chunks, then either ends or raises (a connection that breaks)."""
+
+    def __init__(self, chunks, error=None):
+        self._chunks, self._error = list(chunks), error
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        return False
+
+    def read(self, size=-1):
+        if self._chunks:
+            return self._chunks.pop(0)
+        if self._error is not None:
+            raise self._error
+        return b""
+
+
+@unittest.skipUnless(HAVE_DEPS, "needs the sgp4 package (pip install sgp4)")
+class DownloadOrbits(unittest.TestCase):
+    """download_orbits without a network: urlopen is replaced by a fake."""
+
+    RECORD = OMM_CSV.splitlines()[1] + "\n"
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self._tmp.cleanup)
+        self.dest = Path(self._tmp.name) / "orbits" / "starlink.csv"
+
+    def download(self, response):
+        from unittest import mock
+        with mock.patch("urllib.request.urlopen", side_effect=response
+                        if isinstance(response, Exception) else None,
+                        return_value=None if isinstance(response, Exception) else response):
+            return orbits.download_orbits(str(self.dest))
+
+    def test_complete_file_is_written(self):
+        body = (OMM_CSV + self.RECORD).encode()
+        path = self.download(_FakeResponse([body[:100], body[100:]]))
+        self.assertEqual(path.read_bytes(), body)
+        self.assertEqual(len(orbits.load_orbits(str(path))), 2)
+        self.assertEqual([p.name for p in path.parent.iterdir()], ["starlink.csv"])
+
+    def test_refusal_shows_the_reason_and_keeps_the_old_file(self):
+        import urllib.error
+        self.dest.parent.mkdir(parents=True)
+        self.dest.write_text(OMM_CSV)
+        reason = (b"GP data has not updated since your last successful\n"
+                  b"download of GROUP=starlink at 2026-11-20 08:49:24 UTC.\n")
+        refusal = urllib.error.HTTPError("https://celestrak.org", 403, "Forbidden", {},
+                                         io.BytesIO(reason))
+        with self.assertRaises(SystemExit) as raised:
+            self.download(refusal)
+        message = str(raised.exception)
+        self.assertIn("HTTP 403", message)
+        self.assertIn("2026-11-20 08:49:24 UTC", message)          # CelesTrak's own words
+        self.assertIn("starlink.csv", message)                     # the file that is still there
+        self.assertEqual(self.dest.read_text(), OMM_CSV)
+
+    def test_broken_transfer_saves_the_complete_records_apart(self):
+        body = (OMM_CSV + self.RECORD + self.RECORD[:40]).encode()  # third record cut off
+        with self.assertRaises(SystemExit) as raised:
+            self.download(_FakeResponse([body], error=ConnectionResetError("reset by peer")))
+        self.assertIn("broke off", str(raised.exception))
+        self.assertIn("PART of the constellation", str(raised.exception))
+        self.assertFalse(self.dest.exists())                       # never passed off as complete
+        partial = self.dest.with_name("starlink_incomplete.csv")
+        self.assertEqual(len(orbits.load_orbits(str(partial))), 2)
+
+    def test_file_that_ends_mid_record_is_not_accepted(self):
+        body = (OMM_CSV + self.RECORD[:40]).encode()                # no error, just short
+        with self.assertRaises(SystemExit) as raised:
+            self.download(_FakeResponse([body]))
+        self.assertIn("middle of a record", str(raised.exception))
+        self.assertFalse(self.dest.exists())
+
+    def test_answer_that_is_not_orbit_data(self):
+        with self.assertRaises(SystemExit) as raised:
+            self.download(_FakeResponse([b"<html>maintenance</html>\n"]))
+        self.assertIn("did not return orbital elements", str(raised.exception))
+        self.assertFalse(self.dest.exists())
+
+    def test_no_connection(self):
+        with self.assertRaises(SystemExit) as raised:
+            self.download(OSError("network unreachable"))
+        self.assertIn("network unreachable", str(raised.exception))
+
+
 @unittest.skipUnless(HAVE_DEPS, "needs the sgp4 package (pip install sgp4)")
 class WalkerEphemeris(unittest.TestCase):
     @classmethod
@@ -534,6 +625,35 @@ class MainOnGeneratedWorlds(unittest.TestCase):
             self.run_main(["--worlds-dir", str(Path(self._tmp.name) / "nothing"),
                            "--generations", "1", "--disable-metrics"])
         self.assertIn("data_processing.realistic_trace", str(raised.exception))
+
+    @unittest.skipIf(os.path.exists("data/example.csv") or os.path.isdir("data/worlds"),
+                     "the original data is present, so main.py never prints this message")
+    def test_no_original_data_points_to_the_generated_worlds(self):
+        # Plain `python3 main.py` must not train on generated data by itself,
+        # but its error has to say where that data is, or how to make it.
+        argv = ["--generations", "1", "--disable-metrics"]
+        old = self.main.REALISTIC_WORLDS_DIR
+        self.addCleanup(setattr, self.main, "REALISTIC_WORLDS_DIR", old)
+
+        self.main.REALISTIC_WORLDS_DIR = str(Path(self._tmp.name) / "none" / "worlds")
+        with self.assertRaises(SystemExit) as raised:
+            self.run_main(argv)
+        self.assertIn("No data found", str(raised.exception))
+        self.assertIn("data_processing.realistic_trace --download", str(raised.exception))
+
+        out_dir = Path(self._tmp.name) / "realistic"
+        generate.generate_trace(orbits.walker_constellation(), str(out_dir),
+                                scenario=Scenario(duration_s=20.0, energy_cpu_hz=4.5e9), runs=1)
+        self.main.REALISTIC_WORLDS_DIR = str(out_dir / "worlds")
+        with self.assertRaises(SystemExit) as raised:
+            self.run_main(argv)
+        message = str(raised.exception)
+        self.assertIn("No data found", message)
+        self.assertIn("2 GENERATED world(s)", message)
+        self.assertIn(f"--worlds-dir {out_dir / 'worlds'}", message)
+        # ... and the flag it names works.
+        self.assertIn("Jobs scheduled:", self.run_main(
+            argv + ["--worlds-dir", str(out_dir / "worlds"), "--print-every", "0"]))
 
 
 if __name__ == "__main__":

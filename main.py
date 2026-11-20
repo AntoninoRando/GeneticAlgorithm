@@ -61,6 +61,12 @@ class GAConfig(TypedDict):
 # tests can point it at a temporary directory.
 DEMO_DIR = "data/demo"
 
+# Where data_processing/realistic_trace writes its worlds.  Never used unless
+# --worlds-dir (or runConfigurations/realistic.json) names it; main.py only
+# mentions it when the original data is missing.  A module constant so the
+# tests can point it at a temporary directory.
+REALISTIC_WORLDS_DIR = "data/realistic/worlds"
+
 
 def default_config() -> GAConfig:
     return GAConfig(
@@ -349,12 +355,30 @@ def run_genetic_algorithm(config: GAConfig):
         # FileNotFoundError from the CSV loader.
         from pathlib import Path
         if not (Path(__file__).resolve().parent / world_paths[0]).is_file():
+            # Generated worlds are never used unless asked for (they are not
+            # the original data), but say that they are there, or how to get
+            # them, instead of leaving the reader with no way forward.
+            generated = load_world_paths(REALISTIC_WORLDS_DIR)
+            if generated:
+                alternative = (
+                    f"\n\nWithout the original trace: {len(generated)} GENERATED world(s) are in "
+                    f"{REALISTIC_WORLDS_DIR}/.\nTrain on them by adding\n"
+                    f"    --worlds-dir {REALISTIC_WORLDS_DIR}\n"
+                    "to your command, or with  ./run realistic --no-start-prompt\n"
+                    "They are generated data, not the original log: say so with any result.")
+            else:
+                alternative = (
+                    "\n\nWithout the original trace, generate realistic worlds from real "
+                    "Starlink orbits:\n"
+                    "    python3 -m data_processing.realistic_trace --download\n"
+                    f"then add  --worlds-dir {REALISTIC_WORLDS_DIR}  to your command "
+                    "(see 'Realistic data' in readme.md).")
             raise SystemExit(
                 "No data found: neither data/worlds/ nor data/example.csv exists.\n"
                 "The simulation trace is not stored in the repository. Copy it to "
                 "data/example.csv, then run\n"
                 "    python3 -m data_processing.csv_preprocessing.world_splitter\n"
-                "to create data/worlds/ (see the Data section of readme.md).")
+                "to create data/worlds/ (see the Data section of readme.md)." + alternative)
         print("No pre-processed worlds in data/worlds/; falling back to "
               "data/example.csv. Run "
               "`python -m data_processing.csv_preprocessing.world_splitter` "
