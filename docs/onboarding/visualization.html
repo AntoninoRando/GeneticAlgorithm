@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The Scheduler in 3D</title>
+<link rel="stylesheet" href="assets/style.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css">
+<script defer src="assets/site.js"></script>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.js"></script>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/contrib/auto-render.min.js" onload="onboardingRenderMath()"></script>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script defer src="assets/formula.js"></script>
+<script defer src="assets/viz3d.js"></script>
+</head>
+<body>
+<div class="layout">
+<aside class="sidebar" id="sidebar"></aside>
+<main class="content">
+
+<div class="eyebrow">Concepts</div>
+<h1>The scheduler in 3D</h1>
+<p class="lede">The Earth, fifteen satellites around it, and one button. Press <strong>Create task</strong> and follow a task from the ground user to the satellite that will run it. Every choice you see is made by the same rule as the C++ decoder.</p>
+
+<div class="stage wide" id="v3-stage">
+  <div class="stage-view" id="v3-view">
+    <canvas id="v3-canvas" tabindex="0" aria-label="3D view: the Earth, fifteen satellites on three orbits, the links between them and the tasks that travel along the links. Drag or use the arrow keys to rotate, plus and minus to zoom. The same information is in the table below."></canvas>
+    <div class="v3-labels" id="v3-labels" aria-hidden="true"></div>
+    <div class="stage-msg" id="v3-msg" role="alert" hidden></div>
+    <button class="btn btn-primary v3-quick" id="v3-create-quick" type="button">Create task</button>
+  </div>
+
+  <div class="hud hud-controls">
+    <div class="row">
+      <button class="btn btn-primary" id="v3-create" type="button">Create task</button>
+      <button class="btn" id="v3-create5" type="button">Create 5</button>
+      <button class="btn" id="v3-new" type="button">New world</button>
+    </div>
+    <label for="v3-preset">Scheduling rule (the formula GP evolves)</label>
+    <select id="v3-preset">
+      <option value="sat.remainingEnergy">Most energy left</option>
+      <option value="-sat.completedTasks">Least-loaded satellite</option>
+      <option value="-(job.executionTime + job.transferTime)">Shortest job first</option>
+      <option value="-job.arrivalTime">FCFS: earliest arrival first</option>
+      <option value="(sat.remainingEnergy /? (job.executionTime + job.transferTime)) - sat.completedTasks">A mixed rule (job and satellite)</option>
+    </select>
+    <label for="v3-expr">Formula (edit it, then press Enter)</label>
+    <input type="text" id="v3-expr" spellcheck="false" autocomplete="off">
+    <div class="status" id="v3-status" role="status"></div>
+    <label class="check"><input type="checkbox" id="v3-auto" checked> Schedule tasks as they arrive</label>
+    <div class="row">
+      <button class="btn" id="v3-step" type="button" disabled>One round</button>
+      <button class="btn" id="v3-run" type="button" disabled>Run decoder</button>
+    </div>
+    <label class="check"><input type="checkbox" id="v3-ef"> Earliest-free tie-break</label>
+    <label class="check"><input type="checkbox" id="v3-orbits" checked> Satellites move</label>
+    <label for="v3-world">Batteries and sunsets</label>
+    <select id="v3-world">
+      <option value="roomy">Roomy: 60–120 energy, sunset at 60–140 min</option>
+      <option value="tight">Like our data: 14–26 energy, sunset at 300–600 min</option>
+    </select>
+  </div>
+
+  <div class="hud hud-stats">
+    <h4>This world so far</h4>
+    <div id="v3-stats"></div>
+  </div>
+
+  <div class="hud hud-log">
+    <h4>What just happened</h4>
+    <div id="v3-log" role="log" aria-live="polite"></div>
+  </div>
+
+  <div class="hud hud-view">
+    <span class="hint">Drag to rotate</span>
+    <button class="btn" id="v3-zoom-out" type="button" aria-label="Zoom out">−</button>
+    <button class="btn" id="v3-zoom-in" type="button" aria-label="Zoom in">+</button>
+    <button class="btn" id="v3-reset-view" type="button">Reset view</button>
+    <button class="btn" id="v3-full" type="button">Full screen</button>
+  </div>
+</div>
+<p class="small muted">Zoom with the − and + buttons, or hold Ctrl (⌘ on a Mac) and scroll. The 3D library (three.js) is loaded from the internet, like the formulas of this guide; offline, the picture is replaced by a message.</p>
+
+<div class="toc"><strong>On this page</strong>
+<ol>
+  <li><a href="#legend">What you are looking at</a></li>
+  <li><a href="#steps">What happens to one task</a></li>
+  <li><a href="#table">What the decoder sees</a></li>
+  <li><a href="#try">Things to try</a></li>
+  <li><a href="#honest">What is real and what is simplified</a></li>
+  <li><a href="#code">Where the code is</a></li>
+</ol></div>
+
+<h2 id="legend">1. What you are looking at</h2>
+<div class="table-wrap"><table>
+<tr><th>On screen</th><th>What it stands for</th><th>In the code</th></tr>
+<tr><td>Yellow dot on the Earth, "Ground user"</td><td>The person who sends computing <strong>tasks</strong>. The code calls a task a <strong>job</strong>.</td><td><code>Job</code> in <a href="../../include/scheduler/types.h"><code>types.h</code></a></td></tr>
+<tr><td>A satellite, named <code>S0</code> … <code>S14</code></td><td>A <a href="glossary.html#sen">satellite edge node (SEN)</a>: a satellite that carries a small computer and can run tasks.</td><td><code>Satellite</code> in <code>types.h</code></td></tr>
+<tr><td>Bar under a satellite's name</td><td>Its <strong>battery</strong>: the energy it has left, \(E_s\). Green, then amber below 35%. A grey satellite cannot take even the shortest task any more.</td><td><code>remainingEnergy</code></td></tr>
+<tr><td>Dashed yellow line; the satellite marked "access point"</td><td>The <a href="glossary.html#access-point">access point</a>: the satellite that is overhead right now. It receives the task and decides where it runs.</td><td>Not modelled: see <a href="#honest">section 5</a></td></tr>
+<tr><td>Thin blue lines between satellites</td><td><a href="glossary.html#isl">Inter-satellite links</a>. A task travels along them, one <a href="glossary.html#hop">hop</a> at a time.</td><td>Only the count: <code>numberOfHops</code></td></tr>
+<tr><td>Glowing dot with a name (<code>T0</code>, <code>T1</code>, …)</td><td>A task on its way. Under the access point it is <strong>waiting</strong>. The coloured line ahead of it is the route it will fly.</td><td>An unscheduled job of the snapshot</td></tr>
+<tr><td>Numbers that appear above every satellite</td><td>The <strong>score</strong> the formula gives to (this task, that satellite). The winner is yellow. "✕ energy" or "✕ sunset" means the pair is not allowed.</td><td>The score matrix of <code>greedyDecode</code></td></tr>
+<tr><td>Small cubes stacked on a satellite</td><td>The tasks that satellite has accepted, in order: its <strong>queue</strong>.</td><td><code>completedTasks</code>, and the list of assignments</td></tr>
+</table></div>
+
+<h2 id="steps">2. What happens to one task</h2>
+<ol>
+  <li><strong>The task is created.</strong> It gets an arrival minute \(a_j\), an execution time \(e_j\) (5 to 30 minutes of computing) and a transfer time \(t_j\) (1 to 8 minutes to move its data). Its <strong>duration</strong> is \(d_j = e_j + t_j\).</li>
+  <li><strong>It flies up to the access point</strong> and waits there.</li>
+  <li><strong>Feasibility.</strong> For every satellite \(s\), two hard rules are checked. \(f_s\) is the minute at which the satellite is free, \(\omega_s\) its <a href="glossary.html#operational-until">sunset</a>, \(E_s\) its energy left, and \(\rho_s = 1\) its energy use per minute:
+  $$f_s + d_j \le \omega_s \quad\text{(finish before sunset)} \qquad\text{and}\qquad \rho_s\, d_j \le E_s \quad\text{(enough energy)}$$
+  A satellite that fails one of them shows "✕" and is out, whatever its score would be.</li>
+  <li><strong>Scoring.</strong> The formula in the box is evaluated for every pair that is left. This formula is the thing <a href="gp-basics.html">genetic programming</a> evolves; here you choose it by hand. The pair with the <strong>highest</strong> score wins:
+  $$(j^*, s^*) = \arg\max_{\text{feasible } (j,\,s)} \ \text{formula}(j, s)$$
+  With several tasks waiting, the formula chooses the task <em>and</em> the satellite at once.</li>
+  <li><strong>Commit.</strong> The task starts when the satellite is free and ends \(d_j\) minutes later. The satellite's state changes: \(f_{s^*} \leftarrow f_{s^*} + d_{j^*}\) and \(E_{s^*} \leftarrow E_{s^*} - \rho_{s^*} d_{j^*}\). Its battery bar shrinks.</li>
+  <li><strong>The task hops</strong> from the access point to the chosen satellite and joins its queue.</li>
+  <li><strong>If no pair is feasible, the decoder stops.</strong> Every task still waiting is <strong>rejected</strong>: it turns red and falls back to the ground. A rejected task lowers the completion ratio \(C\).</li>
+</ol>
+<p>Steps 3 to 5 and step 7 are one <strong>round</strong> of the greedy <a href="decoder.html">decoder</a>, <code>detail::greedyDecode</code> in <a href="../../include/scheduler/fitness_evaluator.h"><code>fitness_evaluator.h</code></a>. The <a href="decoder.html#playground">decoder playground</a> shows the same rounds as a table, on a world small enough to check by hand.</p>
+<p>The panel "This world so far" shows the three objectives of the <a href="problem.html#maths">problem page</a>: the completion ratio \(C\) (scheduled tasks ÷ tasks decided so far, that is scheduled plus rejected), the mean response time \(R\) (end minute − arrival minute, over scheduled tasks) and the energy spent \(\mathcal{E}\). It does not show a <a href="glossary.html#fitness">fitness</a>, because the fitness compares one formula with the rest of a population, and here there is only one formula.</p>
+
+<h2 id="table">3. What the decoder sees</h2>
+<p>The picture is for you. The decoder only reads these numbers. The table is refreshed at every decision.</p>
+<p id="v3-decision" class="small"></p>
+<div class="table-wrap"><table id="v3-sats"></table></div>
+<p class="small muted">Outlined cell: the winning score. Struck-through score: the pair was not feasible, so its score was never compared. "Free at" is \(\max(f_s, \tau)\), where \(\tau\) is the current world minute.</p>
+
+<h2 id="try">4. Things to try</h2>
+<div class="callout try"><span class="callout-title">Five small experiments</span>
+<ul>
+  <li><strong>Follow one task.</strong> Press <em>Create task</em> once and read the log line: which satellite won, with which score, and how many hops the task flew.</li>
+  <li><strong>Empty the batteries.</strong> Keep pressing <em>Create 5</em>. The bars shrink, satellites turn grey, and at some point tasks come back red. Then choose "Like our data" under <em>Batteries and sunsets</em>: with the energy of the real worlds a satellite can pay for one or two tasks only. This is why the completion ratio is low in our experiments (<a href="quirks.html#energy">energy is the binding constraint</a>).</li>
+  <li><strong>See the pile-up.</strong> Go back to "Roomy", choose <em>Shortest job first</em> and create ten tasks, one at a time. They queue on <code>S0</code> until it cannot take another one, then on <code>S1</code>, while thirteen satellites stay idle. The formula reads the task only, so every satellite gets the same score, and a tie goes to the lowest satellite number. Now tick <em>Earliest-free tie-break</em>, press <em>New world</em> and repeat: each task goes to a satellite that is free, and the mean response time (R) drops (<a href="decoder.html#ties">ties</a>).</li>
+  <li><strong>See the batch.</strong> Untick <em>Schedule tasks as they arrive</em>, press <em>Create 5</em>, wait until five tasks hang under the access point, then press <em>One round</em> five times. With <em>Shortest job first</em> the shortest task leaves first, not the oldest one. The formula picks the task too.</li>
+  <li><strong>Write a rule.</strong> Type <code>sat.remainingEnergy - 3 * sat.completedTasks</code> and press Enter. Does it spread the tasks better than <em>Most energy left</em>? Compare \(C\) and \(R\) after 40 tasks. Reload the page before each rule: both then start from world 1 and get the same 40 tasks.</li>
+</ul></div>
+
+<h2 id="honest">5. What is real and what is simplified</h2>
+<p>The picture adds things that the program does not have, and leaves things out. Know which is which before you explain the project with it.</p>
+<div class="table-wrap"><table>
+<tr><th>In this view</th><th>In the real program</th></tr>
+<tr><td><strong>Same:</strong> the two feasibility rules, "highest score wins", both tie-breaks, the commit, and "stop when nothing is feasible".</td><td>The script replays the worked examples of the decoder page and gets the same schedules (<a href="#code">section 6</a>).</td></tr>
+<tr><td>Tasks arrive one by one, and the decoder runs a round whenever a task is waiting.</td><td>The decoder gets a <a href="glossary.html#snapshot">snapshot</a>: about 100 tasks, all waiting at the same minute \(\tau\), decoded in one go. Untick <em>Schedule tasks as they arrive</em> to get closer to that.</td></tr>
+<tr><td>The formula is chosen by you and never changes.</td><td>GP breeds 100 formulas for hundreds of generations and keeps the best (<a href="evolution.html">one generation</a>). This page shows what <em>one</em> formula does. To watch evolution, run <code>./run demo</code> (<a href="demo.html">giving a demo</a>).</td></tr>
+<tr><td>Satellites fly on three orbits; the access point is the nearest one above the horizon; the route is the path with the fewest hops.</td><td>None of this exists in the decoder. Positions, links and routes are <strong>not</strong> simulated. A job only carries a number, <code>numberOfHops</code>, taken from the log.</td></tr>
+<tr><td>The flight of a task takes about a second per hop.</td><td>There is no flight. The transfer time \(t_j\) is part of the duration \(d_j\), and it is the same on every satellite.</td></tr>
+<tr><td>Sunset is a number in the table. It is not tied to where the satellite is on screen.</td><td>The same: <code>operationalUntil</code> is a number in the data (<a href="data.html">data pipeline</a>).</td></tr>
+<tr><td>15 satellites; "roomy" batteries of 60–120 units and sunsets at 60–140 minutes, so that both rules show up within a minute of clicking.</td><td>About 100 jobs per world; batteries of 14–26 units and sunsets at 300–600 minutes ("Like our data").</td></tr>
+<tr><td>8 inputs for the formula.</td><td>18 terminals (<code>registry.h</code>).</td></tr>
+<tr><td>Orbits are drawn at 1.55 Earth radii, and one lap takes 90 seconds.</td><td>Not modelled. A real low orbit is at about 1.09 Earth radii, too close to the ground to draw clearly.</td></tr>
+<tr><td>Nothing ever finishes: a queue only grows, and batteries do not recharge.</td><td>The same. The decoder plans start and end minutes; it does not play them. Press <em>New world</em> for fresh satellites.</td></tr>
+</table></div>
+<div class="callout warn"><span class="callout-title">The numbers on this page mean nothing</span>
+<p>The worlds are made up, like those of <a href="glossary.html#demo-mode">demo mode</a>. Use the view to understand and to explain, never to compare rules or to choose a parameter. Real comparisons need the held-out worlds, several seeds and a statistical test (<a href="results.html">experiments</a>).</p></div>
+
+<h2 id="code">6. Where the code is</h2>
+<ul>
+  <li><a href="assets/viz3d.js"><code>docs/onboarding/assets/viz3d.js</code></a>. Part 1, <em>MODEL</em>, mirrors the selection and commit blocks of <code>detail::greedyDecode</code>. Part 2, <em>SCENE</em>, only draws.</li>
+  <li><a href="assets/formula.js"><code>docs/onboarding/assets/formula.js</code></a>: the formula parser, shared with the decoder playground.</li>
+  <li><strong>Self-test.</strong> Open the browser console (F12) on this page and run <code>Viz3D.selfTest()</code>. It decodes the worked example and the tie-break examples of the <a href="decoder.html">decoder page</a> and must answer <code>ok: true</code>. Run it after any change to part 1.</li>
+  <li>If you change the decoder in C++, change part 1 of <code>viz3d.js</code>, the self-test and this page in the same commit (<a href="where-to-start.html">where do I start</a>).</li>
+</ul>
+
+<p class="updated">Last checked against the code on 2026-11-20.</p>
+</main>
+</div>
+</body>
+</html>

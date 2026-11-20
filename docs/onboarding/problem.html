@@ -22,6 +22,7 @@
 <h2>The real-world setting</h2>
 <p><strong>Satellite edge computing (SEC)</strong> puts small computers on satellites in <strong>low Earth orbit (LEO)</strong>, a few hundred kilometres up. Instead of sending raw data down to a data centre, the satellites process it themselves (<a href="references.html#leyva2023sec">leyva2023sec</a>, <a href="references.html#wang2023satellite">wang2023satellite</a>).</p>
 <p>A ground user sends a <strong>task</strong> (we call it a <strong>job</strong> in the code) to an <strong>access point</strong>, a satellite currently overhead. The access point decides which satellite in its neighbourhood runs the job. In the research our data comes from, each of these satellites is called a <strong>satellite edge node (SEN)</strong> (<a href="references.html#magliarisi2025orbit">magliarisi2025orbit</a>).</p>
+<p>The page <a href="visualization.html">The scheduler in 3D</a> draws exactly this: a ground user, an access point, the satellites around it, and a task that travels to the satellite chosen for it.</p>
 <p>Two things make this hard:</p>
 <ul>
   <li><strong>Satellites move.</strong> A LEO satellite is visible from a point on the ground for only a few minutes. After its <strong>sunset</strong> it can no longer return results to that user. A job must finish before then.</li>

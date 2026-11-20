@@ -19,6 +19,18 @@
 <h1>Changelog</h1>
 <p class="lede">One dated entry per change to this guide, newest first. Say which pages changed and which code change made them necessary.</p>
 
+<h2>2026-11-20: the scheduler in 3D</h2>
+<ul>
+  <li><strong>Guide change only.</strong> No change to the C++ core, the Python runners or the algorithm, so no new references.</li>
+  <li><strong>The scheduler in 3D</strong> (new page, in "Concepts"): the Earth, 15 satellites on three orbits, the links between them and a <em>Create task</em> button. A task flies to the access point, every satellite shows the score the chosen formula gives it, the best feasible one wins, and the task hops to it over the links. Rejected tasks fall back red. The page has the rule selector of the playground, both tie-breaks, a batch mode, two battery settings ("roomy" and "like our data"), a live table of what the decoder sees, and a table "What is real and what is simplified".</li>
+  <li><strong>New files:</strong> <code>assets/viz3d.js</code> (a JavaScript mirror of the selection and commit blocks of <code>detail::greedyDecode</code>, plus the three.js scene) and <code>assets/formula.js</code> (the formula parser, moved out of the decoder page so both pages share it). <code>Viz3D.selfTest()</code> in the browser console replays the worked examples of the decoder page. three.js r128 is loaded from cdnjs.</li>
+  <li><strong>Decoder &amp; fitness:</strong> the playground now uses the shared parser (same behaviour); two pointers to the 3D view.</li>
+  <li><strong>Welcome, The problem, Giving a demo:</strong> pointers to the new page; the demo script shows it at minute 3.</li>
+  <li><strong>Glossary:</strong> two terms (hop, inter-satellite link).</li>
+  <li><strong>Architecture, Where to start:</strong> the three script files of the guide; a new recipe "change the 3D view"; the decoder recipe now lists the two JavaScript copies of the selection rule.</li>
+  <li><strong>Not modelled, and said so on the page:</strong> orbits, links, routes and flight times are drawings. The program has no such simulation.</li>
+</ul>
+
 <h2>2026-11-19: demo mode and a page on giving a demo</h2>
 <ul>
   <li><strong>Code change:</strong> new <code>data_processing/demo_data.py</code>, which writes a synthetic task log with the real columns and splits it with the real splitter into <code>data/demo/worlds/</code>; a <code>--demo</code> flag and <code>demo</code> key in <code>main.py</code>; <code>runConfigurations/demo.json</code> (small seeded run, metrics on); new <code>tests/test_demo_data.py</code>. Without <code>--demo</code> nothing changes. No algorithm change: the GP, decoder and fitness are untouched, so no new references.</li>

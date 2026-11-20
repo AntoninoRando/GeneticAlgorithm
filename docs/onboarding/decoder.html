@@ -74,7 +74,7 @@ loop:
 </ul>
 <p>The maths, a proof for job-only formulas and the sources are on the <a href="theory.html#ties">theory page</a>. The code is the selection block of <code>detail::greedyDecode</code> in <a href="../../include/scheduler/fitness_evaluator.h"><code>fitness_evaluator.h</code></a>.</p>
 <div class="callout warn"><span class="callout-title">Off by default, and not yet measured</span>
-<p>Every thesis number uses the default tie-break, including the baselines. The option changes the decoder itself, so a rule trained with it must be compared with baselines scored with it too. The playground below implements the default tie-break only.</p></div>
+<p>Every thesis number uses the default tie-break, including the baselines. The option changes the decoder itself, so a rule trained with it must be compared with baselines scored with it too. The playground below implements the default tie-break only; the <a href="visualization.html">3D view</a> has a checkbox for the other one.</p></div>
 
 <h2 id="example">2. A worked example</h2>
 <p>Snapshot time \(\tau = 10\), energy rate 1 per minute. Five jobs, two satellites:</p>
@@ -101,7 +101,7 @@ loop:
 <p>Result: 3 of 5 jobs scheduled, so \(C = 0.6\). Response times are J1 \(16-3=13\), J3 \(26-9=17\) and J0 \(22-0=22\), so \(R = 17.33\). Energy \(\mathcal{E} = 6+10+12 = 28\).</p>
 
 <h2 id="playground">3. Playground: try your own formula</h2>
-<p>The same world and the same algorithm, in your browser: same tie-breaking, same protected division, same column refresh. Pick a rule or type one, then step through.</p>
+<p>The same world and the same algorithm, in your browser: same tie-breaking, same protected division, same column refresh. Pick a rule or type one, then step through. For the same decoder on a moving constellation, with tasks that fly from satellite to satellite, open <a href="visualization.html">the scheduler in 3D</a>.</p>
 <div class="widget" id="pg">
   <div class="controls">
     <label for="pg-preset">Rule</label>
@@ -197,6 +197,7 @@ $$C_i = \frac{\sum_w |\mathcal A_{i,w}|}{\sum_w N_w}, \qquad R_i = \frac{\sum_w 
 </main>
 </div>
 
+<script src="assets/formula.js"></script>
 <script>
 (function () {
   "use strict";
@@ -212,80 +213,9 @@ $$C_i = \frac{\sum_w |\mathcal A_{i,w}|}{\sum_w N_w}, \qquad R_i = \frac{\sum_w 
     { name: "S0", remainingEnergy: 20, operationalUntil: 40, bandwidth: 12.0, cpuCapacity: 3.1 },
     { name: "S1", remainingEnergy: 30, operationalUntil: 35, bandwidth: 9.0,  cpuCapacity: 4.2 }
   ];
-  var TERMS = {
-    "job.arrivalTime":   function (j) { return j.arrivalTime; },
-    "job.executionTime": function (j) { return j.executionTime; },
-    "job.transferTime":  function (j) { return j.transferTime; },
-    "job.imageSize":     function (j) { return j.imageSize; },
-    "sat.remainingEnergy": function (j, s) { return s.remainingEnergy; },
-    "sat.completedTasks":  function (j, s) { return s.completedTasks; },
-    "sat.bandwidth":       function (j, s) { return s.bandwidth; },
-    "sat.cpuCapacity":     function (j, s) { return s.cpuCapacity; }
-  };
-  function pdiv(a, b) { return Math.abs(b) < 1e-9 ? 0 : a / b; }
-  var FUNCS = {
-    MAX: [2, function (a, b) { return Math.max(a, b); }],
-    MIN: [2, function (a, b) { return Math.min(a, b); }],
-    ABS: [1, function (a) { return Math.abs(a); }],
-    NEG: [1, function (a) { return -a; }],
-    INV: [1, function (a) { return Math.abs(a) < 1e-9 ? 0 : 1 / a; }]
-  };
-
-  // ── Tiny recursive-descent parser → closure (j, s) => number ──
-  function parse(src) {
-    var toks = [], re = /\s*(\/\?|[A-Za-z_][\w.]*|\d+(?:\.\d+)?|[-+*\/(),])/y, m, pos = 0;
-    src = src.trim();
-    while (pos < src.length) {
-      re.lastIndex = pos; m = re.exec(src);
-      if (!m) throw new Error("Unexpected character at position " + (pos + 1) + ": '" + src[pos] + "'");
-      toks.push(m[1]); pos = re.lastIndex;
-      while (pos < src.length && /\s/.test(src[pos])) pos++;
-    }
-    var i = 0;
-    function peek() { return toks[i]; }
-    function eat(t) { if (toks[i] !== t) throw new Error("Expected '" + t + "' but found " + (toks[i] ? "'" + toks[i] + "'" : "end of formula")); i++; }
-    function expr() {
-      var f = term();
-      while (peek() === "+" || peek() === "-") {
-        var op = toks[i++], g = term();
-        f = (function (a, b, o) { return o === "+" ? function (j, s) { return a(j, s) + b(j, s); } : function (j, s) { return a(j, s) - b(j, s); }; })(f, g, op);
-      }
-      return f;
-    }
-    function term() {
-      var f = unary();
-      while (peek() === "*" || peek() === "/" || peek() === "/?") {
-        var op = toks[i++], g = unary();
-        f = (function (a, b, o) { return o === "*" ? function (j, s) { return a(j, s) * b(j, s); } : function (j, s) { return pdiv(a(j, s), b(j, s)); }; })(f, g, op);
-      }
-      return f;
-    }
-    function unary() {
-      if (peek() === "-") { i++; var a = unary(); return function (j, s) { return -a(j, s); }; }
-      return primary();
-    }
-    function primary() {
-      var t = toks[i];
-      if (t === undefined) throw new Error("Formula ends too early");
-      if (t === "(") { i++; var e = expr(); eat(")"); return e; }
-      if (/^\d/.test(t)) { i++; var v = parseFloat(t); return function () { return v; }; }
-      var up = t.toUpperCase();
-      if (FUNCS[up] && toks[i + 1] === "(") {
-        i += 2; var args = [expr()];
-        while (peek() === ",") { i++; args.push(expr()); }
-        eat(")");
-        if (args.length !== FUNCS[up][0]) throw new Error(up + " takes " + FUNCS[up][0] + " argument(s)");
-        var fn = FUNCS[up][1];
-        return args.length === 1 ? function (j, s) { return fn(args[0](j, s)); }
-                                 : function (j, s) { return fn(args[0](j, s), args[1](j, s)); };
-      }
-      if (TERMS[t]) { i++; var acc = TERMS[t]; return function (j, s) { return acc(j, s); }; }
-      throw new Error("Unknown name '" + t + "'");
-    }
-    var f = expr();
-    if (i < toks.length) throw new Error("Unexpected '" + toks[i] + "'");
-    return f;
-  }
+  // The formula parser (terminals, operators, protected division) is shared
+  // with the 3D view: assets/formula.js.
+  var parse = window.OnboardingFormula.parse;
 
   // ── Decoder state (mirrors detail::greedyDecode) ──
   var st;

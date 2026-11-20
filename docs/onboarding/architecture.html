@@ -97,7 +97,7 @@
 <ul>
   <li><code>thesis/</code>: LaTeX thesis, <code>references.bib</code> and <code>literature_notes.md</code>, which holds reading notes for every cited paper. Read the notes before changing the algorithm.</li>
   <li><code>docs/source</code>, <code>docs/build</code>: Sphinx API documentation of the <code>scheduler</code> module (<code>scripts/make-doc.sh</code>). <code>docs/build</code> is generated; only the PDF that the readme links to (<code>docs/build/latex/schedulerlib.pdf</code>) is kept in git.</li>
-  <li><code>docs/onboarding</code>: this guide.</li>
+  <li><code>docs/onboarding</code>: this guide. Plain HTML, no build step. <code>assets/site.js</code> holds the navigation, <code>assets/formula.js</code> the formula parser of the interactive pages, and <code>assets/viz3d.js</code> the <a href="visualization.html">3D view</a>, including a JavaScript copy of the decoder's selection rule that must follow the C++ one.</li>
   <li><code>runConfigurations/</code>: named JSON run settings.</li>
   <li><code>scripts/</code>: small shell helpers for building, running and debugging.</li>
   <li><code>.devcontainer/</code>: the Docker development environment.</li>

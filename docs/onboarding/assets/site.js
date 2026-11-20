@@ -15,6 +15,7 @@
     ]},
     { group: "Concepts", items: [
       { href: "problem.html",       title: "The scheduling problem" },
+      { href: "visualization.html", title: "The scheduler in 3D" },
       { href: "gp-basics.html",     title: "Genetic programming from zero" },
       { href: "glossary.html",      title: "Glossary" }
     ]},

@@ -44,8 +44,10 @@
 <dt id="grow">Grow method</dt><dd>Random tree construction where branches may stop early. Biased here toward operators near the root.</dd>
 <dt id="height">Height (of a node)</dt><dd>The depth of the subtree below a node: 0 for a leaf. A node's depth plus its height is at most the depth of the whole tree.</dd>
 <dt id="hoist">Hoist mutation</dt><dd>Replacing a tree with one of its own subtrees. Shrinks trees.</dd>
+<dt id="hop">Hop</dt><dd>One step of a task's journey from one satellite to a neighbouring one over an <a href="#isl">inter-satellite link</a>. A job in the data only carries the count, <code>numberOfHops</code>; the decoder does not simulate the route. <span class="see"><a href="visualization.html">The scheduler in 3D</a></span></dd>
 <dt id="hyper-heuristic">Hyper-heuristic</dt><dd>A method that searches over heuristics instead of over solutions.</dd>
 <dt id="individual">Individual</dt><dd>One candidate solution: here a <code>GPIndividual</code> with a tree, a fitness and an id.</dd>
+<dt id="isl">Inter-satellite link (ISL)</dt><dd>A direct radio or laser connection between two satellites. Tasks and results travel over these links from the access point to the satellite that runs the task. Drawn in the <a href="visualization.html">3D view</a>; not simulated by the program.</dd>
 <dt id="leo">LEO</dt><dd>Low Earth orbit, a few hundred kilometres up. Satellites there move fast relative to the ground.</dd>
 <dt id="list-scheduling">List scheduling</dt><dd>The classic rule for several identical machines: take jobs from a priority list and give each one to the machine that becomes free first. The earliest-free tie-break makes a job-only formula behave this way.</dd>
 <dt id="mutation">Mutation</dt><dd>Random edits: redraw a terminal, swap an operator, or regrow a subtree. Rate 0.08 per node.</dd>

@@ -216,3 +216,86 @@ td.done { color: var(--muted); }
 
 .toc { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 10px 16px; margin: 18px 0; font-size: 14.5px; }
 .toc ol { margin: 4px 0; padding-left: 20px; }
+
+/* ── 3D view (visualization.html) ───────────────────────────────────────── */
+/* The picture is outer space, so the stage keeps its own dark colours in
+   both themes.  Panels sit over the picture on wide screens and move below
+   it on narrow ones. */
+.stage {
+  --hud-bg: rgba(12, 16, 26, .8); --hud-border: rgba(255, 255, 255, .14);
+  --hud-text: #e8ecf4; --hud-muted: #a4adbd; --hud-accent: #ffd166;
+  position: relative; width: 100%; margin: 18px 0; overflow: hidden;
+  height: min(76vh, 760px); min-height: 520px;
+  background: #05070d; color: var(--hud-text); color-scheme: dark;
+  border: 1px solid var(--border); border-radius: var(--radius); font-size: 13px; line-height: 1.45;
+}
+.stage:fullscreen { width: 100vw; height: 100vh; max-height: none; border: 0; border-radius: 0; margin: 0; }
+.stage-view { position: absolute; inset: 0; }
+.stage-view canvas { display: block; width: 100%; height: 100%; touch-action: pan-y; cursor: grab; outline-offset: -3px; }
+.stage-view canvas.dragging { cursor: grabbing; }
+.stage-msg { position: absolute; inset: 0; display: grid; place-items: center; padding: 24px; text-align: center; font-size: 15px; background: #05070d; }
+.stage-msg[hidden] { display: none; }
+
+.hud { position: absolute; background: var(--hud-bg); border: 1px solid var(--hud-border); border-radius: 10px; padding: 10px 12px; backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
+.hud h4 { margin: 0 0 6px; font-size: 11px; letter-spacing: .07em; text-transform: uppercase; color: var(--hud-muted); font-weight: 650; }
+.hud-controls { top: 12px; left: 12px; width: 268px; }
+.hud-stats { top: 12px; right: 12px; width: 236px; }
+.hud-log { bottom: 12px; left: 12px; width: min(470px, calc(100% - 290px)); }
+.hud-view { bottom: 12px; right: 12px; display: flex; gap: 6px; align-items: center; padding: 6px; }
+.hud .row { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+.hud .btn { background: rgba(255, 255, 255, .08); border-color: var(--hud-border); color: var(--hud-text); font-size: 13px; padding: 5px 10px; }
+.hud .btn:hover:not(:disabled) { border-color: var(--hud-accent); }
+.hud .btn:disabled { opacity: .4; cursor: default; }
+.hud .btn-primary { background: var(--hud-accent); border-color: var(--hud-accent); color: #1a1300; font-weight: 650; }
+.hud label { display: block; color: var(--hud-muted); font-size: 12px; margin: 6px 0 2px; }
+.hud label.check { display: flex; gap: 6px; align-items: center; color: var(--hud-text); font-size: 13px; margin: 4px 0; }
+.hud select, .hud input[type="text"] { width: 100%; font-size: 12.5px; padding: 5px 7px; background: rgba(0, 0, 0, .35); border-color: var(--hud-border); color: var(--hud-text); }
+.hud .status { font-size: 12px; min-height: 0; color: var(--hud-muted); }
+.hud .status.err { color: #ff9a90; }
+#v3-stats div { display: flex; justify-content: space-between; gap: 10px; padding: 1px 0; }
+#v3-stats span { color: var(--hud-muted); }
+#v3-stats b { font-variant-numeric: tabular-nums; font-weight: 650; }
+#v3-log { font-family: var(--mono); font-size: 11.5px; line-height: 1.5; }
+#v3-log div { overflow-wrap: anywhere; color: var(--hud-muted); }
+#v3-log div:last-child { color: var(--hud-text); }
+#v3-log .ok { color: #8fe3ae; } #v3-log .bad { color: #ff9a90; }
+.hud-view .hint { color: var(--hud-muted); font-size: 12px; padding: 0 6px; }
+
+/* A second "Create task" button on the picture itself, for the stacked layout. */
+.v3-quick { display: none; position: absolute; left: 50%; bottom: 12px; transform: translateX(-50%); background: #ffd166; border-color: #ffd166; color: #1a1300; font-weight: 650; box-shadow: 0 2px 10px rgba(0, 0, 0, .5); }
+.v3-quick:disabled { display: none !important; }
+
+.v3-labels { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
+.v3-label { position: absolute; left: 0; top: 0; display: flex; flex-direction: column; align-items: center; gap: 2px; white-space: nowrap; will-change: transform; font: 600 11px/1.2 var(--font); color: #e8ecf4; text-shadow: 0 1px 3px #000, 0 0 2px #000; }
+.v3-label .bar { width: 26px; height: 3px; border-radius: 2px; background: rgba(255, 255, 255, .2); overflow: hidden; }
+.v3-label .bar i { display: block; height: 100%; width: 100%; background: #5fe08a; }
+.v3-label.low .bar i { background: #f0b45a; }
+.v3-label.out { color: #8a92a0; }
+.v3-label.out .bar i { background: #6b7280; }
+.v3-label.ap .n::after { content: " · access point"; color: #ffd166; }
+.v3-label .chip { order: -1; font-weight: 500; font-size: 10.5px; padding: 0 5px; border-radius: 8px; background: rgba(16, 22, 36, .9); border: 1px solid rgba(255, 255, 255, .2); text-shadow: none; font-variant-numeric: tabular-nums; }
+.v3-label .chip:empty { display: none; }
+.v3-label .chip.bad { color: #ff9a90; }
+.v3-label .chip.win { background: #ffd166; border-color: transparent; color: #1a1300; font-weight: 700; }
+.v3-label.gs { color: #ffd166; }
+.v3-label.pk { font-weight: 500; font-size: 10.5px; color: #fff; }
+
+/* Wide screens: let the picture use the space to the right of the text column. */
+@media (min-width: 1181px) {
+  .stage.wide { width: min(1280px, calc(100vw - 390px)); }
+}
+/* Narrow screens: the panels move below the picture. */
+@media (max-width: 1180px) {
+  .stage { height: auto; min-height: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; padding: 0 0 8px; }
+  .stage-view { position: relative; inset: auto; grid-column: 1 / -1; height: 62vh; min-height: 340px; }
+  .hud { position: static; width: auto; margin: 0 8px; backdrop-filter: none; -webkit-backdrop-filter: none; }
+  .hud-log, .hud-view { grid-column: 1 / -1; }
+  .hud-view .hint { flex: 1; }
+  .v3-quick { display: inline-block; }
+  .stage:fullscreen { overflow-y: auto; }
+}
+@media (max-width: 640px) {
+  .stage { grid-template-columns: minmax(0, 1fr); }
+  .stage-view { height: 56vh; }
+  .v3-label.ap .n::after { content: " · AP"; }
+}

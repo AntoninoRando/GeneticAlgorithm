@@ -59,7 +59,7 @@
 python3 -m unittest discover -s tests
 ./run demo --no-start-prompt</pre>
   The tests should end in <code>OK</code>; without the real data, 13 of them are <em>skipped</em>, which is expected.</li>
-  <li><strong>Open the guide offline-safe.</strong> Open <code>docs/onboarding/index.html</code> in a browser (double-click it; no server needed). The formulas are drawn by KaTeX from a CDN: with no internet they appear as raw LaTeX, so check the room's network, or open each page once beforehand.</li>
+  <li><strong>Open the guide offline-safe.</strong> Open <code>docs/onboarding/index.html</code> in a browser (double-click it; no server needed). The formulas are drawn by KaTeX from a CDN: with no internet they appear as raw LaTeX, so check the room's network, or open each page once beforehand. The <a href="visualization.html">3D view</a> also loads its library (three.js) from a CDN and shows a message instead of the picture when it cannot.</li>
   <li><strong>Have the thesis ready.</strong> <code>thesis/main.pdf</code> has the formal version of everything.</li>
   <li><strong>If you do have the real data</strong>, put it in <code>data/example.csv</code> and run the splitter (<a href="running.html#data">day one, step 2</a>). Then you can also show a real run, without <code>demo</code>.</li>
 </ol>
@@ -69,7 +69,7 @@ python3 -m unittest discover -s tests
 <div class="table-wrap"><table>
 <tr><th>Min</th><th>Show</th><th>Say</th></tr>
 <tr><td>0–3</td><td><a href="index.html">Welcome</a>, the loop diagram</td><td>Satellites carry small computers; someone must decide which one runs which job. We do not write that rule by hand: we evolve it. The output is a formula a satellite can evaluate in microseconds.</td></tr>
-<tr><td>3–7</td><td><a href="problem.html">The problem</a></td><td>Jobs, satellites, the hard constraints (sunset, battery) and the three objectives: complete many jobs, finish them fast, use little energy.</td></tr>
+<tr><td>3–7</td><td><a href="visualization.html">The scheduler in 3D</a>, then <a href="problem.html">The problem</a></td><td>Press <em>Create task</em> a few times: a task goes up to the access point, every satellite gets a score, the best one wins, and the task hops to it. Keep pressing until tasks come back red: batteries are the limit. Then the same on the problem page, in words: jobs, satellites, the hard constraints (sunset, battery) and the three objectives: complete many jobs, finish them fast, use little energy. Say that the 3D worlds are made up and that orbits and links are not part of the program.</td></tr>
 <tr><td>7–11</td><td><a href="gp-basics.html">GP from zero</a></td><td>A formula is a tree. A population of trees, scored, selected, crossed over and mutated, generation after generation.</td></tr>
 <tr><td>11–15</td><td><a href="decoder.html#playground">Decoder playground</a></td><td>Pick a preset formula, press <em>Step</em> a few times: this is how one formula turns into a schedule. Then change the formula and run it to the end to show the score change.</td></tr>
 <tr><td>15–20</td><td>Terminal: <code>./run demo --no-start-prompt</code></td><td>The real program on synthetic data (say so). Point at: the demo banner; <em>New best fitness</em> lines; <em>Convergence detected … Regenerating</em>, the switch to the next world when progress stops; the best tree printed every 20 generations; the final line with jobs scheduled, mean response and energy.</td></tr>
