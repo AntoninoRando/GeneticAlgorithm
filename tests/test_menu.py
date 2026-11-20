@@ -83,6 +83,17 @@ class SettingsTable(unittest.TestCase):
         shown = {s.group for s in menu.SETTINGS} - {"Data"}
         self.assertEqual(shown, set(menu.GROUPS))
 
+    def test_every_setting_says_what_it_does(self):
+        texts = [s.help for s in menu.SETTINGS]
+        self.assertEqual(len(set(texts)), len(texts))                    # no copy-paste
+        for setting in menu.SETTINGS:
+            self.assertTrue(setting.help.endswith("."), setting.key)
+            self.assertNotIn("  ", setting.help, setting.key)             # joined string pieces
+            if setting.group in menu.GROUPS and setting.kind != "str":
+                self.assertGreater(len(setting.help), 60, setting.key)   # more than a label
+            if setting.kind == "bool" and setting.group in ("Operators", "Fitness"):
+                self.assertIn("On:", setting.help, setting.key)          # says what on changes
+
 
 class Commands(unittest.TestCase):
     def setUp(self):
@@ -312,6 +323,30 @@ class PlainSessions(unittest.TestCase):
         self.assertIn("dry run", text)
         self.assertIn("* = changed from the starting configuration", text)
 
+    def test_question_mark_describes_the_entries(self):
+        # "?" lists what every entry of the screen does, "?N" only entry N.
+        _, text = self.session([1, "?", "", "b", "q"])
+        for setting in menu.SETTINGS:
+            if setting.group in menu.GROUPS:
+                self.assertIn(setting.label, text)
+        flat = " ".join(text.split())
+        self.assertIn(menu.SETTING["tournament_size"].help, flat)
+        self.assertIn(menu.SETTING["fixed_bounds"].help, flat)
+        self.assertIn("Start the training with the settings below.", flat)
+        self.assertIn("? what each entry does", text)
+
+        _, text = self.session([1, f"?{number_of('seed')}", "", "b", "q"])
+        flat = " ".join(text.split())
+        self.assertIn(menu.SETTING["seed"].help, flat)
+        self.assertNotIn(menu.SETTING["tournament_size"].help, flat)
+        # The description is also shown when the value is typed.
+        _, text = self.session([1, number_of("seed"), 4, "b", "q"])
+        self.assertIn("Starting value of the random generator.", " ".join(text.split()))
+
+        # Screens whose entries explain themselves in one line do not offer it.
+        _, text = self.session(["q"])
+        self.assertNotIn("? what each entry does", text)
+
     def test_wrong_input_is_explained_not_accepted(self):
         history, text = self.session([
             1, number_of("generations"), "lots", 0, 30, 1, "", "b", "q"])
@@ -445,7 +480,11 @@ class ArrowKeys(unittest.TestCase):
         self.press(b"\x1b[A\r")                             # Up, Enter: the training screen
         self.wait_for("Change what you like")               # header of the training screen
         self.wait_for("↑↓ move")
-        self.press(b"jjj\r")                                # three down: Generations
+        self.assertIn("Start the training with the settings below.", self.seen)
+        self.press(b"jjj")                                  # three down: Generations
+        self.wait_for("How many generations to evolve.")    # its description follows the cursor
+        self.wait_for("↑↓ move")
+        self.press(b"\r")
         self.wait_for("Generations [")
         self.press(b"33\n")
         self.wait_for("--generations 33")                   # shown in the command preview

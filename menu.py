@@ -78,82 +78,143 @@ class Setting:
 SETTINGS: List[Setting] = [
     # ── the search ──────────────────────────────────────────────────────────
     Setting("generations", "Generations", "int", 200, "--generations",
-            "How many generations to evolve.", "Search", minimum=1),
+            "How many generations to evolve. In each generation every formula is scored and "
+            "a new population is bred from the best ones. More generations give the search "
+            "more time and take proportionally longer.",
+            "Search", minimum=1),
     Setting("population_size", "Population size", "int", 100, "--population",
-            "Formulas per generation.", "Search", minimum=2),
+            "How many formulas are alive in each generation. A larger population tries more "
+            "formulas at once and makes every generation proportionally slower.",
+            "Search", minimum=2),
     Setting("max_depth", "Maximum tree depth", "int", 7, "--max-depth",
-            "Largest depth of a formula. The thesis uses 4.", "Search", minimum=1),
+            "Largest allowed depth of a formula's tree. Deeper trees can express more "
+            "complicated formulas, but they are slower, harder to read and tend to grow "
+            "without getting better (bloat). The thesis and the shipped configurations use 4.",
+            "Search", minimum=1),
     Setting("seed", "Random seed", "int", -1, "--seed",
-            "0 or more makes the run reproducible; -1 is different every time.", "Search",
-            minimum=-1),
+            "Starting value of the random generator. With 0 or more, the same seed gives "
+            "exactly the same run: use one for anything you report. -1 is different every "
+            "time.",
+            "Search", minimum=-1),
     Setting("convergence_threshold", "Generations before a new world", "int", 10,
             "--convergence-threshold",
-            "Generations without improvement before moving to the next world.", "Search",
-            minimum=1),
+            "After this many generations without a better best formula, training moves on to "
+            "the next world. Smaller values rotate through the worlds faster, so formulas "
+            "have less time to fit the quirks of a single world.",
+            "Search", minimum=1),
     Setting("worlds_per_eval", "Worlds per evaluation", "int", 1, "--worlds-per-eval",
-            "Score every formula on this many worlds at once (3 in the robust setup).",
+            "How many worlds each formula is scored on in every generation; the results are "
+            "pooled. 1 is fastest. More worlds make the score depend less on one world and "
+            "make every generation proportionally slower. The 'robust' configuration uses 3.",
             "Search", minimum=1),
     Setting("csv_row_limit", "Jobs loaded per world", "int", 100, "--csv-row-limit",
-            "0 loads every job of the world.", "Search"),
+            "How many jobs are read from each world file, from the top. A world has about "
+            "100 jobs. 0 reads all of them.",
+            "Search"),
     # ── operators ───────────────────────────────────────────────────────────
     Setting("hoist_rate", "Hoist rate", "float", 0.05, "--hoist-rate",
-            "Chance that an offspring is replaced by one of its subtrees (fights bloat).",
+            "Probability, from 0 to 1, that a new formula is replaced by one of its own "
+            "sub-formulas. This keeps formulas small (it fights bloat). 0 turns it off; a "
+            "high value shrinks formulas aggressively.",
             "Operators", minimum=0.0, maximum=1.0),
     Setting("tournament_size", "Tournament size", "int", 5, "--tournament-size",
-            "Candidates per selection tournament: higher means stronger selection.",
+            "Parents are chosen by tournament: this many formulas are drawn at random and the "
+            "best one becomes a parent. A larger tournament favours the best formulas more "
+            "strongly and leaves less variety. The cited papers use 2 to 7.",
             "Operators", minimum=1),
     Setting("initial_max_depth", "Depth of the first trees", "int", -1, "--initial-max-depth",
-            "-1 uses the maximum tree depth.", "Operators", minimum=-1),
+            "Largest depth of the random formulas of the first generation. -1 means the "
+            "maximum tree depth. A smaller value starts from simple formulas and leaves "
+            "crossover room to grow them.",
+            "Operators", minimum=-1),
     Setting("internal_crossover_bias", "Crossover bias to operators", "float", 0.0,
             "--internal-crossover-bias",
-            "Chance that a crossover point is an operator, not a leaf (Koza: 0.9).",
+            "Crossover swaps a sub-formula between two parents. This is the probability that "
+            "the swap point is an operator rather than a single input. 0 picks any node with "
+            "equal chance; Koza uses 0.9, which swaps larger pieces.",
             "Operators", minimum=0.0, maximum=1.0),
     Setting("clone_retries", "Clone retries", "int", 0, "--clone-retries",
-            "Re-mutate offspring that are copies of a parent (3 in the robust setup).",
+            "When a new formula is identical to a parent or to one of the best formulas kept "
+            "from the last generation, mutate it again, up to this many times, so that no "
+            "evaluation is spent on a copy. 0 turns it off; the 'robust' configuration uses 3.",
             "Operators", minimum=0),
     Setting("depth_aware_mutation", "Depth-aware mutation", "bool", False,
-            "--depth-aware-mutation", "Mutation never builds a tree above the depth limit.",
+            "--depth-aware-mutation",
+            "Mutation replaces part of a formula by a new random piece. On: the piece is "
+            "sized to fit under the depth limit. Off: a result that is too deep is thrown "
+            "away and the parent is copied instead.",
             "Operators"),
     Setting("depth_aware_crossover", "Depth-aware crossover", "bool", False,
-            "--depth-aware-crossover", "Crossover never builds a tree above the depth limit.",
+            "--depth-aware-crossover",
+            "On: crossover only picks swap points whose result fits under the depth limit. "
+            "Off: a child that is too deep is thrown away and a parent is copied instead.",
             "Operators"),
     Setting("terminal_weighting", "Adaptive terminal weighting", "bool", False,
-            "--terminal-weighting", "Mutation prefers the inputs the best formulas use.",
+            "--terminal-weighting",
+            "On: mutation draws an input (a property of the job or of the satellite) more "
+            "often when the best formulas of the current generation use it. Off: all inputs "
+            "are equally likely.",
             "Operators"),
     Setting("prune_constant_terminals", "Skip constant inputs", "bool", False,
-            "--prune-constant-terminals", "Never draw inputs that are the same in every world.",
+            "--prune-constant-terminals",
+            "On: never use inputs that have the same value for every job and satellite in "
+            "the loaded worlds. Such an input cannot help a formula tell candidates apart.",
             "Operators"),
     # ── decoder and fitness ─────────────────────────────────────────────────
     Setting("fixed_bounds", "Fixed-bound fitness", "bool", False, "--fixed-bounds",
-            "Penalise unscheduled jobs; pushes towards scheduling more of them.", "Fitness"),
+            "Changes how formulas are scored. Off: response time and energy are compared "
+            "with the best and worst formula of the current population. On: they are divided "
+            "by fixed limits of the world, and every job left unscheduled is charged the "
+            "worst response time, so scheduling more jobs pays.",
+            "Fitness"),
     Setting("track_busy_until", "Live 'busy until' input", "bool", False, "--track-busy-until",
-            "Formulas can see when each satellite becomes free.", "Fitness"),
+            "On: formulas can read, for each satellite, the time at which it becomes free "
+            "given the jobs already placed on it. Off: that input is always 0 and tells a "
+            "formula nothing.",
+            "Fitness"),
     Setting("earliest_free_tie_break", "Earliest-free tie-break", "bool", False,
             "--earliest-free-tie-break",
-            "Equal scores go to the satellite that is free first.", "Fitness"),
+            "What happens when two job-satellite pairs get exactly the same score. On: the "
+            "job goes to the satellite that is free first. Off: to the satellite that comes "
+            "first in the list, so a formula that ignores the satellite piles jobs on one.",
+            "Fitness"),
     # ── output ──────────────────────────────────────────────────────────────
     Setting("print_every", "Print progress every", "int", 50, "--print-every",
-            "Generations between progress reports; 0 prints none.", "Output", minimum=0),
+            "Print the current best schedule and formula every this many generations. 0 "
+            "prints only the final summary.",
+            "Output", minimum=0),
     Setting("collect_metrics", "Write metrics (CSV, plot)", "bool", True, "--enable-metrics",
-            "Per-generation metrics in the metrics folder.", "Output",
-            off_flag="--disable-metrics"),
+            "On: write the numbers of every generation (best and mean fitness, completion, "
+            "response time, energy) to a CSV file, a NumPy file and a plot in the metrics "
+            "folder.",
+            "Output", off_flag="--disable-metrics"),
     Setting("metrics_dir", "Metrics folder", "str", "metrics", "--metrics-dir",
-            "Where the metrics files go.", "Output"),
+            "Folder in which the metrics files are written.", "Output"),
     Setting("metrics_prefix", "Metrics file prefix", "str", "", "--metrics-prefix",
-            "Empty uses a timestamp.", "Output"),
+            "First part of the names of the metrics files. Empty uses the date and time of "
+            "the run, so earlier runs are not overwritten.",
+            "Output"),
     Setting("metrics_flush_every", "Refresh metrics every", "int", 1, "--metrics-flush-every",
-            "Generations between two writes of the metrics dump.", "Output", minimum=1),
+            "How often, in generations, the NumPy metrics file is rewritten during the run. "
+            "1 keeps it current; a larger value writes less often.",
+            "Output", minimum=1),
     Setting("inspect_snapshots", "Print world summaries", "bool", False, "--inspect-snapshots",
-            "Readable summary of each world when it is loaded.", "Output"),
+            "On: print a readable summary of each world (its satellites and jobs) at the "
+            "start, at every change of world and at the end.",
+            "Output"),
     Setting("save_snapshots", "Save worlds as JSON", "bool", False, "--save-snapshots",
-            "Write each world to the snapshots folder.", "Output"),
+            "On: save those same worlds as JSON files in the snapshots folder. Tools > Plot "
+            "the timeline of a saved world reads them.",
+            "Output"),
     Setting("snapshots_dir", "Snapshots folder", "str", "snapshots", "--snapshots-dir",
-            "Where the snapshot files go.", "Output"),
+            "Folder in which the saved worlds are written.", "Output"),
     Setting("snapshots_prefix", "Snapshot file prefix", "str", "", "--snapshots-prefix",
-            "Empty uses a timestamp.", "Output"),
+            "First part of the names of the saved world files. Empty uses the date and time "
+            "of the run.",
+            "Output"),
     # ── data (set through the "Data" row of the training screen) ────────────
     Setting("demo", "Demo data", "bool", False, "--demo",
-            "Toy data: its numbers mean nothing.", "Data"),
+            "Train on toy data written to data/demo. Its numbers mean nothing.", "Data"),
     Setting("worlds_dir", "Worlds folder", "str", ORIGINAL_WORLDS, "--worlds-dir",
             "Folder of world_*.csv files to train on.", "Data"),
 ]
@@ -479,6 +540,7 @@ class Item:
     hint: str = ""
     disabled: str = ""       # if set: why the entry cannot be chosen
     heading: bool = False    # a section title, not selectable
+    detail: str = ""         # what the entry does, in a sentence or two
 
 
 class Style:
@@ -530,13 +592,16 @@ class PlainUI:
         top.append("")
         body: List[str] = []
         at = 0
-        width = max((len(i.label) for i in items if not i.heading), default=0)
+        # The value column starts after the longest label that has a value;
+        # entries without one ("Back", "Save ...") must not push it away.
+        width = max((len(i.label) for i in items if not i.heading and (i.hint or i.disabled)),
+                    default=0)
         for index, (item, number) in enumerate(zip(items, self._numbering(items))):
             if item.heading:
                 body += ["", s.dim("  " + item.label)] if item.label else [""]
                 continue
-            text = f"{number:>3}  {item.label.ljust(width)}"
             hint = item.hint + (" (unavailable)" if item.disabled else "")
+            text = f"{number:>3}  {item.label.ljust(width) if hint else item.label}"
             if index == current:
                 at = len(body)
                 body.append(s.accent(">" + text[1:]) + ("   " + s.dim(hint) if hint else ""))
@@ -544,18 +609,63 @@ class PlainUI:
                 body.append(s.dim(text + ("   " + hint if hint else "")))
             else:
                 body.append(text + ("   " + s.dim(hint) if hint else ""))
-        bottom = [""] + ([s.dim(line) for line in footer.splitlines()] if footer else [])
+        bottom = [""] + self._detail_panel(items, current)
+        bottom += [s.dim(line) for line in footer.splitlines()] if footer else []
         return top, body, bottom, at
+
+    @staticmethod
+    def _text_width() -> int:
+        return max(40, min(shutil.get_terminal_size((100, 30)).columns, 110) - 4)
+
+    def _wrapped(self, text: str) -> List[str]:
+        import textwrap
+        return textwrap.wrap(text, self._text_width())
+
+    def _detail_panel(self, items: Sequence[Item], current: int) -> List[str]:
+        """Description of the highlighted entry.  The panel has the height of
+        the longest description on the screen, so the lines below it do not
+        jump when the cursor moves."""
+        if current < 0 or not any(item.detail for item in items):
+            return []
+        height = max(len(self._wrapped(item.detail)) for item in items)
+        lines = self._wrapped(items[current].detail)
+        panel = [self.style.bold("  " + items[current].label)]
+        panel += ["  " + line for line in lines] + [""] * (height - len(lines))
+        return panel + [""]
+
+    def _describe(self, items: Sequence[Item], only: Optional[int] = None) -> None:
+        """Print what the entries do (the numbered interface has no cursor)."""
+        for index, (item, number) in enumerate(zip(items, self._numbering(items))):
+            if item.heading:
+                if only is None and item.label:
+                    self.write(self.style.dim("\n  " + item.label))
+                continue
+            if only is not None and index != only:
+                continue
+            self.write(self.style.bold(f"{number:>3}  {item.label}"))
+            for line in self._wrapped(item.detail or item.hint or "(no description)"):
+                self.write("       " + line)
 
     def select(self, title: str, items: Sequence[Item], header: str = "", footer: str = "",
                index: int = 0) -> Optional[int]:
         """Show a menu; return the index of the chosen entry, or None for back."""
         numbers = self._numbering(items)
+        described = any(item.detail for item in items)
+        keys = self.keys_help + (" · ? what each entry does · ?4 only entry 4"
+                                 if described else "")
         while True:
             top, body, bottom, _ = self._parts(title, header, items, footer)
             for line in top + body + bottom:
                 self.write(line)
-            answer = self.read(self.style.dim(f"[{self.keys_help}] ") + "> ").strip().lower()
+            answer = self.read(self.style.dim(f"[{keys}] ") + "> ").strip().lower()
+            if answer.startswith("?") or answer in ("h", "help"):
+                wanted = answer.lstrip("?").strip()
+                if wanted.isdigit() and int(wanted) in numbers:
+                    self._describe(items, numbers.index(int(wanted)))
+                else:
+                    self._describe(items)
+                self.pause()
+                continue
             if answer in ("b", "back", ""):
                 return None
             if answer in ("q", "quit", "exit"):
@@ -592,8 +702,8 @@ class PlainUI:
         """Ask for a line of text.  ``check`` converts it and raises ValueError
         with a readable message if it is not acceptable.  Empty keeps the default."""
         while True:
-            if hint:
-                self.write(self.style.dim("  " + hint))
+            for line in self._wrapped(hint) if hint else []:
+                self.write(self.style.dim("  " + line))
             suffix = f" [{default}]" if default != "" else ""
             text = self.read(f"  {prompt}{suffix}: ").strip()
             if text == "":
@@ -767,7 +877,7 @@ def edit_setting(ui: PlainUI, setting: Setting, value):
         limits.append(f"at least {setting.minimum:g}")
     if setting.maximum is not None:
         limits.append(f"at most {setting.maximum:g}")
-    hint = setting.help + (f" ({', '.join(limits)})" if limits else "")
+    hint = setting.help + (f" Allowed: {', '.join(limits)}." if limits else "")
     if setting.kind == "str":
         hint += " Type - for empty."
         text = ui.ask(setting.label, str(value), hint=hint)
@@ -832,9 +942,15 @@ def screen_train(ui: PlainUI, project: Project, runner: Runner) -> None:
         base_values = project.base_values(base)
         command = train_command(base, base_values, values)
         items = [
-            Item("Run now"),
-            Item("Starting configuration", base or "built-in defaults"),
-            Item("Data", data_label(project, values)),
+            Item("Run now", detail="Start the training with the settings below. The exact "
+                                   "command is shown at the bottom of this screen."),
+            Item("Starting configuration", base or "built-in defaults",
+                 detail="The set of values everything starts from: the built-in defaults or a "
+                        "file from runConfigurations/. Whatever you change below is added on "
+                        "top of it and marked with *."),
+            Item("Data", data_label(project, values),
+                 detail="Which worlds the formulas are trained on. A world is one batch of "
+                        "about 100 jobs together with the satellites that can run them."),
         ]
         rows: List[Optional[Setting]] = [None, None, None]
         for group in GROUPS:
@@ -843,10 +959,16 @@ def screen_train(ui: PlainUI, project: Project, runner: Runner) -> None:
             for setting in (s for s in SETTINGS if s.group == group):
                 changed = values[setting.key] != base_values[setting.key]
                 items.append(Item(setting.label,
-                                  show_value(values[setting.key]) + ("  *" if changed else "")))
+                                  show_value(values[setting.key]) + ("  *" if changed else ""),
+                                  detail=setting.help))
                 rows.append(setting)
-        items += [Item("", heading=True), Item("Save these settings as a configuration..."),
-                  Item("Back to the main menu")]
+        items += [Item("", heading=True),
+                  Item("Save these settings as a configuration...",
+                       detail="Write the values on this screen to a new file in "
+                              "runConfigurations/, so the same run can be started again with "
+                              "./run NAME or picked here as a starting configuration."),
+                  Item("Back to the main menu",
+                       detail="Leave this screen. Changes that were not saved are lost.")]
         rows += [None, None, None]
         save_at, back_at = len(items) - 2, len(items) - 1
         footer = "Command:  " + display(command) + "\n* = changed from the starting configuration"
@@ -926,17 +1048,38 @@ def screen_generate(ui: PlainUI, project: Project, runner: Runner) -> None:
         command = generator_command(source, orbit_file, options)
         worlds = options["runs"] * 30
         items = [
-            Item("Generate now", f"about {worlds} worlds; takes well under a minute"),
-            Item("Orbits", source_text),
-            Item("Independent runs", f"{options['runs']}  (30 worlds each)"),
-            Item("Random seed", str(options["seed"])),
-            Item("Requests per second", f"{options['rate']:g}  (the thesis uses 2 to 10)"),
+            Item("Generate now", f"about {worlds} worlds; takes well under a minute",
+                 detail="Run the generator with the settings below. The files in the output "
+                        "folder are replaced."),
+            Item("Orbits", source_text,
+                 detail="The file of satellite orbits the simulation uses. A different file "
+                        "gives different data, so keep one file and reuse it."),
+            Item("Independent runs", f"{options['runs']}  (30 worlds each)",
+                 detail="Each run simulates 300 seconds, starting 10 minutes after the "
+                        "previous one, when other satellites are overhead. Runs do not "
+                        "influence each other, so more runs give more varied worlds."),
+            Item("Random seed", str(options["seed"]),
+                 detail="Fixes the random requests. The same orbit file, settings and seed "
+                        "give exactly the same data."),
+            Item("Requests per second", f"{options['rate']:g}  (the thesis uses 2 to 10)",
+                 detail="How many requests arrive per second on average. The thesis studies "
+                        "2, 4, 6, 8 and 10; the original log matches 10."),
             Item("Battery per satellite [J]", f"{options['energy_budget']:g}  "
-                                              "(the thesis uses 80000 to 120000)"),
-            Item("Scheduler of the simulated system", str(options["policy"])),
-            Item("Energy CPU frequency", str(options["energy_cpu_hz"])),
-            Item("Output folder", str(options["output_dir"])),
-            Item("Back"),
+                                              "(the thesis uses 80000 to 120000)",
+                 detail="Energy every satellite starts with, in joules. Batteries never "
+                        "recharge during a run."),
+            Item("Scheduler of the simulated system", str(options["policy"]),
+                 detail="How the simulated system itself assigns requests while the log is "
+                        "recorded. OrbitAware also requires a request to finish before the "
+                        "satellite leaves the user's sky; DTS checks deadline and energy only."),
+            Item("Energy CPU frequency", str(options["energy_cpu_hz"]),
+                 detail="The processor frequency used to charge energy: the one input the "
+                        "thesis does not report. 'calibrate' picks the value for which the "
+                        "simulation comes closest to the two published figures."),
+            Item("Output folder", str(options["output_dir"]),
+                 detail="Where trace.csv, the worlds, visibility.csv and report.json are "
+                        "written."),
+            Item("Back", detail="Return to the Data menu without generating."),
         ]
         footer = "Command:  " + display(command)
         if options["output_dir"] == "data/realistic" and project.count_worlds(REALISTIC_WORLDS):

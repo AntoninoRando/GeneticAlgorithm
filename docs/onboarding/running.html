@@ -54,11 +54,15 @@ Change what you like, then choose Run now.
   Fitness
  20  Fixed-bound fitness         on  *
 
+  Run now
+  Start the training with the settings below. The exact command is shown at
+  the bottom of this screen.
+
 Command:  python3 main.py --no-start-prompt --generations 300 --max-depth 4
           --fixed-bounds --worlds-dir data/realistic/worlds
 * = changed from the starting configuration</pre>
 </div>
-<figcaption>The training screen. The line at the bottom is the command the menu will run.</figcaption>
+<figcaption>The training screen. Under the list: what the highlighted entry does. At the bottom: the command the menu will run.</figcaption>
 </figure>
 <div class="table-wrap"><table>
 <tr><th>Menu entry</th><th>What it runs</th><th>Step on this page</th></tr>
@@ -69,6 +73,7 @@ Command:  python3 main.py --no-start-prompt --generations 300 --max-depth 4
 <tr><td>Thesis experiments</td><td>The baselines with the energy ceiling, <code>run_ablation.py</code>, <code>run_experiments.py</code>, <code>make_report.py</code>.</td><td><a href="#experiments">8</a></td></tr>
 <tr><td>Documentation, Tools</td><td>Serves this guide on <code>localhost:8000</code>; plots a saved world; starts gdb.</td><td><a href="#debug">9</a></td></tr>
 </table></div>
+<p><strong>Every setting explains itself.</strong> On the training screen and the data generator, the lines under the list say what the highlighted entry does and what a larger or smaller value changes, and they follow the cursor. With <code>--plain</code>, type <code>?</code> for all descriptions or <code>?7</code> for entry 7. The same text is shown when you type a new value. The descriptions are the <code>help</code> strings of the <code>SETTINGS</code> table in <code>menu.py</code>; the <a href="#config">flag table</a> below and <a href="evolution.html">One generation</a> go deeper.</p>
 <p>The menu adds nothing of its own. Every entry builds one of the commands described below, <strong>prints it</strong>, and runs it, so whatever you did through the menu you can repeat, script, or paste into your notes. Entries that cannot work yet say why (no data, module not built, <code>cmake</code> missing). Results of experiments on generated data go to their own folder automatically.</p>
 <div class="callout"><span class="callout-title">Read the rest of this page anyway</span>
 <p>The menu spares you the typing, not the understanding. The steps below explain what each command does and what its output means.</p></div>

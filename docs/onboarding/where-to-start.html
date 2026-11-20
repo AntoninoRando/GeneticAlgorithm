@@ -67,7 +67,7 @@
 <h3>…I want to change a genetic operator or a GP parameter</h3>
 <ol>
   <li>Operators: <code>tree_operators.h</code>. Loop and selection: <code>solveNextGeneration()</code> in <code>scheduler_gp.h</code>.</li>
-  <li>New parameter: add it to <code>initialize()</code> with a default that reproduces the old behaviour, then to <code>py::arg</code> in <code>bindings.cpp</code>, then to <code>GAConfig</code>, <code>default_config()</code>, argparse and <code>_dest_to_key</code> in <code>main.py</code>, and one row to <code>SETTINGS</code> in <code>menu.py</code> so the menu offers it (<code>tests/test_menu.py</code> fails until the two agree).</li>
+  <li>New parameter: add it to <code>initialize()</code> with a default that reproduces the old behaviour, then to <code>py::arg</code> in <code>bindings.cpp</code>, then to <code>GAConfig</code>, <code>default_config()</code>, argparse and <code>_dest_to_key</code> in <code>main.py</code>, and one row to <code>SETTINGS</code> in <code>menu.py</code> so the menu offers it (<code>tests/test_menu.py</code> fails until the two agree). The row's <code>help</code> text is what the menu shows the user: say what the setting does and what turning it up, down, on or off changes.</li>
   <li>All randomness must use the pair's <code>mt19937</code>, so seeded runs stay reproducible.</li>
   <li>Add a test to <code>tests/test_paper_features.py</code> and an ablation configuration to <code>thesis/experiments/run_ablation.py</code>.</li>
 </ol>
