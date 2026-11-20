@@ -13,6 +13,8 @@
 *.sh        text eol=lf
 /run        text eol=lf
 Dockerfile  text eol=lf
+# Started as ./menu.py: with CRLF its "#!/usr/bin/env python3" line fails on Linux.
+/menu.py    text eol=lf
 
 # Never touch binary files.
 *.pdf   binary

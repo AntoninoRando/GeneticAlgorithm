@@ -81,6 +81,7 @@
 <div class="table-wrap"><table>
 <tr><th>File</th><th>Role</th></tr>
 <tr><td><a href="../../main.py"><code>main.py</code></a></td><td>CLI and configuration layering (<code>resolve_config</code>), world loading, the generation loop, convergence-triggered world switching, metrics and logs.</td></tr>
+<tr><td><a href="../../menu.py"><code>menu.py</code></a></td><td>Interactive menu (<code>./menu.py</code>) over every command of the project: training with any setting, data, build, tests, experiments, documentation. It only builds a command, shows it and runs it. Its <code>SETTINGS</code> table mirrors the options of <code>main.py</code> (see <a href="running.html#menu">Day one</a>).</td></tr>
 <tr><td><a href="../../data_processing/data_factory.py"><code>data_processing/data_factory.py</code></a></td><td>Builds <code>Job</code> and <code>Satellite</code> objects from a world CSV (<code>create_jobs_from_csv</code>, <code>create_satellites_from_csv</code>), plus dummy random generators.</td></tr>
 <tr><td><a href="../../data_processing/demo_data.py"><code>data_processing/demo_data.py</code></a></td><td>Writes a synthetic task log with the real columns and splits it into worlds in <code>data/demo/</code>, for <code>main.py --demo</code>. Demonstrations only: its numbers mean nothing.</td></tr>
 <tr><td><a href="../../data_processing/realistic_trace/"><code>data_processing/realistic_trace/</code></a></td><td>The <a href="realistic-data.html">realistic trace generator</a>, for working without the original log: <code>orbits.py</code> (real Starlink orbits, SGP4, elevation), <code>scenario.py</code> (every parameter with its source), <code>simulator.py</code> (discrete-event simulation of the published model), <code>generate.py</code> (runs, calibration, files in <code>data/realistic/</code>). Nothing else imports it.</td></tr>
@@ -91,6 +92,7 @@
 <tr><td><a href="../../tests/test_paper_features.py"><code>tests/test_paper_features.py</code></a></td><td>Deterministic unittest checks of the literature features.</td></tr>
 <tr><td><a href="../../tests/test_config.py"><code>tests/test_config.py</code></a></td><td>Checks the configuration layering of <code>main.py</code> (defaults, JSON file, typed flags).</td></tr>
 <tr><td><a href="../../tests/test_demo_data.py"><code>tests/test_demo_data.py</code></a></td><td>Checks demo mode: the synthetic log, its worlds, and <code>main.py --demo</code> end to end.</td></tr>
+<tr><td><a href="../../tests/test_menu.py"><code>tests/test_menu.py</code></a></td><td>Checks the menu: its settings table against <code>main.py</code>, the commands it builds, and scripted sessions.</td></tr>
 <tr><td><a href="../../tests/test_realistic_trace.py"><code>tests/test_realistic_trace.py</code></a></td><td>Checks the realistic trace generator: geometry, model equations, energy conservation, reproducibility, file format, and <code>main.py --worlds-dir</code>.</td></tr>
 <tr><td><code>thesis/experiments/</code></td><td><code>run_experiments.py</code> (main study and baselines), <code>run_ablation.py</code> (options vs baseline), <code>make_report.py</code> (LaTeX tables and plots).</td></tr>
 </table></div>

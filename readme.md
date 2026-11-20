@@ -56,6 +56,18 @@ _More information specified in the [documentation](/docs/build/latex/schedulerli
 
 ## Building and Running the Project
 
+### Interactive menu
+
+`./menu.py` is a menu over every command below: build, data, training with any setting, tests, experiments, documentation.
+
+```shell
+./menu.py              # arrow keys and Enter, or the number of an entry; q goes back
+./menu.py --plain      # numbered menus only (any terminal, also Windows: python menu.py --plain)
+./menu.py --dry-run    # show the commands without running them
+```
+
+It only builds a command, prints it and runs it, so anything done through the menu can be repeated by hand. The training screen starts from the built-in defaults or a file in `runConfigurations/`, lets you change any setting and the data, and can save the result as a new named configuration. It uses the Python standard library only.
+
 ### Requirements
 
 - python

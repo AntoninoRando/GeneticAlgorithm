@@ -32,6 +32,47 @@
   <li><a href="#debug">Debug the C++ from Python</a></li>
 </ol></div>
 
+<h2 id="menu">Prefer a menu? <code>./menu.py</code></h2>
+<p>Everything on this page can also be done from one interactive menu, without remembering a command:</p>
+<pre>./menu.py              <span class="c"># arrow keys and Enter, or the number of an entry; q goes back</span>
+./menu.py --plain      <span class="c"># numbered menus only: any terminal, also Windows</span>
+./menu.py --dry-run    <span class="c"># show the commands, run nothing: safe for looking around</span></pre>
+<figure>
+<div class="frame">
+<pre>Train a scheduling formula
+Change what you like, then choose Run now.
+
+&gt; 1  Run now
+  2  Starting configuration      built-in defaults
+  3  Data                        generated realistic data, 150 worlds
+
+  Search
+  4  Generations                 300  *
+  5  Population size             100
+  6  Maximum tree depth          4  *
+  ...
+  Fitness
+ 20  Fixed-bound fitness         on  *
+
+Command:  python3 main.py --no-start-prompt --generations 300 --max-depth 4
+          --fixed-bounds --worlds-dir data/realistic/worlds
+* = changed from the starting configuration</pre>
+</div>
+<figcaption>The training screen. The line at the bottom is the command the menu will run.</figcaption>
+</figure>
+<div class="table-wrap"><table>
+<tr><th>Menu entry</th><th>What it runs</th><th>Step on this page</th></tr>
+<tr><td>Train a scheduling formula</td><td><code>python3 main.py …</code> with the data, the starting configuration and the settings you picked. It can save them as a new file in <code>runConfigurations/</code>.</td><td><a href="#run">4</a>, <a href="#config">5</a></td></tr>
+<tr><td>Data</td><td>The <a href="realistic-data.html">realistic trace generator</a>, the world splitter, the demo data, and a summary of what is on the machine.</td><td><a href="#data">2</a></td></tr>
+<tr><td>Build the C++ module</td><td><code>scripts/build.sh</code>, a rebuild from scratch, the debug build.</td><td><a href="#build">3</a></td></tr>
+<tr><td>Run the tests</td><td>All tests or one file.</td><td><a href="#tests">7</a></td></tr>
+<tr><td>Thesis experiments</td><td>The baselines with the energy ceiling, <code>run_ablation.py</code>, <code>run_experiments.py</code>, <code>make_report.py</code>.</td><td><a href="#experiments">8</a></td></tr>
+<tr><td>Documentation, Tools</td><td>Serves this guide on <code>localhost:8000</code>; plots a saved world; starts gdb.</td><td><a href="#debug">9</a></td></tr>
+</table></div>
+<p>The menu adds nothing of its own. Every entry builds one of the commands described below, <strong>prints it</strong>, and runs it, so whatever you did through the menu you can repeat, script, or paste into your notes. Entries that cannot work yet say why (no data, module not built, <code>cmake</code> missing). Results of experiments on generated data go to their own folder automatically.</p>
+<div class="callout"><span class="callout-title">Read the rest of this page anyway</span>
+<p>The menu spares you the typing, not the understanding. The steps below explain what each command does and what its output means.</p></div>
+
 <h2 id="env">1. Get an environment</h2>
 <p>The project is developed on <strong>Linux inside a VS Code dev container</strong>. The <code>scheduler</code> module is a compiled extension (a <code>.so</code> file) that only loads in the Python version and on the CPU it was built for. For that reason it is <strong>not stored in git</strong>: every machine builds its own copy (step 3), and the container does it for you on first start.</p>
 <ol>
@@ -156,6 +197,7 @@ cmake --build build --target scheduler</pre>
 <p><a href="../../tests/test_config.py"><code>tests/test_config.py</code></a> checks the three configuration layers of step 5 (defaults, file, typed flags) through <code>main.resolve_config()</code>.</p>
 <p><a href="../../tests/test_demo_data.py"><code>tests/test_demo_data.py</code></a> checks demo mode: the synthetic log is reproducible and has the real columns, the splitter and the data factory read it, and <code>main.py --demo</code> runs end to end with the same result for the same seed. It writes to a temporary folder and needs no data.</p>
 <p><a href="../../tests/test_realistic_trace.py"><code>tests/test_realistic_trace.py</code></a> checks the realistic trace generator: the orbit geometry against textbook values, the model equations, that energy is conserved, that a seed fixes the output, the file format, and <code>main.py --worlds-dir</code> end to end. It builds an idealised constellation in code, so it needs neither data nor a network, but it is skipped if the <code>sgp4</code> package is not installed.</p>
+<p><a href="../../tests/test_menu.py"><code>tests/test_menu.py</code></a> checks the menu: that its table of settings matches <code>main.py</code> (every flag it can produce is accepted and means what the menu shows), the commands it builds, whole sessions through the numbered menus, and one session with real key presses in a pseudo-terminal. Sessions run in dry-run mode, so nothing is executed.</p>
 <p>Tests that read <code>data/worlds</code> are reported as <em>skipped</em> when the data is missing; the others build small worlds in code. <strong>Continuous integration</strong> (CI, a service that runs checks automatically) does the same on GitHub: <a href="../../.github/workflows/ci.yml"><code>.github/workflows/ci.yml</code></a> builds the module and runs this command on every push and pull request. It has no data, so it runs only the tests that need none.</p>
 
 <h2 id="experiments">8. Re-run the thesis experiments</h2>

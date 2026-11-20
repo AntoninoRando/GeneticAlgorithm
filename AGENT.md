@@ -43,6 +43,7 @@ Key files & directories
 - `data_processing/data_factory.py`: dataset / snapshot helpers.
 - `data_processing/realistic_trace/`: generator of a realistic task log (real Starlink orbits + a re-implementation of the original simulator) for working without `data/example.csv`. Writes `data/realistic/`; needs the `sgp4` package. Not imported by `main.py`.
 - `main.py`, `run` (launcher script), and `scripts/`: runners and helper scripts.
+- `menu.py`: interactive menu (`./menu.py`, `--plain`, `--dry-run`) over all commands. It only builds, shows and runs commands. Its `SETTINGS` table must list every option of `main.py`: when you add, rename or change the default of a `main.py` option, update that table (`tests/test_menu.py` checks it).
 - `tests/`: unit tests.
 - `metrics/` and `snapshots/`: run outputs (not tracked).
 

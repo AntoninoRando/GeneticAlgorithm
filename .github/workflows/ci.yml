@@ -46,6 +46,9 @@ jobs:
             bash -n "$f"
             if grep -q $'\r' "$f"; then echo "::error file=$f::CRLF line endings"; exit 1; fi
           done
+          # menu.py is started as ./menu.py: it must be executable and use LF too.
+          if grep -q $'\r' menu.py; then echo "::error file=menu.py::CRLF line endings"; exit 1; fi
+          test -x menu.py || { echo "::error file=menu.py::not executable"; exit 1; }
 
       - name: Configure
         run: >
