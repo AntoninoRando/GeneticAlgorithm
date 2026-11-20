@@ -189,7 +189,11 @@ def main():
     ap.add_argument("--out", default="thesis/experiments/results_ablation")
     ap.add_argument("--configs", default=",".join(CONFIGS))
     ap.add_argument("--procs", type=int, default=max(1, (os.cpu_count() or 2) - 1))
+    ap.add_argument("--worlds-dir", default=None,
+                    help="Directory of pre-split worlds (default data/worlds, or $GA_WORLDS_DIR).")
     a = ap.parse_args()
+    if a.worlds_dir:
+        os.environ[rx.WORLDS_DIR_ENV] = a.worlds_dir     # inherited by the workers
     os.makedirs(a.out, exist_ok=True)
     names = [n for n in a.configs.split(",") if n]
 

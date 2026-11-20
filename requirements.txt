@@ -2,3 +2,6 @@
 # Installed automatically inside the dev container (see .devcontainer/postCreate.sh).
 numpy
 matplotlib
+# Orbit propagation for the realistic trace generator (data_processing/realistic_trace).
+# Only that generator and its tests need it; main.py runs without it.
+sgp4

@@ -57,7 +57,7 @@
 
 <h2>Where the data comes from</h2>
 <p><code>data/example.csv</code> is the task log of one 300-minute run of the discrete-event simulator of Magliarisi et al. (<a href="references.html#magliarisi2025orbit">magliarisi2025orbit</a>). That simulator uses real Starlink orbits and models each satellite as a queue. The log has one row per task: its type, execution and transfer time, image size, number of routing hops, queue length, the server (satellite) that ran it, and its remaining energy. <code>config.json5</code> holds the simulator settings that produced it.</p>
-<p>The file is <strong>not in git</strong>. Ask your supervisor for it.</p>
+<p>The file is <strong>not in git</strong>. Ask your supervisor for it. If you cannot get it, <a href="realistic-data.html">Realistic data</a> generates a log with the same columns from the same model, on real Starlink orbits; the simulator itself is public too (<a href="references.html#cosmos2025">cosmos2025</a>).</p>
 
 <h2>Step 1: split into worlds</h2>
 <p><a href="../../data_processing/csv_preprocessing/world_splitter.py"><code>world_splitter.py</code></a> puts each row into a 10-minute window, \([0,10), [10,20), \dots\), using its <code>Arrival Time (System)</code>. Each non-empty window becomes a <strong>world</strong>: 30 files of about 100 tasks each, plus a <code>manifest.json</code>.</p>
@@ -101,10 +101,13 @@
   <li>Columns listed in <code>_IGNORED_CSV_COLUMNS</code> (task ID, status, start/end time, server name…) are deliberately <strong>not</strong> used as job features. Most of them are <em>outcomes</em> of the simulator's own scheduler and would leak the answer.</li>
 </ul>
 
+<h2 id="realistic">No original log? Realistic data</h2>
+<p><a href="../../data_processing/realistic_trace/"><code>data_processing/realistic_trace</code></a> re-implements the simulator of Magliarisi et al. on real Starlink orbits and writes <code>data/realistic/trace.csv</code> with the 27 columns of the original file, then runs the same splitter to get <code>data/realistic/worlds/</code> (150 worlds by default). <code>main.py --worlds-dir data/realistic/worlds</code>, or <code>./run realistic</code>, trains on them, and steps 2 to 4 above are unchanged. Unlike demo mode this data is meant for experiments, as long as it is always labelled as generated. The model, its sources, how close it is to the published figures and its limits are on <a href="realistic-data.html">Realistic data</a>.</p>
+
 <h2 id="demo">No data yet? Demo mode</h2>
 <p><a href="../../data_processing/demo_data.py"><code>data_processing/demo_data.py</code></a> writes a <strong>synthetic</strong> log with the same columns, <code>data/demo/trace.csv</code> (about 600 tasks, 60 minutes, 12 made-up satellites, Poisson arrivals at 10 per minute), and runs the same splitter on it to get 6 worlds in <code>data/demo/worlds/</code>. <code>main.py --demo</code> trains on those. Steps 2 to 4 above are then exactly the same. The generator is a toy that is not fitted to the real log, so its results must never be reported or compared. Details on <a href="demo.html#demo-mode">giving a demo</a>.</p>
 
-<p class="updated">Last checked against the code on 2026-11-19.</p>
+<p class="updated">Last checked against the code on 2026-11-20.</p>
 </main>
 </div>
 </body>

@@ -22,6 +22,7 @@
     { group: "The code", items: [
       { href: "architecture.html",  title: "Architecture map" },
       { href: "data.html",          title: "Data pipeline" },
+      { href: "realistic-data.html", title: "Realistic data" },
       { href: "decoder.html",       title: "Decoder & fitness" },
       { href: "evolution.html",     title: "One generation, step by step" }
     ]},

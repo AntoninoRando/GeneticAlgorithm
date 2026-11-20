@@ -1,0 +1,15 @@
+{
+    "worlds_dir":            "data/realistic/worlds",
+    "seed":                  1,
+    "generations":           300,
+    "population_size":       100,
+    "max_depth":             4,
+    "hoist_rate":            0.05,
+    "convergence_threshold": 10,
+    "csv_row_limit":         0,
+    "print_every":           50,
+    "collect_metrics":       true,
+    "metrics_prefix":        "realistic",
+    "inspect_snapshots":     false,
+    "save_snapshots":        false
+}

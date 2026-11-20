@@ -51,6 +51,10 @@ class GAConfig(TypedDict):
     # Synthetic demo data instead of data/worlds (data_processing/demo_data.py).
     # For demonstrations only: the numbers it produces mean nothing.
     demo: bool
+    # Directory of pre-split worlds to train on.  The default is the real
+    # simulator log; data_processing/realistic_trace writes its own worlds to
+    # data/realistic/worlds (see runConfigurations/realistic.json).
+    worlds_dir: str
 
 
 # Where --demo writes its synthetic trace and worlds.  A module constant so the
@@ -89,6 +93,7 @@ def default_config() -> GAConfig:
         snapshots_prefix="",
         print_every=50,
         demo=False,
+        worlds_dir="data/worlds",
     )
 
 
@@ -212,6 +217,11 @@ parser.add_argument("--demo", action=argparse.BooleanOptionalAction,
                          "data/worlds/, so the program runs without the real simulation log. "
                          "For demonstrations only: the results mean nothing "
                          "(see data_processing/demo_data.py). './run demo' uses it.")
+parser.add_argument("--worlds-dir", type=str,
+                    help="Directory of pre-split worlds to train on (world_*.csv + manifest.json). "
+                         "Default data/worlds, the real simulator log. Use data/realistic/worlds "
+                         "for the worlds written by 'python3 -m data_processing.realistic_trace' "
+                         "('./run realistic' does).")
 #endregion
 
 
@@ -322,8 +332,16 @@ def run_genetic_algorithm(config: GAConfig):
         print("The pipeline is the real one, the data is a toy: do not report or")
         print("compare these numbers (see data_processing/demo_data.py).")
         print("=" * 72)
-    elif world_paths := [str(path) for path in load_world_paths("data/worlds")]:
-        print(f"Loaded {len(world_paths)} pre-processed world(s) from data/worlds/.")
+    elif world_paths := [str(path) for path in load_world_paths(config["worlds_dir"])]:
+        print(f"Loaded {len(world_paths)} pre-processed world(s) from {config['worlds_dir']}/.")
+    elif config["worlds_dir"] != default_config()["worlds_dir"]:
+        # A worlds directory was asked for by name: do not fall back silently
+        # to another data set.
+        raise SystemExit(
+            f"No worlds found in {config['worlds_dir']}/ (no manifest.json or world_*.csv).\n"
+            "To generate realistic worlds from real Starlink orbits run\n"
+            "    python3 -m data_processing.realistic_trace --download\n"
+            "(see 'Realistic data' in readme.md).")
     else:
         world_paths = ["data/example.csv"]
         # data/ is not in the repository (.gitignore), so on a fresh clone

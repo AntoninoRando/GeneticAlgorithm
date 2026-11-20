@@ -83,6 +83,7 @@
 <tr><td><a href="../../main.py"><code>main.py</code></a></td><td>CLI and configuration layering (<code>resolve_config</code>), world loading, the generation loop, convergence-triggered world switching, metrics and logs.</td></tr>
 <tr><td><a href="../../data_processing/data_factory.py"><code>data_processing/data_factory.py</code></a></td><td>Builds <code>Job</code> and <code>Satellite</code> objects from a world CSV (<code>create_jobs_from_csv</code>, <code>create_satellites_from_csv</code>), plus dummy random generators.</td></tr>
 <tr><td><a href="../../data_processing/demo_data.py"><code>data_processing/demo_data.py</code></a></td><td>Writes a synthetic task log with the real columns and splits it into worlds in <code>data/demo/</code>, for <code>main.py --demo</code>. Demonstrations only: its numbers mean nothing.</td></tr>
+<tr><td><a href="../../data_processing/realistic_trace/"><code>data_processing/realistic_trace/</code></a></td><td>The <a href="realistic-data.html">realistic trace generator</a>, for working without the original log: <code>orbits.py</code> (real Starlink orbits, SGP4, elevation), <code>scenario.py</code> (every parameter with its source), <code>simulator.py</code> (discrete-event simulation of the published model), <code>generate.py</code> (runs, calibration, files in <code>data/realistic/</code>). Nothing else imports it.</td></tr>
 <tr><td><a href="../../data_processing/csv_preprocessing/world_splitter.py"><code>…/csv_preprocessing/world_splitter.py</code></a></td><td>One-off preprocessing: splits the raw log into 10-minute worlds with normalised arrival times.</td></tr>
 <tr><td><a href="../../utils.py"><code>utils.py</code></a></td><td>CSV loading, locale-aware number parsing (<code>"2,17E+10"</code>), and linear <code>_rescale</code>.</td></tr>
 <tr><td><a href="../../metrics_tracker.py"><code>metrics_tracker.py</code></a></td><td><code>GenerationMetrics</code> dataclass and <code>MetricsCollector</code> (CSV, NPZ, PNG).</td></tr>
@@ -90,6 +91,7 @@
 <tr><td><a href="../../tests/test_paper_features.py"><code>tests/test_paper_features.py</code></a></td><td>Deterministic unittest checks of the literature features.</td></tr>
 <tr><td><a href="../../tests/test_config.py"><code>tests/test_config.py</code></a></td><td>Checks the configuration layering of <code>main.py</code> (defaults, JSON file, typed flags).</td></tr>
 <tr><td><a href="../../tests/test_demo_data.py"><code>tests/test_demo_data.py</code></a></td><td>Checks demo mode: the synthetic log, its worlds, and <code>main.py --demo</code> end to end.</td></tr>
+<tr><td><a href="../../tests/test_realistic_trace.py"><code>tests/test_realistic_trace.py</code></a></td><td>Checks the realistic trace generator: geometry, model equations, energy conservation, reproducibility, file format, and <code>main.py --worlds-dir</code>.</td></tr>
 <tr><td><code>thesis/experiments/</code></td><td><code>run_experiments.py</code> (main study and baselines), <code>run_ablation.py</code> (options vs baseline), <code>make_report.py</code> (LaTeX tables and plots).</td></tr>
 </table></div>
 
@@ -106,7 +108,7 @@
 <h3>What is deliberately not in git</h3>
 <ul>
   <li><strong>The compiled module</strong> (<code>scheduler*.so</code>) and <code>build/</code>: built per machine, stale after any C++ change.</li>
-  <li><strong>The data</strong> (<code>data/</code>): see <a href="running.html#data">Day one, step 2</a>. The synthetic demo data in <code>data/demo/</code> is regenerated on every <code>--demo</code> run, so it is not committed either.</li>
+  <li><strong>The data</strong> (<code>data/</code>): see <a href="running.html#data">Day one, step 2</a>. The synthetic demo data in <code>data/demo/</code> is regenerated on every <code>--demo</code> run, so it is not committed either. The same goes for the orbit file in <code>data/orbits/</code> and the generated log in <code>data/realistic/</code>: keep the orbit file yourself, because a later download gives a different trace.</li>
   <li><strong>Run outputs</strong> (<code>metrics/</code>, <code>snapshots/</code>).</li>
   <li><strong>Generated documentation</strong> (<code>docs/build</code>, except the linked PDF) and the papers in <code>thesis/papers/</code>.</li>
 </ul>

@@ -138,6 +138,26 @@ This writes `data/worlds/world_000.csv`, ... and `data/worlds/manifest.json` (de
 
 It goes through the real pipeline, so it is good for showing or trying the program, but the data is a toy: never report or compare its numbers. A presenter's script is in the onboarding guide (`docs/onboarding/demo.html`).
 
+### Realistic data
+
+If you cannot get the original log, `data_processing/realistic_trace` generates one with the same 27 columns. It re-implements the simulator that produced `data/example.csv` (Magliarisi's PhD thesis, Chapter 6, with the settings in `config.json5`) on **real Starlink orbits** from CelesTrak, propagated with SGP4. It needs the `sgp4` package (in `requirements.txt`).
+
+```shell
+python3 -m data_processing.realistic_trace --download   # first time: fetches the orbits (about 1.7 MB)
+python3 -m data_processing.realistic_trace              # later: reuses data/orbits/starlink.csv
+./run realistic --no-start-prompt                       # = python3 main.py -c realistic --no-start-prompt
+```
+
+This writes `data/realistic/trace.csv`, `data/realistic/worlds/` (150 worlds from 5 independent 300-second runs by default), `visibility.csv` and `report.json`. The generator prints how its output compares with the figures published in the thesis. Any worlds directory can be used with `python3 main.py --worlds-dir DIR`, and the experiment scripts take the same flag.
+
+Three things to know:
+
+- It is **generated data, not the original log**. Say so wherever you use it, and never mix its results with results on `data/worlds/`.
+- CelesTrak allows one download every two hours. Keep the orbit file: the same file, seed and options give the same trace byte for byte, and `report.json` records the file's SHA-256.
+- `--walker` uses an idealised constellation instead of a file, for trying the program offline. It is not Starlink: never report its numbers.
+
+The model, its sources and its limits are in the onboarding guide (`docs/onboarding/realistic-data.html`). The original simulator is public as well (`https://github.com/DMagliarisi/COSMOS`, no licence file): running it is the way to get a log in the original format from the original code.
+
 ### Line endings
 
 `.gitattributes` keeps shell scripts (`*.sh`, `run`) in LF on every platform, so a Windows checkout still works inside the Linux dev container. If a script fails with `bash\r: No such file or directory`, your copy predates that file: run `git add --renormalize . && git checkout -- run scripts .devcontainer`.

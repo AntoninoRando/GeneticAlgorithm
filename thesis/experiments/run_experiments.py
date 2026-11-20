@@ -13,6 +13,11 @@ from data_processing.data_factory import create_jobs_from_csv, create_satellites
 from data_processing.csv_preprocessing import load_world_paths
 
 N_TRAIN, ROW_LIMIT, TOP_K = 20, 100, 20          # worlds 0..19 train, 20.. test
+# Worlds to train and test on.  The default is the real simulator log.  Set the
+# environment variable GA_WORLDS_DIR (or pass --worlds-dir, which sets it) to
+# use another set, e.g. data/realistic/worlds from data_processing/realistic_trace.
+# An environment variable, so that the worker processes of run_ablation.py see it.
+WORLDS_DIR_ENV, DEFAULT_WORLDS_DIR = "GA_WORLDS_DIR", "data/worlds"
 REG = buildTerminalRegistry()
 TERM = {t.name: i for i, t in enumerate(REG)}
 OPS = {NodeType.ADD: "+", NodeType.SUB: "-", NodeType.MUL: "*", NodeType.DIV: "/?",
@@ -47,7 +52,11 @@ BASELINES = {
 
 
 def load_worlds():
-    paths = [str(p) for p in load_world_paths("data/worlds")]
+    worlds_dir = os.environ.get(WORLDS_DIR_ENV, DEFAULT_WORLDS_DIR)
+    paths = [str(p) for p in load_world_paths(worlds_dir)]
+    if len(paths) <= N_TRAIN:
+        raise SystemExit(f"{worlds_dir}: {len(paths)} world(s) found, but more than {N_TRAIN} are "
+                         "needed (the first 20 train, the rest test).")
     snaps = []
     for i, p in enumerate(paths):
         seed = 1000 + i                      # same world for every method
@@ -105,8 +114,17 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--out", default="thesis/experiments/results")
     ap.add_argument("--seeds", type=int, default=10)
+    ap.add_argument("--worlds-dir", default=None,
+                    help="Directory of pre-split worlds (default data/worlds, or $GA_WORLDS_DIR).")
+    ap.add_argument("--baselines-only", action="store_true",
+                    help="Print the hand-written baselines on the test worlds and stop. They are "
+                         "deterministic, take a second and write no file: a quick way to compare "
+                         "two sets of worlds.")
     a = ap.parse_args()
-    os.makedirs(a.out, exist_ok=True)
+    if a.worlds_dir:
+        os.environ[WORLDS_DIR_ENV] = a.worlds_dir
+    if not a.baselines_only:
+        os.makedirs(a.out, exist_ok=True)
     train_s, test_s = load_worlds()
     print(f"{len(train_s)} train worlds, {len(test_s)} test worlds", flush=True)
 
@@ -117,8 +135,14 @@ def main():
     for name, tree in BASELINES.items():
         P[0].tree = tree
         base[name] = mean_metrics(fe, P[0], test_s)
+    if a.baselines_only:
+        print(f"{'baseline':26s} {'C':>7s} {'R':>8s} {'E':>8s}")
+        for name, (c, r, e) in base.items():
+            print(f"{name:26s} {c:7.3f} {r:8.2f} {e:8.1f}")
+        return
     res = dict(baselines=base, defaults={k: (list(v) if isinstance(v, tuple) else v) for k, v in DEF.items()},
-               n_train=len(train_s), n_test=len(test_s), runs=[])
+               n_train=len(train_s), n_test=len(test_s),
+               worlds_dir=os.environ.get(WORLDS_DIR_ENV, DEFAULT_WORLDS_DIR), runs=[])
 
     cache = {}
     def run(cfg, seed):

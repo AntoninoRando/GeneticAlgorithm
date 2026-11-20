@@ -566,3 +566,22 @@ Tuning the window length changes the number and size of worlds (the data is
 - **C++ not exercised in-sandbox** — the Python logic is covered by tests, but
   the integrated GA should be run in the Docker container to confirm fitness
   behaviour against the real scheduler.
+
+---
+
+## 14. Other sources of worlds (added 2026-11-20)
+
+The splitter and the loader described above do not care where the raw log comes
+from. Two generators in this package write a log with the same columns and call
+the same splitter:
+
+| Source | Module | Output | Use |
+|---|---|---|---|
+| Demo data | `demo_data.py` | `data/demo/` | Shows that the program runs. A toy: never report its numbers. |
+| Realistic data | `realistic_trace/` | `data/realistic/` | Experiments without the original log. A re-implementation of the original simulator on real Starlink orbits; always label it as generated. |
+
+`main.py --worlds-dir DIR` trains on any worlds directory (default `data/worlds`).
+The realistic generator works in **seconds**, which is very likely the true unit
+of the original log as well (the simulator's settings give a simulated time of
+300 s): read "minute" in this document as "time unit of the log". Details:
+`docs/onboarding/realistic-data.html`.

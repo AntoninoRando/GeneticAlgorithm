@@ -49,6 +49,12 @@
 <h3 id="dead">Four terminals never vary</h3>
 <p><code>sat.cpuBusyUntil</code>, <code>sat.networkBusyUntil</code>, <code>sat.energyReserved</code> and <code>sat.loadRatio</code> are 0 for every satellite in our data: 4 of 18 terminals (7 job + 11 satellite), about 22% of uniform draws.</p>
 
+<h3 id="seconds">The "minutes" are very likely seconds</h3>
+<p>The code, this guide and the thesis call the time unit of the data a minute (a "300-minute simulation", "10-minute worlds"). The simulator's own settings say otherwise: <code>config.json5</code> has <code>simulation_duration: 300</code>, and the thesis that describes the simulator gives the simulated time as 300 s and the arrival rate as up to 10 requests per second (<a href="references.html#magliarisi2026thesis">magliarisi2026thesis</a>, Table 6.3), which matches the 2960 rows of the log. The data would then cover five minutes, and a world ten seconds. Results do not change, because the loader rescales every time per world, but the wording in <code>problem.tex</code> and on these pages should be checked with your supervisor and corrected. The <a href="realistic-data.html">realistic trace generator</a> works in seconds.</p>
+
+<h3 id="orbits-unused">The orbits never reach the formula</h3>
+<p>The simulator knows when each satellite leaves the listening dome, but the log has no such column. <code>create_satellites_from_csv</code> therefore draws each satellite's sunset at random, 300 to 600 time units after the snapshot, and derives its "elevation angle" from the mean queue length. The realistic trace generator writes the true elevations and sunsets to <code>data/realistic/visibility.csv</code>; nothing reads that file yet.</p>
+
 <h2>Inconsistencies in the code and docs</h2>
 <div class="table-wrap"><table>
 <tr><th>Where</th><th>What</th></tr>
@@ -56,7 +62,7 @@
 <tr><td><code>main.py</code></td><td>The crossover rate (0.80) and mutation rate (0.08) are not passed to <code>initialize()</code>, so the binding defaults always apply. The fitness weights are not exposed either.</td></tr>
 <tr><td><code>CMakeLists.txt</code></td><td>The flags are no longer GCC-only, but a build with MSVC on Windows has never been tried. Expect work there (the headers use <code>using namespace std</code> at global scope).</td></tr>
 <tr><td><code>runConfigurations/default.json</code></td><td>Has a <code>jobsCSV</code> block that nothing reads; the ignored columns are hard-coded in <code>data_factory.py</code>.</td></tr>
-<tr><td><code>config.json5</code></td><td>Upstream simulator configuration; nothing here reads it.</td></tr>
+<tr><td><code>config.json5</code></td><td>Upstream simulator configuration; nothing here reads it. The defaults of <code>data_processing/realistic_trace/scenario.py</code> are copied from it by hand, so a change here does not change the generated data.</td></tr>
 <tr><td><code>data_factory.py</code></td><td>CSV satellites get <code>cpuCapacity</code>, <code>networkCapacity</code>, <code>latency</code> and <code>bandwidth</code> scaled twice (× 0.2, then × 0.22 inside the perturbation). This only changes the magnitude of those terminals.</td></tr>
 <tr><td><code>thesis/references.bib</code></td><td>The <code>icdcs_sc</code> entry still has <code>TODO</code> for venue and year.</td></tr>
 </table></div>

@@ -35,11 +35,13 @@ python3 main.py --no-start-prompt --generations 5
 ```
 or `scripts/run.sh` (build, then run), or `./run <config>` for a named file in `runConfigurations/`.
 - The input data (`data/`) is not in the repository either; without it `main.py` stops with a message and the data-dependent tests are skipped. See "Data" in `readme.md`.
+- Without the original log, generate realistic data and train on it: `python3 -m data_processing.realistic_trace --download`, then `./run realistic --no-start-prompt` (or `python3 main.py --worlds-dir data/realistic/worlds`). It is generated data: label it as such and never mix its results with results on `data/worlds/`. See "Realistic data" in `readme.md`.
 
 Key files & directories
 - `bindings.cpp`: Python bindings / glue.
 - `include/scheduler`: public headers and core types.
 - `data_processing/data_factory.py`: dataset / snapshot helpers.
+- `data_processing/realistic_trace/`: generator of a realistic task log (real Starlink orbits + a re-implementation of the original simulator) for working without `data/example.csv`. Writes `data/realistic/`; needs the `sgp4` package. Not imported by `main.py`.
 - `main.py`, `run` (launcher script), and `scripts/`: runners and helper scripts.
 - `tests/`: unit tests.
 - `metrics/` and `snapshots/`: run outputs (not tracked).

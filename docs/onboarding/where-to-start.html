@@ -84,6 +84,13 @@
   <li>Check the rescaling ranges in <code>data_factory.py</code>: they are fixed numbers, not read from the data.</li>
 </ol>
 
+<h3>…I cannot get the original data</h3>
+<ol>
+  <li>Generate realistic data: <code>python3 -m data_processing.realistic_trace --download</code>, then <code>./run realistic</code>. Read <a href="realistic-data.html">Realistic data</a> before you use a single number from it.</li>
+  <li>To change what is generated (arrival rate, battery, ground position, the simulated scheduler), follow the table at the end of that page. Parameters live in <code>data_processing/realistic_trace/scenario.py</code>, each with its source: a new value needs a source too.</li>
+  <li>Run <code>python3 -m unittest tests.test_realistic_trace -v</code> and update the validation table of that page with the figures the generator prints.</li>
+</ol>
+
 <h3>…a run gives strange results</h3>
 <ol>
   <li>Re-run with <code>--seed</code> to make it reproducible.</li>

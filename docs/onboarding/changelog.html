@@ -19,6 +19,19 @@
 <h1>Changelog</h1>
 <p class="lede">One dated entry per change to this guide, newest first. Say which pages changed and which code change made them necessary.</p>
 
+<h2>2026-11-20: realistic data without the original log</h2>
+<ul>
+  <li><strong>Code change:</strong> new package <code>data_processing/realistic_trace</code> (<code>orbits.py</code>, <code>scenario.py</code>, <code>simulator.py</code>, <code>generate.py</code>): a re-implementation of the simulator of Magliarisi et al. on real Starlink orbits (CelesTrak elements, SGP4) that writes a task log with the original 27 columns to <code>data/realistic/</code> and splits it into worlds. New <code>--worlds-dir</code> flag and <code>worlds_dir</code> key in <code>main.py</code>, the same flag in the two experiment scripts, <code>runConfigurations/realistic.json</code>, <code>sgp4</code> in <code>requirements.txt</code>, a <code>--baselines-only</code> flag in <code>run_experiments.py</code>, and <code>tests/test_realistic_trace.py</code> (39 tests). Without the new flag nothing changes. <strong>No change to the GP, the decoder, the fitness or the loader.</strong></li>
+  <li><strong>Realistic data</strong> (new page, in "The code"): the three kinds of data, how to generate and use the realistic one, the model step by step with its equations, the one fitted parameter and how it is fitted, a comparison with the published figures and with the baselines recorded on the original worlds, the source of every parameter, where the program differs from the thesis text, the limits, and how to cite generated data.</li>
+  <li><strong>Data pipeline:</strong> new section "No original log? Realistic data"; "ask your supervisor" now names the alternatives.</li>
+  <li><strong>Day one:</strong> the generator in the "No worlds?" box and the examples, <code>--worlds-dir</code> in the flag table, the new test file, and <code>--worlds-dir</code> for the experiment scripts.</li>
+  <li><strong>Known quirks:</strong> two new entries: the time unit of the data is very likely seconds, not minutes; the real orbits never reach the formula. The <code>config.json5</code> row now says its values are copied by hand into the generator.</li>
+  <li><strong>Architecture, Where to start, Welcome:</strong> the new package and test file; what is not in git; a recipe "I cannot get the original data"; a pointer.</li>
+  <li><strong>Glossary:</strong> nine terms (buffer zone, calibration, deadline, discrete-event simulation, elevation angle, listening dome, orbital elements, realistic data, SGP4).</li>
+  <li><strong>References:</strong> added the simulator's public source code (<code>cosmos2025</code>, checked through the GitHub API) and the SGP4 reference (<code>vallado2006spacetrack</code>, already in the bibliography, metadata checked again on Crossref, not read). Thesis Chapter 6 of <code>magliarisi2026thesis</code> was read for the model. Notes in <code>thesis/literature_notes.md</code> §11.</li>
+  <li><strong>Not done:</strong> the generator has not been compared with the original log (not available) and has only been run on an incomplete orbit file (about half the constellation). No GP experiment on generated data exists.</li>
+</ul>
+
 <h2>2026-11-20: the scheduler in 3D</h2>
 <ul>
   <li><strong>Guide change only.</strong> No change to the C++ core, the Python runners or the algorithm, so no new references.</li>

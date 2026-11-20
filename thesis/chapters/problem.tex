@@ -37,3 +37,99 @@ world the arrival times are shifted so that the earliest task arrives at minute 
 the scheduler only depends on the relative arrival pattern. Satellites are built from the server
 profiles found in the world's rows. The snapshot time is set to the last arrival, so every task of
 the world is available to the decoder. Chapter~\ref{ch:impl} describes the pipeline.
+
+\section{Generated Simulation Data}
+\label{sec:generated-data}
+The log above is not distributed with the code. So that the method can be run and studied
+without it, the project includes a generator (\texttt{data\_processing/realistic\_trace}) that
+produces a log with the same columns. It is an independent re-implementation of the simulation
+model of \citet[Chapter~6]{magliarisi2026thesis}, the energy-aware extension of
+\citet{magliarisi2025orbit}, written from the thesis, from the simulator's settings file and from
+the behaviour of its public source code \citep{cosmos2025}. \textbf{No result in this thesis was
+obtained on generated data.} Any future result on it must be labelled as such and kept apart from
+results on the original log. The time unit of this section is the second, as in
+\citet[Table~6.3]{magliarisi2026thesis}.
+
+\paragraph{Geometry.}
+Satellite positions come from the orbital elements of the Starlink constellation published by
+CelesTrak, propagated with SGP4 \citep{vallado2006spacetrack}, the same chain as the original
+simulator. Let $\boldsymbol\rho_s(t)$ be the vector from the ground user (Rome) to satellite $s$
+in an Earth-fixed frame and $\hat{\mathbf u}$ the local vertical. The elevation angle is
+\begin{equation}
+  \varphi_s(t) = \arcsin\frac{\boldsymbol\rho_s(t)\cdot\hat{\mathbf u}}{\lVert\boldsymbol\rho_s(t)\rVert}.
+\end{equation}
+Every $\Delta t = 2$\,s the network consists of the satellites with $\varphi_s > 25^\circ$.
+Those with $\varphi_s \ge \varphi_{\max} = 40^\circ$ (the listening dome) can execute requests,
+and their residual visibility is $T^{res}_s(t) = t^{LOS}_s - t$, where $t^{LOS}_s$ is the first
+later time at which $\varphi_s < \varphi_{\max}$. Two satellites are neighbours when they are
+less than $d_{\max} = 659$\,km apart. The access points are the $n_{AP} = 5$ dome satellites
+nearest to the user among those whose distance to the user is decreasing.
+
+\paragraph{Workload.}
+Requests arrive as a Poisson process of rate $\lambda = 10$\,s$^{-1}$ over $\Delta T = 300$\,s.
+A request $r$ is generic, CPU-intensive or CPU-and-data-intensive with probabilities
+$(0.4, 0.35, 0.25)$. It has a CPU demand $c_r$, exponentially distributed with mean $0.05$\,s
+(generic) or $0.5$\,s, and a payload $s_r$. With $b^{isl} = 2150$\,MB/s, its network demand and
+its deadline, relative to its arrival, are \citep[Eqs.~6.1--6.2]{magliarisi2026thesis}
+\begin{equation}
+  c^{net}_r = \frac{s_r}{b^{isl}}, \qquad D_r = (1+\delta_D)\,(c_r + c^{net}_r), \quad \delta_D = 0.1 .
+\end{equation}
+
+\paragraph{Energy.}
+Each satellite starts with a budget $B_s = 100$\,kJ that is never recharged. Executing $r$ costs
+\citep[Eq.~6.3]{magliarisi2026thesis}
+\begin{equation}
+  \varepsilon^{cpu}_r = e\,c_r\,C^3, \qquad \varepsilon^{net}_r = P_{net}\,c^{net}_r,
+  \qquad e = 5\times10^{-26},\quad P_{net} = 1\,\text{W},
+\end{equation}
+where $C$ is the CPU frequency. A node admits a request only if its residual budget, minus the
+energy already reserved for admitted requests, covers this cost.
+
+\paragraph{Scheduler of the simulated system.}
+Each node has a CPU stage and a network stage with $m = 5$ parallel slots each, served first come
+first served. The waiting time of a stage is estimated as
+\begin{equation}
+  W = r_{\min} + \frac{\max(0,\; A - m\,r_{\min})}{m},
+\end{equation}
+where $A$ is the total remaining work of the stage (running and queued) and $r_{\min}$ the
+shortest remaining time among the running requests if all slots are busy, and $0$ otherwise. A
+request enters at the access point with the highest score
+\begin{equation}
+  \sigma_j(r) = w_e\,\frac{B_j}{B_{\max}} - w_R\,\frac{W_j}{D_r}, \qquad w_e = 0.7,\quad w_R = 0.3,
+\end{equation}
+with $B_{\max}$ the largest budget among the access points, and $\sigma_j = -\infty$ if node $j$
+cannot meet the deadline or lacks the energy. The access point then considers its neighbours in
+the dome in decreasing order of $\sigma_j$ and assigns the request to the first one whose
+estimated completion time $\hat T_j$ satisfies $\hat T_j < D_r$ and, for the OrbitAware policy,
+$\hat T_j < T^{res}_j$. If there is none the request is rejected. This is the behaviour of the
+public code, which differs from the text of \citet[Section~6.3.1]{magliarisi2026thesis} in several
+points (selection by score instead of minimum response time, a different waiting-time estimate, no
+relocation); the differences are listed in the project documentation.
+
+\paragraph{Calibration.}
+The original simulator charges $\varepsilon^{cpu}_r$ with a single frequency $C$ per run, drawn
+uniformly from $[10\,\text{MHz}, 10\,\text{GHz}]$ and not reported. Since the energy grows with
+$C^3$, the generator fits it instead: with $S(C)$ the success rate and $G(C)$ the share of
+rejections due to energy, both averaged over three runs,
+\begin{equation}
+  C^\star = \arg\min_{C \in [1,10]\,\text{GHz}} \big(S(C) - 0.757\big)^2 + \big(G(C) - 0.61\big)^2 ,
+\end{equation}
+where $0.757$ and $0.61$ are the values reported for OrbitAware at $\lambda = 10$\,s$^{-1}$ and
+$B_s = 100$\,kJ \citep[Section~6.5.1]{magliarisi2026thesis}. One parameter cannot match two
+values exactly, and the residual is reported with every generated data set. On the orbital
+elements of 19 November 2026, with $4774$ satellites (an incomplete download, about half the
+constellation), $C^\star = 4.64$\,GHz and five runs gave $S = 0.717$ and $G = 0.605$. These are
+the only two published quantities the generator was compared with. It was not compared with the
+original log. As an indirect check, the four hand-written baselines of
+Chapter~\ref{ch:exp} were run on the $130$ generated test worlds through the same loader and
+decoder: their completion ratios ($0.197$, $0.272$, $0.210$ and $0.218$ for FCFS, shortest job
+first, least-loaded and most energy left) have the same ranking as on the original test worlds and
+differ from the values of Table~\ref{tab:main} by at most $6\%$, as do their response times and
+energies. Because the loader rescales every world to fixed ranges, this shows that the generated
+worlds have the size and shape the pipeline expects, not that the two simulations agree. It is a
+single data seed and no statistical test was applied.
+
+\paragraph{Output.}
+Each run of $300$\,s gives a log of about $3000$ rows (completed and rejected requests), which the
+pipeline of Chapter~\ref{ch:impl} splits into $30$ worlds of $10$\,s. Runs with different seeds
+and start times are independent, so the number of worlds is no longer limited to $30$.

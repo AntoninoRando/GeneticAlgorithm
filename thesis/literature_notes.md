@@ -405,3 +405,46 @@ configurations `depthmut`, `depthx`, `depthops` and `depthops+clones+worlds3`
 in `thesis/experiments/run_ablation.py` are there to measure it; `clones` is
 the natural comparison, because clone retries remove parent copies after the
 fact and the two effects should overlap.
+
+## 11. Sources of the realistic trace generator (2026-11-20)
+
+`data_processing/realistic_trace` generates a task log with the columns of `data/example.csv` for use when the original log is not available. It changes nothing in the GP, the decoder, the fitness or the loader. It is part of the evaluation protocol in the sense that it produces problem instances, so its sources are recorded here. Guide page: `docs/onboarding/realistic-data.html`. Thesis: Section "Generated Simulation Data" of `problem.tex`.
+
+**What was read, and how.** A research sub-agent fetched the sources on 2026-11-20 and reported sections, tables and equation numbers; I then read the passages below myself in its text extraction of the thesis PDF.
+
+| Bib key | Source | What was read |
+|---|---|---|
+| `magliarisi2026thesis` | PhD thesis, open-access PDF (8 MB) converted to text | Sub-agent: Chapters 3, 4, 5 and 6 in full, Sec. 2.2 and Chapter 7; figures not readable as numbers. **Read by me:** Sec. 6.2 (request model, Eqs. 6.1 to 6.3, Table 6.1), Sec. 6.3.1 (feasibility, Eqs. 6.4 to 6.8, the waiting-time estimate), Table 6.2, Table 6.3 and Sec. 6.5.1 to 6.5.3 |
+| `magliarisi2025orbit` | Journal article, Springer HTML | Sub-agent: all sections and Tables 1 to 5. **Checked by me:** the sentences on the buffer zone (25 to 40 degrees), the 40 satellites per scheduling instant and the time in the dome (25 to 176 s, mean 138.53 s) |
+| `cosmos2025` | Public source code, 23 files | Sub-agent: all files except the two ILP modules. **Read by me:** the request flow, the selection of the node, the waiting-time estimate, the score, the result routing and the code that writes the result file. Read for behaviour only; nothing was executed and no code was copied |
+| `vallado2006spacetrack` | SGP4 reference | **Not read.** Metadata checked again on Crossref (DOI 10.2514/6.2006-6753) |
+| (no key) | `config.json5` in this repository | The settings file of the run that produced `data/example.csv`. Identical to the `config.json5` of `cosmos2025` |
+
+**`cosmos2025` is a new entry.** It is a GitHub repository, not a paper: public, created 2025-12-18, last push 2026-06-07, no licence file (checked through the GitHub API). Neither the article nor the thesis links to it (thesis Sec. 4.1 says the code will be released when the paper is accepted). The attribution rests on the owner's account name, the README and the fact that its `config.json5` is the file already in this project. Because there is no licence, the generator re-implements the model and does not reuse the code; whether the original program may be run or redistributed is a question for its author.
+
+**What each source supports.**
+
+- *Model and equations* (network demand, deadline, energy, feasibility): thesis Eqs. 6.1 to 6.5. The energy model is attributed by the thesis to its reference [61] (Zhou et al.), which I did not open and did not add to the bibliography.
+- *Parameter values*: thesis Table 6.3 and `config.json5`. The text extraction of Table 6.3 separated the names from the values; the pairing was done by order and agrees with `config.json5` for every value that appears in both.
+- *Payload size ranges*: only in `cosmos2025` (`img_resolution.json5`). The thesis gives the mixing weights and no sizes.
+- *Geometry* (Starlink elements from CelesTrak, SGP4, dome at 40 degrees, links below 659 km, five access points, AP-Optimal): the article Sec. 3 and 5.1, thesis Eq. 5.2 and Table 6.3.
+- *Validation targets*: thesis Sec. 6.5.1, the only numbers in Chapter 6 that are not plots: OrbitAware reaches about 75.7% success at 10 requests per second, and about 61% of its rejections are for insufficient energy.
+
+**Where the program differs from the thesis text** (the generator follows the program, because the log it replaces was written by the program). The full list is on the guide page. The three that matter most:
+
+1. *Service demand.* Table 6.3 gives uniform distributions, U(0.01, 0.1) and U(0.1, 1). The program draws an exponential with the mean in `config.json5` (0.05 and 0.5 s) and does not apply the bounds.
+2. *Selection.* The text selects the feasible node with the smallest estimated response time (Eq. 6.7). The program sorts the candidates by a score, w_e B/B_max - w_R W/D with weights 0.7 and 0.3 from `config.json5`, and takes the first that passes the deadline and sunset tests.
+3. *Waiting-time estimate.* The text gives W = (sum of the queued demands) + 0.5 c_r. With the deadline D = 1.1 (c + c_net) of Eq. 6.2 this makes every request infeasible, since R = W_cpu + c + W_net + c_net >= 1.5 (c + c_net) > D. This is my own derivation from the two formulas, not a statement of the thesis. The program uses a work-based estimate instead.
+
+**The fitted parameter.** The program charges CPU energy with one frequency per run, drawn uniformly from 10 MHz to 10 GHz, which the thesis does not report. The generator fits it by least squares to the two validation targets. This is a calibration of an unreported input, not a choice supported by a paper; it is described as such in the thesis section and on the guide page. On an incomplete orbit file (4774 satellites, epoch 2026-11-19) the fit gave 4.64 GHz, success 0.717 and energy share 0.605 over five runs.
+
+**An indirect check against the original data.** `docs/onboarding/results.html` records the four hand-written baselines on the 10 original test worlds. On the 130 generated test worlds (`run_experiments.py --worlds-dir data/realistic/worlds --baselines-only`) they give C = 0.197, 0.272, 0.210, 0.218 against 0.204, 0.268, 0.216, 0.214, with response times and energies within 6% as well and the same ranking. The loader rescales every world to fixed ranges, so this mostly shows that the generated worlds have about the same number of tasks and servers as the original ones. One data seed, no statistical test.
+
+**What is not established.**
+
+- The generator has never been compared with `data/example.csv` itself, which was not available.
+- It has only been run on an incomplete download of the orbital elements (about half the constellation). The figures above will change with a complete file.
+- Only two published numbers were available for validation. Response times, energy per node, hop counts and results at other arrival rates exist in the thesis only as plots.
+- The public repository may not be the exact program version that produced the thesis figures or `data/example.csv`.
+- A possible inconsistency in this project, found while reading: the thesis and `config.json5` give the simulated time as 300 **seconds**, while `problem.tex`, the code and the guide describe the data as a 300-**minute** simulation. The 2960 rows of the log match 10 requests per second for 300 s. This needs to be confirmed with the supervisor; nothing was changed in `problem.tex`.
+- No GP experiment has been run on generated data.
